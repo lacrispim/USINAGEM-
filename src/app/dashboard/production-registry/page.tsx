@@ -45,7 +45,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection } from '@/firebase';
-import { addDoc, collection, serverTimestamp, orderBy, query, limit, deleteDoc, doc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, orderBy, query, limit, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { format, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
@@ -596,6 +596,25 @@ export default function ProductionRegistryPage() {
     }
   };
 
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    if (!firestore) return;
+    const recordRef = doc(firestore, 'productionRecords', id);
+    try {
+      await updateDoc(recordRef, { status: newStatus });
+      toast({
+        title: 'Status Atualizado',
+        description: `O status do registro foi alterado para ${newStatus}.`,
+      });
+    } catch (error) {
+      console.error('Error updating status: ', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o status.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const { toast } = useToast();
 
   return (
@@ -677,7 +696,27 @@ export default function ProductionRegistryPage() {
                           <TableCell>{record.quantityProduced}</TableCell>
                           <TableCell>{record.machiningTime} min</TableCell>
                            <TableCell>
-                            <Badge variant={record.status ? statusVariantMap[record.status] : "default"}>{record.status}</Badge>
+                                <Select
+                                value={record.status}
+                                onValueChange={(newStatus) =>
+                                    handleStatusChange(record.id, newStatus)
+                                }
+                                >
+                                <SelectTrigger className={cn("w-full", `bg-${statusVariantMap[record.status]}`)}>
+                                    <SelectValue placeholder="Selecione um status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Fila de produção">
+                                    Fila de produção
+                                    </SelectItem>
+                                    <SelectItem value="Em produção">
+                                    Em produção
+                                    </SelectItem>
+                                    <SelectItem value="Encerrado">Encerrado</SelectItem>
+                                    <SelectItem value="Rejeitado">Rejeitado</SelectItem>
+                                    <SelectItem value="Enviado">Enviado</SelectItem>
+                                </SelectContent>
+                                </Select>
                           </TableCell>
                           <TableCell>
                             {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
@@ -774,5 +813,3 @@ export default function ProductionRegistryPage() {
     </div>
   );
 }
-
-    
