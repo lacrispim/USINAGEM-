@@ -45,9 +45,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection } from '@/firebase';
-import { addDoc, collection, serverTimestamp, orderBy, query, limit } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, orderBy, query, limit, deleteDoc, doc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ptBR } from 'date-fns/locale';
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
@@ -168,7 +169,7 @@ const ProductionFormContent = () => {
                                   )}
                                 >
                                   {field.value ? (
-                                    format(field.value, 'PPP')
+                                    format(field.value, 'PPP', { locale: ptBR })
                                   ) : (
                                     <span>Escolha uma data</span>
                                   )}
@@ -185,6 +186,7 @@ const ProductionFormContent = () => {
                                   date > new Date() || date < new Date('1900-01-01')
                                 }
                                 initialFocus
+                                locale={ptBR}
                               />
                             </PopoverContent>
                           </Popover>
@@ -326,7 +328,7 @@ const ProductionFormContent = () => {
                         <FormItem>
                         <FormLabel>Tempo de Usinagem (minutos)</FormLabel>
                         <FormControl>
-                            <Input type="number" {...field} />
+                            <Input type="number" value={field.value || ''} onChange={(e) => field.onChange(e.target.valueAsNumber)} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -435,7 +437,7 @@ const LossFormContent = () => {
                                   )}
                                 >
                                   {field.value ? (
-                                    format(field.value, 'PPP')
+                                    format(field.value, 'PPP', { locale: ptBR })
                                   ) : (
                                     <span>Escolha uma data</span>
                                   )}
@@ -452,6 +454,7 @@ const LossFormContent = () => {
                                   date > new Date() || date < new Date('1900-01-01')
                                 }
                                 initialFocus
+                                locale={ptBR}
                               />
                             </PopoverContent>
                           </Popover>
@@ -551,7 +554,7 @@ const LossFormContent = () => {
                         <FormItem>
                           <FormLabel>Tempo Perdido (minutos)</FormLabel>
                           <FormControl>
-                             <Input type="number" {...field} />
+                             <Input type="number" value={field.value || ''} onChange={(e) => field.onChange(e.target.valueAsNumber)} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -585,7 +588,25 @@ export default function ProductionRegistryPage() {
   const lossRecordsQuery = firestore ? query(collection(firestore, 'lossRecords'), orderBy('createdAt', 'desc'), limit(10)) : null;
   const { data: lossRecords, loading: loadingLoss } = useCollection(lossRecordsQuery);
 
-  const formId = React.useId(); // Keep for potential unique IDs if needed elsewhere
+  const handleDelete = async (collectionName: string, id: string) => {
+    if (!firestore) return;
+    try {
+      await deleteDoc(doc(firestore, collectionName, id));
+      toast({
+        title: 'Registro Excluído',
+        description: 'O registro foi excluído com sucesso.',
+      });
+    } catch (error) {
+      console.error('Error deleting record: ', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir o registro.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const { toast } = useToast();
 
   return (
     <div className="flex flex-col gap-6">
@@ -672,7 +693,7 @@ export default function ProductionRegistryPage() {
                             {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
                           </TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete('productionRecords', record.id)}>
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           </TableCell>
@@ -740,7 +761,7 @@ export default function ProductionRegistryPage() {
                            {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon">
+                           <Button variant="ghost" size="icon" onClick={() => handleDelete('lossRecords', record.id)}>
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </TableCell>
@@ -763,3 +784,5 @@ export default function ProductionRegistryPage() {
     </div>
   );
 }
+
+    
