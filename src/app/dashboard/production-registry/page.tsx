@@ -64,16 +64,38 @@ export default function ProductionRegistryPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="production-order">Ordem de Produção</Label>
-                <Input id="production-order" placeholder="Ex: OP-12345" />
-              </div>
-              <div className="space-y-2">
+             <div className="space-y-2">
                 <Label htmlFor="operator-id-prod">ID do Operador</Label>
                 <Input id="operator-id-prod" placeholder="Ex: OP-001" />
               </div>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="factory">Fábrica</Label>
+                <Select>
+                  <SelectTrigger id="factory">
+                    <SelectValue placeholder="Selecione a fábrica" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="factory-1">Fábrica 1</SelectItem>
+                    <SelectItem value="factory-2">Fábrica 2</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="forms-number">Número do forms</Label>
+                <Input id="forms-number" placeholder="Ex: F-1024" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="activity-type">Tipo de Atividade</Label>
+                <Select>
+                  <SelectTrigger id="activity-type">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="usinagem">USINAGEM</SelectItem>
+                    <SelectItem value="montagem">MONTAGEM</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             <div className="space-y-2">
               <Label htmlFor="machine-prod">Máquina</Label>
               <Select>
@@ -87,16 +109,18 @@ export default function ProductionRegistryPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="part-code">Código da Peça</Label>
-                <Input id="part-code" placeholder="Ex: PC-5678" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantity-produced">Quantidade Produzida</Label>
-                <Input id="quantity-produced" type="number" defaultValue="0" />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="quantity-produced">Quantidade Produzida</Label>
+              <Input id="quantity-produced" type="number" defaultValue="0" />
             </div>
+             <div className="space-y-2">
+                <Label htmlFor="operations-number">Número de Operações</Label>
+                <Input id="operations-number" placeholder="Ex: 5" />
+              </div>
+               <div className="space-y-2">
+                <Label htmlFor="machining-time">Tempo de Usinagem (minutos)</Label>
+                <Input id="machining-time" type="number" defaultValue="0" />
+              </div>
             <ProductionTimer title="Cronômetro de Produção" />
             <Button className="w-full">Registrar Produção</Button>
           </CardContent>
