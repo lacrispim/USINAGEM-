@@ -59,6 +59,7 @@ export function AddRecordDialog() {
       toolWear: 0.01,
     },
   });
+  const id = React.useId();
 
   function onSubmit(values: FormValues) {
     // In a real application, you would send this data to your API
@@ -79,7 +80,7 @@ export function AddRecordDialog() {
           Add New Record
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent id={id} className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Machining Record</DialogTitle>
           <DialogDescription>
@@ -158,44 +159,4 @@ export function AddRecordDialog() {
                       <Input type="number" step="0.01" {...field} />
                     </FormControl>
                     <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-             <div className="grid grid-cols-2 gap-4">
-               <FormField
-                control={form.control}
-                name="surfaceFinish"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Surface Finish (Ra)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.1" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name="toolWear"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tool Wear (mm)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="submit">Save Record</Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
-}
+                  </Ite
