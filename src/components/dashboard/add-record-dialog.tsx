@@ -159,4 +159,42 @@ export function AddRecordDialog() {
                       <Input type="number" step="0.01" {...field} />
                     </FormControl>
                     <FormMessage />
-                  </Ite
+                  </FormItem>
+                )}
+              />
+            </div>
+             <FormField
+              control={form.control}
+              name="surfaceFinish"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Surface Finish (Ra)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.1" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="toolWear"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tool Wear (mm)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button type="submit">Save Record</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
