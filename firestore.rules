@@ -1,0 +1,16 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read and write access to production and loss records
+    // for development purposes.
+    // TODO: Secure these rules once user authentication is implemented.
+    match /productionRecords/{recordId} {
+      allow read, write: if true;
+    }
+
+    match /lossRecords/{recordId} {
+      allow read, write: if true;
+    }
+  }
+}
