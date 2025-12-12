@@ -42,13 +42,18 @@
           "type": "number",
           "description": "The time spent on machining, in minutes."
         },
+        "status": {
+            "type": "string",
+            "description": "The status of the production activity.",
+            "enum": ["Fila de produção", "Em produção", "Encerrado", "Rejeitado", "Enviado"]
+        },
         "createdAt": {
             "type": "string",
             "format": "date-time",
             "description": "The timestamp when the record was created."
         }
       },
-      "required": ["operatorId", "date", "createdAt"]
+      "required": ["operatorId", "date", "createdAt", "status"]
     },
     "lossRecord": {
       "title": "Loss Record",
@@ -111,3 +116,5 @@
     }
   }
 }
+
+    

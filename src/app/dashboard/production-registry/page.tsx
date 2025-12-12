@@ -60,6 +60,7 @@ const productionFormSchema = z.object({
   quantityProduced: z.coerce.number().optional(),
   operationsNumber: z.string().optional(),
   machiningTime: z.coerce.number().optional(),
+  status: z.string().optional(),
 });
 
 const lossFormSchema = z.object({
@@ -91,6 +92,7 @@ const ProductionFormContent = () => {
             quantityProduced: 0,
             operationsNumber: '',
             machiningTime: 0,
+            status: 'Em produção',
         },
     });
 
@@ -191,6 +193,43 @@ const ProductionFormContent = () => {
                         </FormItem>
                     )}
                     />
+                     <FormField
+                        control={productionForm.control}
+                        name="status"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <Select
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                            >
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o status" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                <SelectItem value="Fila de produção">
+                                    Fila de produção
+                                </SelectItem>
+                                <SelectItem value="Em produção">
+                                    Em produção
+                                </SelectItem>
+                                <SelectItem value="Encerrado">
+                                    Encerrado
+                                </SelectItem>
+                                 <SelectItem value="Rejeitado">
+                                    Rejeitado
+                                </SelectItem>
+                                 <SelectItem value="Enviado">
+                                    Enviado
+                                </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
                     <FormField
                     control={productionForm.control}
                     name="formsNumber"
@@ -240,7 +279,7 @@ const ProductionFormContent = () => {
                         <FormItem>
                         <FormLabel>Máquina</FormLabel>
                         <Select
-                            onValuechange={field.onChange}
+                            onValueChange={field.onChange}
                             defaultValue={field.value}
                         >
                             <FormControl>
@@ -521,6 +560,15 @@ const LossFormContent = () => {
     );
 }
 
+const statusVariantMap: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
+    'Fila de produção': 'outline',
+    'Em produção': 'secondary',
+    'Encerrado': 'default',
+    'Rejeitado': 'destructive',
+    'Enviado': 'default',
+};
+
+
 export default function ProductionRegistryPage() {
   const firestore = useFirestore();
 
@@ -629,7 +677,7 @@ export default function ProductionRegistryPage() {
                           <TableCell>{record.quantityProduced}</TableCell>
                           <TableCell>{record.machiningTime} min</TableCell>
                            <TableCell>
-                            <Badge>Concluído</Badge>
+                            <Badge variant={record.status ? statusVariantMap[record.status] : "default"}>{record.status}</Badge>
                           </TableCell>
                           <TableCell>
                             {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
@@ -726,3 +774,5 @@ export default function ProductionRegistryPage() {
     </div>
   );
 }
+
+    
