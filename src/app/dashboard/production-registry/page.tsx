@@ -23,9 +23,8 @@ import {
   Monitor,
   Smartphone,
   TrendingUp,
-  Play,
-  RotateCcw,
 } from 'lucide-react';
+import { ProductionTimer } from '@/components/dashboard/production-timer';
 
 export default function ProductionRegistryPage() {
   return (
@@ -65,39 +64,15 @@ export default function ProductionRegistryPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="operator-id-prod">ID do Operador</Label>
-              <Input id="operator-id-prod" placeholder="Ex: OP-001" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="factory-prod">Fábrica</Label>
-              <Select>
-                <SelectTrigger id="factory-prod">
-                  <SelectValue placeholder="Selecione a fábrica" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="factory-a">Fábrica A</SelectItem>
-                  <SelectItem value="factory-b">Fábrica B</SelectItem>
-                  <SelectItem value="factory-c">Fábrica C</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="form-number">Número do forms</Label>
-              <Input id="form-number" placeholder="Ex: F-1024" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="activity-type">Tipo de Atividade</Label>
-              <Select>
-                <SelectTrigger id="activity-type">
-                  <SelectValue placeholder="Selecione o tipo de atividade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="usinagem">USINAGEM</SelectItem>
-                  <SelectItem value="montagem">Montagem</SelectItem>
-                  <SelectItem value="inspecao">Inspeção</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="production-order">Ordem de Produção</Label>
+                <Input id="production-order" placeholder="Ex: OP-12345" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="operator-id-prod">ID do Operador</Label>
+                <Input id="operator-id-prod" placeholder="Ex: OP-001" />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="machine-prod">Máquina</Label>
@@ -112,36 +87,17 @@ export default function ProductionRegistryPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="quantity-produced">Quantidade Produzida</Label>
-              <Input id="quantity-produced" type="number" defaultValue="0" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="part-code">Código da Peça</Label>
+                <Input id="part-code" placeholder="Ex: PC-5678" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quantity-produced">Quantidade Produzida</Label>
+                <Input id="quantity-produced" type="number" defaultValue="0" />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="operations-number">Número de Operações</Label>
-              <Input id="operations-number" placeholder="Ex: 5" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="machining-time">
-                Tempo de Usinagem (minutos)
-              </Label>
-              <Input id="machining-time" type="number" defaultValue="0" />
-            </div>
-            <Card className="bg-card-foreground/5">
-              <CardContent className="p-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Cronômetro de Produção
-                </p>
-                <p className="text-4xl font-bold tracking-tighter">00:00:00</p>
-                <div className="mt-4 flex justify-center gap-2">
-                  <Button>
-                    <Play className="mr-2" /> Iniciar
-                  </Button>
-                  <Button variant="secondary">
-                    <RotateCcw className="mr-2" /> Zerar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <ProductionTimer title="Cronômetro de Produção" />
             <Button className="w-full">Registrar Produção</Button>
           </CardContent>
         </Card>
@@ -156,19 +112,6 @@ export default function ProductionRegistryPage() {
             <div className="space-y-2">
               <Label htmlFor="operator-id-loss">ID do Operador</Label>
               <Input id="operator-id-loss" placeholder="Ex: OP-001" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="factory-loss">Fábrica</Label>
-              <Select>
-                <SelectTrigger id="factory-loss">
-                  <SelectValue placeholder="Selecione a fábrica" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="factory-a">Fábrica A</SelectItem>
-                  <SelectItem value="factory-b">Fábrica B</SelectItem>
-                  <SelectItem value="factory-c">Fábrica C</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="machine-loss">Máquina</Label>
@@ -196,26 +139,7 @@ export default function ProductionRegistryPage() {
               </Label>
               <Input id="dead-parts-quantity" type="number" defaultValue="0" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="time-lost">Tempo Perdido (minutos)</Label>
-              <Input id="time-lost" type="number" defaultValue="0" />
-            </div>
-            <Card className="bg-card-foreground/5">
-              <CardContent className="p-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Cronômetro de Perda
-                </p>
-                <p className="text-4xl font-bold tracking-tighter">00:00:00</p>
-                <div className="mt-4 flex justify-center gap-2">
-                  <Button>
-                    <Play className="mr-2" /> Iniciar
-                  </Button>
-                  <Button variant="secondary">
-                    <RotateCcw className="mr-2" /> Zerar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <ProductionTimer title="Cronômetro de Perda" />
             <Button variant="destructive" className="w-full">
               Registrar Perda
             </Button>
