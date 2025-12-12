@@ -1,0 +1,155 @@
+'use client';
+
+import * as React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+  SidebarTrigger,
+  SidebarInset,
+} from '@/components/ui/sidebar';
+import {
+  BrainCircuit,
+  LayoutDashboard,
+  LogOut,
+  Settings,
+  Table2,
+} from 'lucide-react';
+import { Logo } from '@/components/logo';
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+
+  const menuItems = [
+    {
+      href: '/dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      href: '/dashboard/records',
+      label: 'Records',
+      icon: Table2,
+    },
+    {
+      href: '/dashboard/ai-recommendations',
+      label: 'AI Maintenance',
+      icon: BrainCircuit,
+    },
+  ];
+
+  return (
+    <SidebarProvider>
+      <Sidebar>
+        <SidebarHeader>
+          <Logo />
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarMenu>
+            {menuItems.map((item) => (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href}
+                  tooltip={item.label}
+                >
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarContent>
+        <SidebarFooter>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <SidebarMenuButton
+                className="justify-start"
+                tooltip="User Settings"
+              >
+                <Avatar className="h-7 w-7">
+                  <AvatarImage src="https://picsum.photos/seed/user-avatar/100/100" data-ai-hint="user avatar" alt="User" />
+                  <AvatarFallback>UR</AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium">User</span>
+              </SidebarMenuButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56 mb-2 ml-2">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/login">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarInset>
+        <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
+          <SidebarTrigger className="md:hidden" />
+          <div className="flex-1">
+             {/* Can add page title or search bar here */}
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" size="icon" className="rounded-full">
+                <Avatar>
+                  <AvatarImage src="https://picsum.photos/seed/user-avatar/100/100" data-ai-hint="user avatar" alt="User" />
+                  <AvatarFallback>UR</AvatarFallback>
+                </Avatar>
+                <span className="sr-only">Toggle user menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>Settings</DropdownMenuItem>
+              <DropdownMenuSeparator />
+               <DropdownMenuItem asChild>
+                <Link href="/login">
+                  Log out
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </header>
+        <main className="flex-1 p-4 lg:p-6">{children}</main>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
