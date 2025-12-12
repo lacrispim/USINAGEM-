@@ -32,7 +32,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -81,12 +81,17 @@ type LossFormValues = z.infer<typeof lossFormSchema>;
 const ProductionFormContent = () => {
     const { toast } = useToast();
     const firestore = useFirestore();
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     const productionForm = useForm<ProductionFormValues>({
         resolver: zodResolver(productionFormSchema),
         defaultValues: {
             operatorId: '',
-            date: format(new Date(), 'dd/MM/yyyy'),
+            date: '',
             factory: '',
             formsNumber: '',
             activityType: '',
@@ -98,6 +103,15 @@ const ProductionFormContent = () => {
             observations: '',
         },
     });
+
+     useEffect(() => {
+        if (isClient) {
+            productionForm.reset({
+                ...productionForm.getValues(),
+                date: format(new Date(), 'dd/MM/yyyy'),
+            });
+        }
+    }, [isClient, productionForm]);
 
     const machiningTime = useWatch({
         control: productionForm.control,
@@ -117,7 +131,19 @@ const ProductionFormContent = () => {
             title: 'Produção Registrada',
             description: 'Os dados de produção foram salvos com sucesso.',
         });
-        productionForm.reset();
+        productionForm.reset({
+             operatorId: '',
+            date: format(new Date(), 'dd/MM/yyyy'),
+            factory: '',
+            formsNumber: '',
+            activityType: '',
+            machine: '',
+            quantityProduced: 0,
+            operationsNumber: '',
+            machiningTime: 0,
+            status: 'Em produção',
+            observations: '',
+        });
         } catch (error) {
         console.error('Error adding production record: ', error);
         toast({
@@ -126,6 +152,10 @@ const ProductionFormContent = () => {
             variant: 'destructive',
         });
         }
+    }
+    
+    if (!isClient) {
+        return null; 
     }
 
     return (
@@ -379,12 +409,17 @@ const ProductionFormContent = () => {
 const LossFormContent = () => {
     const { toast } = useToast();
     const firestore = useFirestore();
+     const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     const lossForm = useForm<LossFormValues>({
         resolver: zodResolver(lossFormSchema),
         defaultValues: {
             operatorId: '',
-            date: format(new Date(), 'dd/MM/yyyy'),
+            date: '',
             machine: '',
             lossReason: '',
             deadPartsQuantity: 0,
@@ -393,6 +428,15 @@ const LossFormContent = () => {
             observations: '',
         },
     });
+
+     useEffect(() => {
+        if (isClient) {
+            lossForm.reset({
+                ...lossForm.getValues(),
+                date: format(new Date(), 'dd/MM/yyyy'),
+            });
+        }
+    }, [isClient, lossForm]);
 
     const timeLost = useWatch({
         control: lossForm.control,
@@ -412,7 +456,16 @@ const LossFormContent = () => {
             title: 'Perda Registrada',
             description: 'O registro de perda foi salvo com sucesso.',
         });
-        lossForm.reset();
+        lossForm.reset({
+             operatorId: '',
+            date: format(new Date(), 'dd/MM/yyyy'),
+            machine: '',
+            lossReason: '',
+            deadPartsQuantity: 0,
+            factory: '',
+            timeLost: 0,
+            observations: '',
+        });
         } catch (error) {
         console.error('Error adding loss record: ', error);
         toast({
@@ -422,6 +475,11 @@ const LossFormContent = () => {
         });
         }
     }
+    
+    if (!isClient) {
+        return null;
+    }
+
 
     return (
         <Card>
@@ -853,3 +911,5 @@ export default function ProductionRegistryPage() {
     </div>
   );
 }
+
+    
