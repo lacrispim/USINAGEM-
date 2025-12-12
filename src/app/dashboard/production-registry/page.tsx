@@ -32,6 +32,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
+import React from 'react';
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
@@ -56,6 +57,7 @@ type LossFormValues = z.infer<typeof lossFormSchema>;
 
 export default function ProductionRegistryPage() {
   const { toast } = useToast();
+  const formId = React.useId();
 
   const productionForm = useForm<ProductionFormValues>({
     resolver: zodResolver(productionFormSchema),
@@ -138,6 +140,7 @@ export default function ProductionRegistryPage() {
               <CardContent>
                 <Form {...productionForm}>
                   <form
+                    id={`production-form-${formId}`}
                     onSubmit={productionForm.handleSubmit(onProductionSubmit)}
                     className="space-y-4"
                   >
@@ -308,6 +311,7 @@ export default function ProductionRegistryPage() {
               <CardContent>
                 <Form {...lossForm}>
                   <form
+                    id={`loss-form-${formId}`}
                     onSubmit={lossForm.handleSubmit(onLossSubmit)}
                     className="space-y-4"
                   >
