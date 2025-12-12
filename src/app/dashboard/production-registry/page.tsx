@@ -745,7 +745,7 @@ export default function ProductionRegistryPage() {
                 <CardDescription>
                   Últimas 10 entradas de perdas de produção.
                 </CardDescription>
-              </Header>
+              </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
