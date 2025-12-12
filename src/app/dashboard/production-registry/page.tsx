@@ -46,15 +46,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection } from '@/firebase';
 import { addDoc, collection, serverTimestamp, orderBy, query, limit, deleteDoc, doc } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
-  date: z.date({
-    required_error: 'A data da produção é obrigatória.',
-  }),
+  date: z.string().min(1, 'A data da produção é obrigatória.'),
   factory: z.string().optional(),
   formsNumber: z.string().optional(),
   activityType: z.string().optional(),
@@ -66,9 +64,7 @@ const productionFormSchema = z.object({
 
 const lossFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
-  date: z.date({
-    required_error: 'A data da perda é obrigatória.',
-  }),
+  date: z.string().min(1, 'A data da perda é obrigatória.'),
   machine: z.string().optional(),
   lossReason: z.string().optional(),
   deadPartsQuantity: z.coerce.number().optional(),
@@ -87,7 +83,7 @@ const ProductionFormContent = () => {
         resolver: zodResolver(productionFormSchema),
         defaultValues: {
             operatorId: '',
-            date: new Date(),
+            date: format(new Date(), 'dd/MM/yyyy'),
             factory: '',
             formsNumber: '',
             activityType: '',
@@ -106,8 +102,10 @@ const ProductionFormContent = () => {
     async function onProductionSubmit(values: ProductionFormValues) {
         if (!firestore) return;
         try {
+        const date = parse(values.date, 'dd/MM/yyyy', new Date());
         await addDoc(collection(firestore, 'productionRecords'), {
             ...values,
+            date,
             createdAt: serverTimestamp(),
         });
         toast({
@@ -156,37 +154,11 @@ const ProductionFormContent = () => {
                       control={productionForm.control}
                       name="date"
                       render={({ field }) => (
-                        <FormItem className="flex flex-col">
+                        <FormItem>
                           <FormLabel>Data da Produção</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant={'outline'}
-                                  className={cn(
-                                    'w-full pl-3 text-left font-normal',
-                                    !field.value && 'text-muted-foreground'
-                                  )}
-                                >
-                                  {field.value ? (
-                                    format(field.value, 'dd/MM/yyyy')
-                                  ) : (
-                                    <span>Escolha uma data</span>
-                                  )}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                initialFocus
-                                locale={ptBR}
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <FormControl>
+                            <Input placeholder="dd/MM/yyyy" {...field} />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -268,7 +240,7 @@ const ProductionFormContent = () => {
                         <FormItem>
                         <FormLabel>Máquina</FormLabel>
                         <Select
-                            onValueChange={field.onChange}
+                            onValuechange={field.onChange}
                             defaultValue={field.value}
                         >
                             <FormControl>
@@ -354,7 +326,7 @@ const LossFormContent = () => {
         resolver: zodResolver(lossFormSchema),
         defaultValues: {
             operatorId: '',
-            date: new Date(),
+            date: format(new Date(), 'dd/MM/yyyy'),
             machine: '',
             lossReason: '',
             deadPartsQuantity: 0,
@@ -371,8 +343,10 @@ const LossFormContent = () => {
     async function onLossSubmit(values: LossFormValues) {
         if (!firestore) return;
         try {
+        const date = parse(values.date, 'dd/MM/yyyy', new Date());
         await addDoc(collection(firestore, 'lossRecords'), {
             ...values,
+            date,
             createdAt: serverTimestamp(),
         });
         toast({
@@ -421,37 +395,11 @@ const LossFormContent = () => {
                       control={lossForm.control}
                       name="date"
                       render={({ field }) => (
-                        <FormItem className="flex flex-col">
+                        <FormItem>
                           <FormLabel>Data da Perda</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant={'outline'}
-                                  className={cn(
-                                    'w-full pl-3 text-left font-normal',
-                                    !field.value && 'text-muted-foreground'
-                                  )}
-                                >
-                                  {field.value ? (
-                                    format(field.value, 'dd/MM/yyyy')
-                                  ) : (
-                                    <span>Escolha uma data</span>
-                                  )}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                initialFocus
-                                locale={ptBR}
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <FormControl>
+                            <Input placeholder="dd/MM/yyyy" {...field} />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -670,7 +618,7 @@ export default function ProductionRegistryPage() {
                       productionRecords.map((record: any) => (
                         <TableRow key={record.id}>
                           <TableCell>{record.operatorId}</TableCell>
-                          <TableCell>{record.date ? format(record.date.toDate(), 'dd/MM/yyyy') : ''}</TableCell>
+                          <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
                           <TableCell>{record.factory}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{record.activityType}</Badge>
@@ -737,7 +685,7 @@ export default function ProductionRegistryPage() {
                       lossRecords.map((record: any) => (
                       <TableRow key={record.id}>
                         <TableCell>{record.operatorId}</TableCell>
-                        <TableCell>{record.date ? format(record.date.toDate(), 'dd/MM/yyyy') : ''}</TableCell>
+                        <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
                         <TableCell>{record.factory}</TableCell>
                         <TableCell>{record.machine}</TableCell>
                         <TableCell>
