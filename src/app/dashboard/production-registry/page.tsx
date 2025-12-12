@@ -702,7 +702,7 @@ export default function ProductionRegistryPage() {
                                     handleStatusChange(record.id, newStatus)
                                 }
                                 >
-                                <SelectTrigger className={cn("w-full text-white", statusColorMap[record.status])}>
+                                <SelectTrigger className={cn("w-[180px] text-white", statusColorMap[record.status])}>
                                     <SelectValue placeholder="Selecione um status" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -745,7 +745,7 @@ export default function ProductionRegistryPage() {
                 <CardDescription>
                   Últimas 10 entradas de perdas de produção.
                 </CardDescription>
-              </CardHeader>
+              </Header>
               <CardContent>
                 <Table>
                   <TableHeader>
