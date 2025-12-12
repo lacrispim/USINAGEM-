@@ -8,7 +8,6 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
 } from 'recharts';
 import {
   Card,
@@ -18,6 +17,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {
+  ChartContainer,
+  ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { format } from 'date-fns';
@@ -44,7 +45,12 @@ export function ToolWearChart({ data }: ToolWearChartProps) {
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ChartContainer config={{
+            toolWear: {
+              label: 'Tool Wear',
+              color: 'hsl(var(--primary))',
+            },
+          }}>
             <AreaChart
               data={chartData}
               margin={{
@@ -62,27 +68,27 @@ export function ToolWearChart({ data }: ToolWearChartProps) {
                 axisLine={false}
               />
               <YAxis unit="mm" tickLine={false} axisLine={false} />
-              <Tooltip
+              <ChartTooltip
                 cursor={{ stroke: 'hsl(var(--accent))', strokeWidth: 2, strokeDasharray: '3 3' }}
                 content={<ChartTooltipContent indicator="dot" />}
               />
               <defs>
                   <linearGradient id="colorToolWear" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.1}/>
+                    <stop offset="5%" stopColor="var(--color-toolWear)" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="var(--color-toolWear)" stopOpacity={0.1}/>
                   </linearGradient>
                 </defs>
               <Area
                 type="monotone"
                 dataKey="toolWear"
-                stroke="hsl(var(--primary))"
+                stroke="var(--color-toolWear)"
                 fillOpacity={1} 
                 fill="url(#colorToolWear)"
                 strokeWidth={2}
                 name="Tool Wear (mm)"
               />
             </AreaChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </div>
       </CardContent>
     </Card>

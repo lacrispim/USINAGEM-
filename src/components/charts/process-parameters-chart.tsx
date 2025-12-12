@@ -7,8 +7,6 @@ import {
   CartesianGrid,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
   ZAxis,
 } from 'recharts';
 import {
@@ -18,7 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ChartTooltipContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 interface ProcessParametersChartProps {
   data: MachiningRecord[];
@@ -35,7 +33,16 @@ export function ProcessParametersChart({ data }: ProcessParametersChartProps) {
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ChartContainer config={{
+            cuttingSpeed: {
+              label: 'Cutting Speed',
+              color: 'hsl(var(--primary))',
+            },
+            surfaceFinish: {
+                label: 'Surface Finish',
+                color: 'hsl(var(--primary))',
+            }
+          }}>
             <ScatterChart
               margin={{
                 top: 5,
@@ -64,13 +71,13 @@ export function ProcessParametersChart({ data }: ProcessParametersChartProps) {
                 axisLine={false}
               />
               <ZAxis type="category" dataKey="material" name="Material" />
-              <Tooltip
+              <ChartTooltip
                 cursor={{ strokeDasharray: '3 3' }}
                 content={<ChartTooltipContent />}
               />
-              <Scatter data={data} fill="hsl(var(--primary))" />
+              <Scatter data={data} fill="var(--color-cuttingSpeed)" />
             </ScatterChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </div>
       </CardContent>
     </Card>
