@@ -212,7 +212,8 @@ export default function ProductionRegistryPage() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="usinagem">USINAGEM</SelectItem>
-                              <SelectItem value="montagem">MONTAGEM</SelectItem>
+                              <SelectItem value="programacao">PROGRAMAÇÃO</SelectItem>
+                              <SelectItem value="primeira-peca">PRIMEIRA PEÇA</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
