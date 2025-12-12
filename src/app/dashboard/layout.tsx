@@ -35,6 +35,7 @@ import {
   LogOut,
   Settings,
   Table2,
+  FileText,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 
@@ -55,6 +56,11 @@ export default function DashboardLayout({
       href: '/dashboard/records',
       label: 'Records',
       icon: Table2,
+    },
+    {
+      href: '/dashboard/production-registry',
+      label: 'Registro de Produção',
+      icon: FileText,
     },
     {
       href: '/dashboard/ai-recommendations',
