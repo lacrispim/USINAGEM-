@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Monitor, Smartphone, TrendingUp, Trash2 } from 'lucide-react';
+import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2 } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -41,13 +41,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection } from '@/firebase';
 import { addDoc, collection, serverTimestamp, orderBy, query, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
+  date: z.date({
+    required_error: 'A data da produção é obrigatória.',
+  }),
   factory: z.string().optional(),
   formsNumber: z.string().optional(),
   activityType: z.string().optional(),
@@ -59,6 +65,9 @@ const productionFormSchema = z.object({
 
 const lossFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
+  date: z.date({
+    required_error: 'A data da perda é obrigatória.',
+  }),
   machine: z.string().optional(),
   lossReason: z.string().optional(),
   deadPartsQuantity: z.coerce.number().optional(),
@@ -77,6 +86,7 @@ const ProductionFormContent = () => {
         resolver: zodResolver(productionFormSchema),
         defaultValues: {
             operatorId: '',
+            date: new Date(),
             factory: '',
             formsNumber: '',
             activityType: '',
@@ -140,6 +150,47 @@ const ProductionFormContent = () => {
                         <FormMessage />
                         </FormItem>
                     )}
+                    />
+                    <FormField
+                      control={productionForm.control}
+                      name="date"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Data da Produção</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant={'outline'}
+                                  className={cn(
+                                    'w-full pl-3 text-left font-normal',
+                                    !field.value && 'text-muted-foreground'
+                                  )}
+                                >
+                                  {field.value ? (
+                                    format(field.value, 'PPP')
+                                  ) : (
+                                    <span>Escolha uma data</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) =>
+                                  date > new Date() || date < new Date('1900-01-01')
+                                }
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
                     <FormField
                     control={productionForm.control}
@@ -304,6 +355,7 @@ const LossFormContent = () => {
         resolver: zodResolver(lossFormSchema),
         defaultValues: {
             operatorId: '',
+            date: new Date(),
             machine: '',
             lossReason: '',
             deadPartsQuantity: 0,
@@ -362,6 +414,47 @@ const LossFormContent = () => {
                           <FormControl>
                             <Input placeholder="Ex: OP-001" {...field} />
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                      control={lossForm.control}
+                      name="date"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Data da Perda</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant={'outline'}
+                                  className={cn(
+                                    'w-full pl-3 text-left font-normal',
+                                    !field.value && 'text-muted-foreground'
+                                  )}
+                                >
+                                  {field.value ? (
+                                    format(field.value, 'PPP')
+                                  ) : (
+                                    <span>Escolha uma data</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) =>
+                                  date > new Date() || date < new Date('1900-01-01')
+                                }
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -538,6 +631,7 @@ export default function ProductionRegistryPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Operador</TableHead>
+                      <TableHead>Data</TableHead>
                       <TableHead>Fábrica</TableHead>
                       <TableHead>Atividade</TableHead>
                       <TableHead>Máquina</TableHead>
@@ -546,14 +640,14 @@ export default function ProductionRegistryPage() {
                       <TableHead>Produzido</TableHead>
                       <TableHead>Tempo de Usinagem</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Data e Horário</TableHead>
+                      <TableHead>Registrado em</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loadingProduction ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center h-24">
+                        <TableCell colSpan={12} className="text-center h-24">
                           Carregando...
                         </TableCell>
                       </TableRow>
@@ -561,6 +655,7 @@ export default function ProductionRegistryPage() {
                       productionRecords.map((record: any) => (
                         <TableRow key={record.id}>
                           <TableCell>{record.operatorId}</TableCell>
+                          <TableCell>{record.date ? format(record.date.toDate(), 'dd/MM/yyyy') : ''}</TableCell>
                           <TableCell>{record.factory}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{record.activityType}</Badge>
@@ -585,7 +680,7 @@ export default function ProductionRegistryPage() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center h-24">
+                        <TableCell colSpan={12} className="text-center h-24">
                           Nenhum registro recente.
                         </TableCell>
                       </TableRow>
@@ -606,19 +701,20 @@ export default function ProductionRegistryPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Operador</TableHead>
+                      <TableHead>Data</TableHead>
                       <TableHead>Fábrica</TableHead>
                       <TableHead>Máquina</TableHead>
                       <TableHead>Motivo</TableHead>
                       <TableHead>Qtd. Peças Mortas</TableHead>
                       <TableHead>Tempo Perdido</TableHead>
-                      <TableHead>Data e Horário</TableHead>
+                      <TableHead>Registrado em</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loadingLoss ? (
                        <TableRow>
-                        <TableCell colSpan={8} className="text-center h-24">
+                        <TableCell colSpan={9} className="text-center h-24">
                           Carregando...
                         </TableCell>
                       </TableRow>
@@ -626,6 +722,7 @@ export default function ProductionRegistryPage() {
                       lossRecords.map((record: any) => (
                       <TableRow key={record.id}>
                         <TableCell>{record.operatorId}</TableCell>
+                        <TableCell>{record.date ? format(record.date.toDate(), 'dd/MM/yyyy') : ''}</TableCell>
                         <TableCell>{record.factory}</TableCell>
                         <TableCell>{record.machine}</TableCell>
                         <TableCell>
@@ -651,7 +748,7 @@ export default function ProductionRegistryPage() {
                     ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center h-24">
+                        <TableCell colSpan={9} className="text-center h-24">
                            Nenhum registro de perda.
                         </TableCell>
                       </TableRow>

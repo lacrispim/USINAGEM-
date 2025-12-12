@@ -9,6 +9,11 @@
           "type": "string",
           "description": "The ID of the operator."
         },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date of the production activity."
+        },
         "factory": {
           "type": "string",
           "description": "The factory where the production took place."
@@ -43,7 +48,7 @@
             "description": "The timestamp when the record was created."
         }
       },
-      "required": ["operatorId", "createdAt"]
+      "required": ["operatorId", "date", "createdAt"]
     },
     "lossRecord": {
       "title": "Loss Record",
@@ -53,6 +58,11 @@
         "operatorId": {
           "type": "string",
           "description": "The ID of the operator."
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date when the loss occurred."
         },
         "machine": {
           "type": "string",
@@ -80,7 +90,7 @@
             "description": "The timestamp when the record was created."
         }
       },
-      "required": ["operatorId", "createdAt"]
+      "required": ["operatorId", "date", "createdAt"]
     }
   },
   "auth": {
