@@ -42,6 +42,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { useFirestore, useCollection } from '@/firebase';
+import { addDoc, collection, serverTimestamp, orderBy, query, limit } from 'firebase/firestore';
+import { format } from 'date-fns';
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
@@ -59,6 +62,8 @@ const lossFormSchema = z.object({
   machine: z.string().optional(),
   lossReason: z.string().optional(),
   deadPartsQuantity: z.coerce.number().optional(),
+  factory: z.string().optional(),
+  timeLost: z.string().optional(),
 });
 
 type ProductionFormValues = z.infer<typeof productionFormSchema>;
@@ -67,6 +72,14 @@ type LossFormValues = z.infer<typeof lossFormSchema>;
 export default function ProductionRegistryPage() {
   const { toast } = useToast();
   const formId = React.useId();
+  const firestore = useFirestore();
+
+  const productionRecordsQuery = firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc'), limit(10)) : null;
+  const { data: productionRecords, loading: loadingProduction } = useCollection(productionRecordsQuery);
+  
+  const lossRecordsQuery = firestore ? query(collection(firestore, 'lossRecords'), orderBy('createdAt', 'desc'), limit(10)) : null;
+  const { data: lossRecords, loading: loadingLoss } = useCollection(lossRecordsQuery);
+
 
   const productionForm = useForm<ProductionFormValues>({
     resolver: zodResolver(productionFormSchema),
@@ -92,45 +105,49 @@ export default function ProductionRegistryPage() {
     },
   });
 
-  function onProductionSubmit(values: ProductionFormValues) {
-    console.log('Production Data:', values);
-    toast({
-      title: 'Produção Registrada',
-      description: 'Os dados de produção foram salvos com sucesso.',
-    });
-    productionForm.reset();
+  async function onProductionSubmit(values: ProductionFormValues) {
+    if (!firestore) return;
+    try {
+      await addDoc(collection(firestore, 'productionRecords'), {
+        ...values,
+        createdAt: serverTimestamp(),
+      });
+      toast({
+        title: 'Produção Registrada',
+        description: 'Os dados de produção foram salvos com sucesso.',
+      });
+      productionForm.reset();
+    } catch (error) {
+      console.error('Error adding production record: ', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível salvar o registro de produção.',
+        variant: 'destructive',
+      });
+    }
   }
 
-  function onLossSubmit(values: LossFormValues) {
-    console.log('Loss Data:', values);
-    toast({
-      title: 'Perda Registrada',
-      description: 'O registro de perda foi salvo com sucesso.',
-      variant: 'destructive',
-    });
-    lossForm.reset();
+  async function onLossSubmit(values: LossFormValues) {
+    if (!firestore) return;
+    try {
+      await addDoc(collection(firestore, 'lossRecords'), {
+        ...values,
+        createdAt: serverTimestamp(),
+      });
+      toast({
+        title: 'Perda Registrada',
+        description: 'O registro de perda foi salvo com sucesso.',
+      });
+      lossForm.reset();
+    } catch (error) {
+      console.error('Error adding loss record: ', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível salvar o registro de perda.',
+        variant: 'destructive',
+      });
+    }
   }
-
-  const lossRecords = [
-    {
-      operator: 'Rodrigo Cantano',
-      factory: 'Garanhuns',
-      machine: 'Centro de Usinagem D600',
-      reason: 'Baixa pressão, ar comprimido',
-      deadParts: 0,
-      timeLost: '00h 11m',
-      dateTime: '12/12/2025, 14:35:53',
-    },
-    {
-      operator: 'RODRIGO CANTANO',
-      factory: 'Valinhos',
-      machine: 'Torno CNC - Centur 30',
-      reason: 'Troca de turno',
-      deadParts: 0,
-      timeLost: '00h 15m',
-      dateTime: '12/12/2025, 14:11:25',
-    },
-  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -362,6 +379,34 @@ export default function ProductionRegistryPage() {
                         </FormItem>
                       )}
                     />
+                     <FormField
+                      control={lossForm.control}
+                      name="factory"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Fábrica</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione a fábrica" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Garanhuns">
+                                Garanhuns
+                              </SelectItem>
+                              <SelectItem value="Valinhos">
+                                Valinhos
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={lossForm.control}
                       name="machine"
@@ -378,14 +423,11 @@ export default function ProductionRegistryPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="machine-1">
-                                Máquina 1
+                               <SelectItem value="Centro de Usinagem D600">
+                                Centro de Usinagem D600
                               </SelectItem>
-                              <SelectItem value="machine-2">
-                                Máquina 2
-                              </SelectItem>
-                              <SelectItem value="machine-3">
-                                Máquina 3
+                              <SelectItem value="Torno CNC - Centur 30">
+                                Torno CNC - Centur 30
                               </SelectItem>
                             </SelectContent>
                           </Select>
@@ -417,6 +459,19 @@ export default function ProductionRegistryPage() {
                           <FormLabel>Quantidade de Peças Mortas</FormLabel>
                           <FormControl>
                             <Input type="number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={lossForm.control}
+                      name="timeLost"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tempo Perdido</FormLabel>
+                          <FormControl>
+                             <Input placeholder="00h 00m" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -461,11 +516,45 @@ export default function ProductionRegistryPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell colSpan={11} className="text-center h-24">
-                        Nenhum registro recente.
-                      </TableCell>
-                    </TableRow>
+                    {loadingProduction ? (
+                      <TableRow>
+                        <TableCell colSpan={11} className="text-center h-24">
+                          Carregando...
+                        </TableCell>
+                      </TableRow>
+                    ) : productionRecords && productionRecords.length > 0 ? (
+                      productionRecords.map((record: any) => (
+                        <TableRow key={record.id}>
+                          <TableCell>{record.operatorId}</TableCell>
+                          <TableCell>{record.factory}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{record.activityType}</Badge>
+                          </TableCell>
+                          <TableCell>{record.machine}</TableCell>
+                          <TableCell>{record.formsNumber}</TableCell>
+                          <TableCell>{record.operationsNumber}</TableCell>
+                          <TableCell>{record.quantityProduced}</TableCell>
+                          <TableCell>{record.machiningTime} min</TableCell>
+                           <TableCell>
+                            <Badge>Concluído</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon">
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={11} className="text-center h-24">
+                          Nenhum registro recente.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -492,30 +581,46 @@ export default function ProductionRegistryPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {lossRecords.map((record, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{record.operator}</TableCell>
+                    {loadingLoss ? (
+                       <TableRow>
+                        <TableCell colSpan={8} className="text-center h-24">
+                          Carregando...
+                        </TableCell>
+                      </TableRow>
+                    ) : lossRecords && lossRecords.length > 0 ? (
+                      lossRecords.map((record: any) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{record.operatorId}</TableCell>
                         <TableCell>{record.factory}</TableCell>
                         <TableCell>{record.machine}</TableCell>
                         <TableCell>
                           <Badge
                             className="bg-yellow-400 text-black hover:bg-yellow-500"
                           >
-                            {record.reason}
+                            {record.lossReason}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-red-500">
-                          {record.deadParts}
+                          {record.deadPartsQuantity}
                         </TableCell>
                         <TableCell>{record.timeLost}</TableCell>
-                        <TableCell>{record.dateTime}</TableCell>
+                        <TableCell>
+                           {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
+                        </TableCell>
                         <TableCell>
                           <Button variant="ghost" size="icon">
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center h-24">
+                           Nenhum registro de perda.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>

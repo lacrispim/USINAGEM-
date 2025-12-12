@@ -1,0 +1,103 @@
+{
+  "entities": {
+    "productionRecord": {
+      "title": "Production Record",
+      "description": "A record of a production activity.",
+      "type": "object",
+      "properties": {
+        "operatorId": {
+          "type": "string",
+          "description": "The ID of the operator."
+        },
+        "factory": {
+          "type": "string",
+          "description": "The factory where the production took place."
+        },
+        "formsNumber": {
+          "type": "string",
+          "description": "The forms number associated with the activity."
+        },
+        "activityType": {
+          "type": "string",
+          "description": "The type of activity (e.g., USINAGEM, PROGRAMAÇÃO)."
+        },
+        "machine": {
+          "type": "string",
+          "description": "The machine used for the activity."
+        },
+        "quantityProduced": {
+          "type": "number",
+          "description": "The quantity of items produced."
+        },
+        "operationsNumber": {
+          "type": "string",
+          "description": "The number of operations performed."
+        },
+        "machiningTime": {
+          "type": "number",
+          "description": "The time spent on machining, in minutes."
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the record was created."
+        }
+      },
+      "required": ["operatorId", "createdAt"]
+    },
+    "lossRecord": {
+      "title": "Loss Record",
+      "description": "A record of a production loss.",
+      "type": "object",
+      "properties": {
+        "operatorId": {
+          "type": "string",
+          "description": "The ID of the operator."
+        },
+        "machine": {
+          "type": "string",
+          "description": "The machine where the loss occurred."
+        },
+        "lossReason": {
+          "type": "string",
+          "description": "The reason for the production loss."
+        },
+        "deadPartsQuantity": {
+          "type": "number",
+          "description": "The quantity of dead parts."
+        },
+        "factory": {
+          "type": "string",
+          "description": "The factory where the loss occurred."
+        },
+        "timeLost": {
+          "type": "string",
+          "description": "The time lost due to the issue."
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the record was created."
+        }
+      },
+      "required": ["operatorId", "createdAt"]
+    }
+  },
+  "auth": {
+    "providers": []
+  },
+  "firestore": {
+    "/productionRecords/{productionRecordId}": {
+      "schema": {
+        "$ref": "#/entities/productionRecord"
+      },
+      "description": "Stores records of production activities."
+    },
+    "/lossRecords/{lossRecordId}": {
+      "schema": {
+        "$ref": "#/entities/lossRecord"
+      },
+      "description": "Stores records of production losses."
+    }
+  }
+}
