@@ -1,15 +1,16 @@
+import Link from 'next/link';
 import { machiningRecords } from '@/lib/data';
 import { MrrChart } from '@/components/charts/mrr-chart';
 import { ProcessParametersChart } from '@/components/charts/process-parameters-chart';
 import { ToolWearChart } from '@/components/charts/tool-wear-chart';
-import { AddRecordDialog } from '@/components/dashboard/add-record-dialog';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ArrowUpRight } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 
 export default function DashboardPage() {
   const totalRecords = machiningRecords.length;
@@ -25,7 +26,12 @@ export default function DashboardPage() {
             Overview of your machining operations.
           </p>
         </div>
-        <AddRecordDialog />
+        <Button asChild>
+          <Link href="/dashboard/production-registry">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add New Record
+          </Link>
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
