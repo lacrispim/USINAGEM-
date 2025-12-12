@@ -7,23 +7,35 @@ import { Play, Pause, RotateCcw } from 'lucide-react';
 
 interface ProductionTimerProps {
   title: string;
+  initialTimeInMinutes: number;
+  onTimeChange: (timeInMinutes: number) => void;
 }
 
-export function ProductionTimer({ title }: ProductionTimerProps) {
-  const [timeInSeconds, setTimeInSeconds] = useState(0);
+export function ProductionTimer({
+  title,
+  initialTimeInMinutes,
+  onTimeChange,
+}: ProductionTimerProps) {
+  const [timeInSeconds, setTimeInSeconds] = useState(initialTimeInMinutes * 60);
   const [isActive, setIsActive] = useState(false);
+
+  useEffect(() => {
+    setTimeInSeconds(initialTimeInMinutes * 60);
+  }, [initialTimeInMinutes]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
 
     if (isActive) {
       interval = setInterval(() => {
-        setTimeInSeconds((prevTime) => prevTime + 1);
+        setTimeInSeconds((prevTime) => {
+          const newTime = prevTime + 1;
+          onTimeChange(Math.floor(newTime / 60));
+          return newTime;
+        });
       }, 1000);
-    } else if (!isActive && timeInSeconds !== 0) {
-      if (interval) {
-        clearInterval(interval);
-      }
+    } else if (interval) {
+      clearInterval(interval);
     }
 
     return () => {
@@ -31,7 +43,7 @@ export function ProductionTimer({ title }: ProductionTimerProps) {
         clearInterval(interval);
       }
     };
-  }, [isActive, timeInSeconds]);
+  }, [isActive, onTimeChange]);
 
   const handleStartPause = useCallback(() => {
     setIsActive((prev) => !prev);
@@ -40,7 +52,8 @@ export function ProductionTimer({ title }: ProductionTimerProps) {
   const handleReset = useCallback(() => {
     setIsActive(false);
     setTimeInSeconds(0);
-  }, []);
+    onTimeChange(0);
+  }, [onTimeChange]);
 
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600)
@@ -61,7 +74,7 @@ export function ProductionTimer({ title }: ProductionTimerProps) {
           {formatTime(timeInSeconds)}
         </p>
         <div className="mt-4 flex justify-center gap-2">
-          <Button onClick={handleStartPause}>
+          <Button type="button" onClick={handleStartPause}>
             {isActive ? (
               <>
                 <Pause className="mr-2" /> Pausar
@@ -72,7 +85,7 @@ export function ProductionTimer({ title }: ProductionTimerProps) {
               </>
             )}
           </Button>
-          <Button variant="secondary" onClick={handleReset}>
+          <Button type="button" variant="secondary" onClick={handleReset}>
             <RotateCcw className="mr-2" /> Zerar
           </Button>
         </div>

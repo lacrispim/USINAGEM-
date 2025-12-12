@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import {
@@ -63,296 +63,284 @@ const lossFormSchema = z.object({
   lossReason: z.string().optional(),
   deadPartsQuantity: z.coerce.number().optional(),
   factory: z.string().optional(),
-  timeLost: z.string().optional(),
+  timeLost: z.coerce.number().optional(),
 });
 
 type ProductionFormValues = z.infer<typeof productionFormSchema>;
 type LossFormValues = z.infer<typeof lossFormSchema>;
 
-export default function ProductionRegistryPage() {
-  const { toast } = useToast();
-  const formId = React.useId();
-  const firestore = useFirestore();
+const ProductionFormContent = () => {
+    const { toast } = useToast();
+    const firestore = useFirestore();
 
-  const productionRecordsQuery = firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc'), limit(10)) : null;
-  const { data: productionRecords, loading: loadingProduction } = useCollection(productionRecordsQuery);
-  
-  const lossRecordsQuery = firestore ? query(collection(firestore, 'lossRecords'), orderBy('createdAt', 'desc'), limit(10)) : null;
-  const { data: lossRecords, loading: loadingLoss } = useCollection(lossRecordsQuery);
+    const productionForm = useForm<ProductionFormValues>({
+        resolver: zodResolver(productionFormSchema),
+        defaultValues: {
+            operatorId: '',
+            factory: '',
+            formsNumber: '',
+            activityType: '',
+            machine: '',
+            quantityProduced: 0,
+            operationsNumber: '',
+            machiningTime: 0,
+        },
+    });
 
+    const machiningTime = useWatch({
+        control: productionForm.control,
+        name: 'machiningTime',
+    });
 
-  const productionForm = useForm<ProductionFormValues>({
-    resolver: zodResolver(productionFormSchema),
-    defaultValues: {
-      operatorId: '',
-      factory: '',
-      formsNumber: '',
-      activityType: '',
-      machine: '',
-      quantityProduced: 0,
-      operationsNumber: '',
-      machiningTime: 0,
-    },
-  });
-
-  const lossForm = useForm<LossFormValues>({
-    resolver: zodResolver(lossFormSchema),
-    defaultValues: {
-      operatorId: '',
-      machine: '',
-      lossReason: '',
-      deadPartsQuantity: 0,
-    },
-  });
-
-  async function onProductionSubmit(values: ProductionFormValues) {
-    if (!firestore) return;
-    try {
-      await addDoc(collection(firestore, 'productionRecords'), {
-        ...values,
-        createdAt: serverTimestamp(),
-      });
-      toast({
-        title: 'Produção Registrada',
-        description: 'Os dados de produção foram salvos com sucesso.',
-      });
-      productionForm.reset();
-    } catch (error) {
-      console.error('Error adding production record: ', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível salvar o registro de produção.',
-        variant: 'destructive',
-      });
+    async function onProductionSubmit(values: ProductionFormValues) {
+        if (!firestore) return;
+        try {
+        await addDoc(collection(firestore, 'productionRecords'), {
+            ...values,
+            createdAt: serverTimestamp(),
+        });
+        toast({
+            title: 'Produção Registrada',
+            description: 'Os dados de produção foram salvos com sucesso.',
+        });
+        productionForm.reset();
+        } catch (error) {
+        console.error('Error adding production record: ', error);
+        toast({
+            title: 'Erro',
+            description: 'Não foi possível salvar o registro de produção.',
+            variant: 'destructive',
+        });
+        }
     }
-  }
 
-  async function onLossSubmit(values: LossFormValues) {
-    if (!firestore) return;
-    try {
-      await addDoc(collection(firestore, 'lossRecords'), {
-        ...values,
-        createdAt: serverTimestamp(),
-      });
-      toast({
-        title: 'Perda Registrada',
-        description: 'O registro de perda foi salvo com sucesso.',
-      });
-      lossForm.reset();
-    } catch (error) {
-      console.error('Error adding loss record: ', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível salvar o registro de perda.',
-        variant: 'destructive',
-      });
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Registro de Produção
-        </h1>
-        <p className="text-muted-foreground">
-          Monitore a produção, registre novas atividades e perdas.
-        </p>
-      </div>
-
-      <Tabs defaultValue="operator-mode" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="supervisor-view">
-            <Monitor className="mr-2 h-4 w-4" />
-            Visão Supervisor
-          </TabsTrigger>
-          <TabsTrigger value="operator-mode">
-            <Smartphone className="mr-2 h-4 w-4" />
-            Modo Operador
-          </TabsTrigger>
-          <TabsTrigger value="optimization">
-            <TrendingUp className="mr-2 h-4 w-4" />
-            Otimização
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="operator-mode">
-          <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
+    return (
+        <Card>
+            <CardHeader>
                 <CardTitle>Registro de Produção</CardTitle>
                 <CardDescription>
-                  Insira os dados de produção da sua atividade.
+                Insira os dados de produção da sua atividade.
                 </CardDescription>
-              </CardHeader>
-              <CardContent>
+            </CardHeader>
+            <CardContent>
                 <Form {...productionForm}>
-                  <form
-                    id={`production-form-${formId}`}
+                <form
                     onSubmit={productionForm.handleSubmit(onProductionSubmit)}
                     className="space-y-4"
-                  >
+                >
                     <FormField
-                      control={productionForm.control}
-                      name="operatorId"
-                      render={({ field }) => (
+                    control={productionForm.control}
+                    name="operatorId"
+                    render={({ field }) => (
                         <FormItem>
-                          <FormLabel>ID do Operador</FormLabel>
-                          <FormControl>
+                        <FormLabel>ID do Operador</FormLabel>
+                        <FormControl>
                             <Input placeholder="Ex: OP-001" {...field} />
-                          </FormControl>
-                          <FormMessage />
+                        </FormControl>
+                        <FormMessage />
                         </FormItem>
-                      )}
+                    )}
                     />
                     <FormField
-                      control={productionForm.control}
-                      name="factory"
-                      render={({ field }) => (
+                    control={productionForm.control}
+                    name="factory"
+                    render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Fábrica</FormLabel>
-                          <Select
+                        <FormLabel>Fábrica</FormLabel>
+                        <Select
                             onValueChange={field.onChange}
                             defaultValue={field.value}
-                          >
+                        >
                             <FormControl>
-                              <SelectTrigger>
+                            <SelectTrigger>
                                 <SelectValue placeholder="Selecione a fábrica" />
-                              </SelectTrigger>
+                            </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="factory-1">
+                            <SelectItem value="factory-1">
                                 Fábrica 1
-                              </SelectItem>
-                              <SelectItem value="factory-2">
+                            </SelectItem>
+                            <SelectItem value="factory-2">
                                 Fábrica 2
-                              </SelectItem>
+                            </SelectItem>
                             </SelectContent>
-                          </Select>
-                          <FormMessage />
+                        </Select>
+                        <FormMessage />
                         </FormItem>
-                      )}
+                    )}
                     />
                     <FormField
-                      control={productionForm.control}
-                      name="formsNumber"
-                      render={({ field }) => (
+                    control={productionForm.control}
+                    name="formsNumber"
+                    render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Número do forms</FormLabel>
-                          <FormControl>
+                        <FormLabel>Número do forms</FormLabel>
+                        <FormControl>
                             <Input placeholder="Ex: F-1024" {...field} />
-                          </FormControl>
-                          <FormMessage />
+                        </FormControl>
+                        <FormMessage />
                         </FormItem>
-                      )}
+                    )}
                     />
                     <FormField
-                      control={productionForm.control}
-                      name="activityType"
-                      render={({ field }) => (
+                    control={productionForm.control}
+                    name="activityType"
+                    render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Tipo de Atividade</FormLabel>
-                          <Select
+                        <FormLabel>Tipo de Atividade</FormLabel>
+                        <Select
                             onValueChange={field.onChange}
                             defaultValue={field.value}
-                          >
+                        >
                             <FormControl>
-                              <SelectTrigger>
+                            <SelectTrigger>
                                 <SelectValue placeholder="Selecione o tipo" />
-                              </SelectTrigger>
+                            </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="usinagem">USINAGEM</SelectItem>
-                              <SelectItem value="programacao">
+                            <SelectItem value="usinagem">USINAGEM</SelectItem>
+                            <SelectItem value="programacao">
                                 PROGRAMAÇÃO
-                              </SelectItem>
-                              <SelectItem value="primeira-peca">
+                            </SelectItem>
+                            <SelectItem value="primeira-peca">
                                 PRIMEIRA PEÇA
-                              </SelectItem>
+                            </SelectItem>
                             </SelectContent>
-                          </Select>
-                          <FormMessage />
+                        </Select>
+                        <FormMessage />
                         </FormItem>
-                      )}
+                    )}
                     />
                     <FormField
-                      control={productionForm.control}
-                      name="machine"
-                      render={({ field }) => (
+                    control={productionForm.control}
+                    name="machine"
+                    render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Máquina</FormLabel>
-                          <Select
+                        <FormLabel>Máquina</FormLabel>
+                        <Select
                             onValueChange={field.onChange}
                             defaultValue={field.value}
-                          >
+                        >
                             <FormControl>
-                              <SelectTrigger>
+                            <SelectTrigger>
                                 <SelectValue placeholder="Selecione a máquina" />
-                              </SelectTrigger>
+                            </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="machine-1">
+                            <SelectItem value="machine-1">
                                 Máquina 1
-                              </SelectItem>
-                              <SelectItem value="machine-2">
+                            </SelectItem>
+                            <SelectItem value="machine-2">
                                 Máquina 2
-                              </SelectItem>
-                              <SelectItem value="machine-3">
+                            </SelectItem>
+                            <SelectItem value="machine-3">
                                 Máquina 3
-                              </SelectItem>
+                            </SelectItem>
                             </SelectContent>
-                          </Select>
-                          <FormMessage />
+                        </Select>
+                        <FormMessage />
                         </FormItem>
-                      )}
+                    )}
                     />
                     <FormField
-                      control={productionForm.control}
-                      name="quantityProduced"
-                      render={({ field }) => (
+                    control={productionForm.control}
+                    name="quantityProduced"
+                    render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Quantidade Produzida</FormLabel>
-                          <FormControl>
+                        <FormLabel>Quantidade Produzida</FormLabel>
+                        <FormControl>
                             <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
+                        </FormControl>
+                        <FormMessage />
                         </FormItem>
-                      )}
+                    )}
                     />
                     <FormField
-                      control={productionForm.control}
-                      name="operationsNumber"
-                      render={({ field }) => (
+                    control={productionForm.control}
+                    name="operationsNumber"
+                    render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Número de Operações</FormLabel>
-                          <FormControl>
+                        <FormLabel>Número de Operações</FormLabel>
+                        <FormControl>
                             <Input placeholder="Ex: 5" {...field} />
-                          </FormControl>
-                          <FormMessage />
+                        </FormControl>
+                        <FormMessage />
                         </FormItem>
-                      )}
+                    )}
                     />
                     <FormField
-                      control={productionForm.control}
-                      name="machiningTime"
-                      render={({ field }) => (
+                    control={productionForm.control}
+                    name="machiningTime"
+                    render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Tempo de Usinagem (minutos)</FormLabel>
-                          <FormControl>
+                        <FormLabel>Tempo de Usinagem (minutos)</FormLabel>
+                        <FormControl>
                             <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
+                        </FormControl>
+                        <FormMessage />
                         </FormItem>
-                      )}
+                    )}
                     />
-                    <ProductionTimer title="Cronômetro de Produção" />
+                    <ProductionTimer
+                        title="Cronômetro de Produção"
+                        initialTimeInMinutes={machiningTime || 0}
+                        onTimeChange={(time) => productionForm.setValue('machiningTime', time)}
+                    />
                     <Button type="submit" className="w-full">
-                      Registrar Produção
+                    Registrar Produção
                     </Button>
-                  </form>
+                </form>
                 </Form>
-              </CardContent>
-            </Card>
-            <Card>
+            </CardContent>
+        </Card>
+    );
+};
+
+const LossFormContent = () => {
+    const { toast } = useToast();
+    const firestore = useFirestore();
+
+    const lossForm = useForm<LossFormValues>({
+        resolver: zodResolver(lossFormSchema),
+        defaultValues: {
+            operatorId: '',
+            machine: '',
+            lossReason: '',
+            deadPartsQuantity: 0,
+            factory: '',
+            timeLost: 0,
+        },
+    });
+
+    const timeLost = useWatch({
+        control: lossForm.control,
+        name: 'timeLost',
+    });
+
+    async function onLossSubmit(values: LossFormValues) {
+        if (!firestore) return;
+        try {
+        await addDoc(collection(firestore, 'lossRecords'), {
+            ...values,
+            createdAt: serverTimestamp(),
+        });
+        toast({
+            title: 'Perda Registrada',
+            description: 'O registro de perda foi salvo com sucesso.',
+        });
+        lossForm.reset();
+        } catch (error) {
+        console.error('Error adding loss record: ', error);
+        toast({
+            title: 'Erro',
+            description: 'Não foi possível salvar o registro de perda.',
+            variant: 'destructive',
+        });
+        }
+    }
+
+    return (
+        <Card>
               <CardHeader>
                 <CardTitle>Registro de Perda</CardTitle>
                 <CardDescription>
@@ -362,7 +350,6 @@ export default function ProductionRegistryPage() {
               <CardContent>
                 <Form {...lossForm}>
                   <form
-                    id={`loss-form-${formId}`}
                     onSubmit={lossForm.handleSubmit(onLossSubmit)}
                     className="space-y-4"
                   >
@@ -469,15 +456,19 @@ export default function ProductionRegistryPage() {
                       name="timeLost"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Tempo Perdido</FormLabel>
+                          <FormLabel>Tempo Perdido (minutos)</FormLabel>
                           <FormControl>
-                             <Input placeholder="00h 00m" {...field} />
+                             <Input type="number" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <ProductionTimer title="Cronômetro de Perda" />
+                    <ProductionTimer 
+                        title="Cronômetro de Perda"
+                        initialTimeInMinutes={timeLost || 0}
+                        onTimeChange={(time) => lossForm.setValue('timeLost', time)}
+                     />
                     <Button
                       type="submit"
                       variant="destructive"
@@ -489,6 +480,50 @@ export default function ProductionRegistryPage() {
                 </Form>
               </CardContent>
             </Card>
+    );
+}
+
+export default function ProductionRegistryPage() {
+  const firestore = useFirestore();
+
+  const productionRecordsQuery = firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc'), limit(10)) : null;
+  const { data: productionRecords, loading: loadingProduction } = useCollection(productionRecordsQuery);
+  
+  const lossRecordsQuery = firestore ? query(collection(firestore, 'lossRecords'), orderBy('createdAt', 'desc'), limit(10)) : null;
+  const { data: lossRecords, loading: loadingLoss } = useCollection(lossRecordsQuery);
+
+  const formId = React.useId(); // Keep for potential unique IDs if needed elsewhere
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Registro de Produção
+        </h1>
+        <p className="text-muted-foreground">
+          Monitore a produção, registre novas atividades e perdas.
+        </p>
+      </div>
+
+      <Tabs defaultValue="operator-mode" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsTrigger value="supervisor-view">
+            <Monitor className="mr-2 h-4 w-4" />
+            Visão Supervisor
+          </TabsTrigger>
+          <TabsTrigger value="operator-mode">
+            <Smartphone className="mr-2 h-4 w-4" />
+            Modo Operador
+          </TabsTrigger>
+          <TabsTrigger value="optimization">
+            <TrendingUp className="mr-2 h-4 w-4" />
+            Otimização
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="operator-mode">
+          <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ProductionFormContent />
+            <LossFormContent />
           </div>
           <div className="mt-8 space-y-8">
             <Card>
