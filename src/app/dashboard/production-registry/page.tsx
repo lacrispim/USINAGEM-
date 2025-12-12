@@ -169,7 +169,7 @@ const ProductionFormContent = () => {
                                   )}
                                 >
                                   {field.value ? (
-                                    format(field.value, 'PPP', { locale: ptBR })
+                                    format(field.value, 'dd/MM/yyyy')
                                   ) : (
                                     <span>Escolha uma data</span>
                                   )}
@@ -437,7 +437,7 @@ const LossFormContent = () => {
                                   )}
                                 >
                                   {field.value ? (
-                                    format(field.value, 'PPP', { locale: ptBR })
+                                    format(field.value, 'dd/MM/yyyy')
                                   ) : (
                                     <span>Escolha uma data</span>
                                   )}
@@ -784,5 +784,3 @@ export default function ProductionRegistryPage() {
     </div>
   );
 }
-
-    
