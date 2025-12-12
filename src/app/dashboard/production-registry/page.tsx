@@ -560,12 +560,12 @@ const LossFormContent = () => {
     );
 }
 
-const statusVariantMap: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
-    'Fila de produção': 'outline',
-    'Em produção': 'secondary',
-    'Encerrado': 'default',
-    'Rejeitado': 'destructive',
-    'Enviado': 'default',
+const statusColorMap: { [key: string]: string } = {
+    'Fila de produção': 'bg-gray-500',
+    'Em produção': 'bg-yellow-500 text-black',
+    'Encerrado': 'bg-green-500',
+    'Rejeitado': 'bg-red-500',
+    'Enviado': 'bg-blue-500',
 };
 
 
@@ -702,7 +702,7 @@ export default function ProductionRegistryPage() {
                                     handleStatusChange(record.id, newStatus)
                                 }
                                 >
-                                <SelectTrigger className={cn("w-full", `bg-${statusVariantMap[record.status]}`)}>
+                                <SelectTrigger className={cn("w-full text-white", statusColorMap[record.status])}>
                                     <SelectValue placeholder="Selecione um status" />
                                 </SelectTrigger>
                                 <SelectContent>
