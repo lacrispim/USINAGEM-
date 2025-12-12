@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Monitor, Smartphone, TrendingUp } from 'lucide-react';
+import { Monitor, Smartphone, TrendingUp, Trash2 } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -33,6 +33,15 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import React from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
@@ -101,6 +110,27 @@ export default function ProductionRegistryPage() {
     });
     lossForm.reset();
   }
+
+  const lossRecords = [
+    {
+      operator: 'Rodrigo Cantano',
+      factory: 'Garanhuns',
+      machine: 'Centro de Usinagem D600',
+      reason: 'Baixa pressão, ar comprimido',
+      deadParts: 0,
+      timeLost: '00h 11m',
+      dateTime: '12/12/2025, 14:35:53',
+    },
+    {
+      operator: 'RODRIGO CANTANO',
+      factory: 'Valinhos',
+      machine: 'Torno CNC - Centur 30',
+      reason: 'Troca de turno',
+      deadParts: 0,
+      timeLost: '00h 15m',
+      dateTime: '12/12/2025, 14:11:25',
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -215,8 +245,12 @@ export default function ProductionRegistryPage() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="usinagem">USINAGEM</SelectItem>
-                              <SelectItem value="programacao">PROGRAMAÇÃO</SelectItem>
-                              <SelectItem value="primeira-peca">PRIMEIRA PEÇA</SelectItem>
+                              <SelectItem value="programacao">
+                                PROGRAMAÇÃO
+                              </SelectItem>
+                              <SelectItem value="primeira-peca">
+                                PRIMEIRA PEÇA
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -389,11 +423,101 @@ export default function ProductionRegistryPage() {
                       )}
                     />
                     <ProductionTimer title="Cronômetro de Perda" />
-                    <Button type="submit" variant="destructive" className="w-full">
+                    <Button
+                      type="submit"
+                      variant="destructive"
+                      className="w-full"
+                    >
                       Registrar Perda
                     </Button>
                   </form>
                 </Form>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="mt-8 space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Registros de Produção Recentes</CardTitle>
+                <CardDescription>
+                  Últimas 10 entradas de produção bem-sucedida.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Operador</TableHead>
+                      <TableHead>Fábrica</TableHead>
+                      <TableHead>Atividade</TableHead>
+                      <TableHead>Máquina</TableHead>
+                      <TableHead>Nº Forms</TableHead>
+                      <TableHead>Nº Operações</TableHead>
+                      <TableHead>Produzido</TableHead>
+                      <TableHead>Tempo de Usinagem</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Data e Horário</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center h-24">
+                        Nenhum registro recente.
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Registros de Perdas Recentes</CardTitle>
+                <CardDescription>
+                  Últimas 10 entradas de perdas de produção.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Operador</TableHead>
+                      <TableHead>Fábrica</TableHead>
+                      <TableHead>Máquina</TableHead>
+                      <TableHead>Motivo</TableHead>
+                      <TableHead>Qtd. Peças Mortas</TableHead>
+                      <TableHead>Tempo Perdido</TableHead>
+                      <TableHead>Data e Horário</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {lossRecords.map((record, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{record.operator}</TableCell>
+                        <TableCell>{record.factory}</TableCell>
+                        <TableCell>{record.machine}</TableCell>
+                        <TableCell>
+                          <Badge
+                            className="bg-yellow-400 text-black hover:bg-yellow-500"
+                          >
+                            {record.reason}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-red-500">
+                          {record.deadParts}
+                        </TableCell>
+                        <TableCell>{record.timeLost}</TableCell>
+                        <TableCell>{record.dateTime}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </div>
