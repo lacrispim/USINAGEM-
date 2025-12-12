@@ -51,6 +51,10 @@
             "type": "string",
             "format": "date-time",
             "description": "The timestamp when the record was created."
+        },
+        "observations": {
+            "type": "string",
+            "description": "Additional notes or observations about the production activity."
         }
       },
       "required": ["operatorId", "date", "createdAt", "status"]
@@ -93,6 +97,10 @@
             "type": "string",
             "format": "date-time",
             "description": "The timestamp when the record was created."
+        },
+        "observations": {
+            "type": "string",
+            "description": "Additional notes or observations about the loss."
         }
       },
       "required": ["operatorId", "date", "createdAt"]

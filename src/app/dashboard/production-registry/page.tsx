@@ -61,6 +61,7 @@ const productionFormSchema = z.object({
   operationsNumber: z.string().optional(),
   machiningTime: z.coerce.number().optional(),
   status: z.string().optional(),
+  observations: z.string().optional(),
 });
 
 const lossFormSchema = z.object({
@@ -71,6 +72,7 @@ const lossFormSchema = z.object({
   deadPartsQuantity: z.coerce.number().optional(),
   factory: z.string().optional(),
   timeLost: z.coerce.number().optional(),
+  observations: z.string().optional(),
 });
 
 type ProductionFormValues = z.infer<typeof productionFormSchema>;
@@ -93,6 +95,7 @@ const ProductionFormContent = () => {
             operationsNumber: '',
             machiningTime: 0,
             status: 'Em produção',
+            observations: '',
         },
     });
 
@@ -342,6 +345,22 @@ const ProductionFormContent = () => {
                         </FormItem>
                     )}
                     />
+                     <FormField
+                      control={productionForm.control}
+                      name="observations"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Observações</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Adicione qualquer observação relevante"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <ProductionTimer
                         title="Cronômetro de Produção"
                         initialTimeInMinutes={machiningTime || 0}
@@ -371,6 +390,7 @@ const LossFormContent = () => {
             deadPartsQuantity: 0,
             factory: '',
             timeLost: 0,
+            observations: '',
         },
     });
 
@@ -541,6 +561,22 @@ const LossFormContent = () => {
                         </FormItem>
                       )}
                     />
+                     <FormField
+                      control={lossForm.control}
+                      name="observations"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Observações</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Adicione qualquer observação relevante"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <ProductionTimer 
                         title="Cronômetro de Perda"
                         initialTimeInMinutes={timeLost || 0}
@@ -670,6 +706,7 @@ export default function ProductionRegistryPage() {
                       <TableHead>Produzido</TableHead>
                       <TableHead>Tempo de Usinagem</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Observações</TableHead>
                       <TableHead>Registrado em</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
@@ -677,7 +714,7 @@ export default function ProductionRegistryPage() {
                   <TableBody>
                     {loadingProduction ? (
                       <TableRow>
-                        <TableCell colSpan={12} className="text-center h-24">
+                        <TableCell colSpan={13} className="text-center h-24">
                           Carregando...
                         </TableCell>
                       </TableRow>
@@ -718,6 +755,7 @@ export default function ProductionRegistryPage() {
                                 </SelectContent>
                                 </Select>
                           </TableCell>
+                          <TableCell>{record.observations}</TableCell>
                           <TableCell>
                             {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
                           </TableCell>
@@ -730,7 +768,7 @@ export default function ProductionRegistryPage() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={12} className="text-center h-24">
+                        <TableCell colSpan={13} className="text-center h-24">
                           Nenhum registro recente.
                         </TableCell>
                       </TableRow>
@@ -757,6 +795,7 @@ export default function ProductionRegistryPage() {
                       <TableHead>Motivo</TableHead>
                       <TableHead>Qtd. Peças Mortas</TableHead>
                       <TableHead>Tempo Perdido</TableHead>
+                      <TableHead>Observações</TableHead>
                       <TableHead>Registrado em</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
@@ -764,7 +803,7 @@ export default function ProductionRegistryPage() {
                   <TableBody>
                     {loadingLoss ? (
                        <TableRow>
-                        <TableCell colSpan={9} className="text-center h-24">
+                        <TableCell colSpan={10} className="text-center h-24">
                           Carregando...
                         </TableCell>
                       </TableRow>
@@ -786,6 +825,7 @@ export default function ProductionRegistryPage() {
                           {record.deadPartsQuantity}
                         </TableCell>
                         <TableCell>{record.timeLost}</TableCell>
+                        <TableCell>{record.observations}</TableCell>
                         <TableCell>
                            {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
                         </TableCell>
@@ -798,7 +838,7 @@ export default function ProductionRegistryPage() {
                     ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center h-24">
+                        <TableCell colSpan={10} className="text-center h-24">
                            Nenhum registro de perda.
                         </TableCell>
                       </TableRow>
