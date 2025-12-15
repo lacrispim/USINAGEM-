@@ -55,26 +55,28 @@ export default function RecordsPage() {
     setIsClient(true);
   }, []);
 
- const operators = useMemo(() => {
+  const operators = useMemo(() => {
     if (!productionRecords) return [];
-    const operatorSet = new Set<string>();
-    productionRecords.forEach((record: any) => {
+    return Array.from(
+      productionRecords.reduce((acc, record: any) => {
         if (record.operatorId && typeof record.operatorId === 'string' && record.operatorId.trim() !== '') {
-            operatorSet.add(record.operatorId);
+          acc.add(record.operatorId);
         }
-    });
-    return Array.from(operatorSet);
+        return acc;
+      }, new Set<string>())
+    );
   }, [productionRecords]);
 
   const factories = useMemo(() => {
     if (!productionRecords) return [];
-    const factorySet = new Set<string>();
-    productionRecords.forEach((record: any) => {
+     return Array.from(
+      productionRecords.reduce((acc, record: any) => {
         if (record.factory && typeof record.factory === 'string' && record.factory.trim() !== '') {
-            factorySet.add(record.factory);
+          acc.add(record.factory);
         }
-    });
-    return Array.from(factorySet);
+        return acc;
+      }, new Set<string>())
+    );
   }, [productionRecords]);
 
 
