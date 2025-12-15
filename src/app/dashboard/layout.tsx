@@ -34,8 +34,8 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
-  Table2,
   FileText,
+  Eye,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -62,6 +62,11 @@ export default function DashboardLayout({
       href: '/dashboard/production-registry',
       label: 'Registro de Produção',
       icon: FileText,
+    },
+    {
+        href: '/dashboard/records',
+        label: 'Visão Supervisor',
+        icon: Eye,
     },
     {
       href: '/dashboard/ai-recommendations',
