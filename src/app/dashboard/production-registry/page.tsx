@@ -345,15 +345,12 @@ const ProductionFormContent = () => {
                             </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                            <SelectItem value="machine-1">
-                                Máquina 1
-                            </SelectItem>
-                            <SelectItem value="machine-2">
-                                Máquina 2
-                            </SelectItem>
-                            <SelectItem value="machine-3">
-                                Máquina 3
-                            </SelectItem>
+                              <SelectItem value="TORNO CNC CENTUR 30">
+                                TORNO CNC CENTUR 30
+                              </SelectItem>
+                              <SelectItem value="CENTRO DE USINAGEM D600">
+                                CENTRO DE USINAGEM D600
+                              </SelectItem>
                             </SelectContent>
                         </Select>
                         <FormMessage />
@@ -618,11 +615,11 @@ const LossFormContent = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                               <SelectItem value="Centro de Usinagem D600">
-                                Centro de Usinagem D600
+                               <SelectItem value="TORNO CNC CENTUR 30">
+                                TORNO CNC CENTUR 30
                               </SelectItem>
-                              <SelectItem value="Torno CNC - Centur 30">
-                                Torno CNC - Centur 30
+                              <SelectItem value="CENTRO DE USINAGEM D600">
+                                CENTRO DE USINAGEM D600
                               </SelectItem>
                             </SelectContent>
                           </Select>
