@@ -30,7 +30,10 @@ export function ProductionTimer({
       interval = setInterval(() => {
         setTimeInSeconds((prevTime) => {
           const newTime = prevTime + 1;
-          onTimeChange(Math.floor(newTime / 60));
+          const newTimeInMinutes = Math.floor(newTime / 60);
+          requestAnimationFrame(() => {
+            onTimeChange(newTimeInMinutes);
+          });
           return newTime;
         });
       }, 1000);
