@@ -54,7 +54,7 @@ export default function RecordsPage() {
     if (!productionRecords) return [];
     const operatorSet = new Set<string>();
     productionRecords.forEach((record: any) => {
-        if (record.operatorId && typeof record.operatorId === 'string') {
+        if (record.operatorId && typeof record.operatorId === 'string' && record.operatorId.trim() !== '') {
             operatorSet.add(record.operatorId);
         }
     });
@@ -65,7 +65,7 @@ export default function RecordsPage() {
     if (!productionRecords) return [];
     const factorySet = new Set<string>();
     productionRecords.forEach((record: any) => {
-        if (record.factory && typeof record.factory === 'string') {
+        if (record.factory && typeof record.factory === 'string' && record.factory.trim() !== '') {
             factorySet.add(record.factory);
         }
     });
