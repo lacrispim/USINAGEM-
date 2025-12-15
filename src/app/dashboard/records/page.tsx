@@ -52,23 +52,31 @@ export default function RecordsPage() {
 
   const operators = useMemo(() => {
     if (!productionRecords) return [];
+    // This Set will store the unique, non-empty operator IDs.
     const operatorSet = new Set<string>();
+    // Loop through the records and add valid operator IDs to the Set.
     productionRecords.forEach((record: any) => {
-      if (record.operatorId && typeof record.operatorId === 'string' && record.operatorId.trim() !== '') {
-        operatorSet.add(record.operatorId);
+      // Ensure the operatorId is a non-empty string before adding.
+      if (record.operatorId && typeof record.operatorId === 'string' && record.operatorId.trim()) {
+        operatorSet.add(record.operatorId.trim());
       }
     });
+    // Convert the Set to an array to be used in the Select component.
     return Array.from(operatorSet);
   }, [productionRecords]);
 
   const factories = useMemo(() => {
     if (!productionRecords) return [];
+    // This Set will store the unique, non-empty factory names.
     const factorySet = new Set<string>();
+    // Loop through the records and add valid factory names to the Set.
     productionRecords.forEach((record: any) => {
-      if (record.factory && typeof record.factory === 'string' && record.factory.trim() !== '') {
-        factorySet.add(record.factory);
+      // Ensure the factory is a non-empty string before adding.
+      if (record.factory && typeof record.factory === 'string' && record.factory.trim()) {
+        factorySet.add(record.factory.trim());
       }
     });
+    // Convert the Set to an array to be used in the Select component.
     return Array.from(factorySet);
   }, [productionRecords]);
 
