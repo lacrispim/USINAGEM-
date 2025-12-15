@@ -65,12 +65,12 @@ export default function RecordsPage() {
     if (!productionRecords) return [];
     const factorySet = new Set<string>();
     productionRecords.forEach((record: any) => {
-        if (record.factory && typeof record.factory === 'string' && record.factory.trim() !== '') {
-            factorySet.add(record.factory);
-        }
+      if (record.factory && typeof record.factory === 'string' && record.factory.trim() !== '') {
+        factorySet.add(record.factory);
+      }
     });
     return Array.from(factorySet);
-}, [productionRecords]);
+  }, [productionRecords]);
 
   const filteredRecords = useMemo(() => {
     if (!productionRecords) return [];
