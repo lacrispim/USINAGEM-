@@ -59,11 +59,6 @@ export default function DashboardLayout({
       icon: LayoutDashboard,
     },
     {
-      href: '/dashboard/records',
-      label: 'Records',
-      icon: Table2,
-    },
-    {
       href: '/dashboard/production-registry',
       label: 'Registro de Produção',
       icon: FileText,
