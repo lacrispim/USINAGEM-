@@ -52,16 +52,24 @@ export default function RecordsPage() {
 
   const operators = useMemo(() => {
     if (!productionRecords) return [];
-    return [
-      ...new Set(productionRecords.map((record: any) => record.operatorId).filter(Boolean)),
-    ] as string[];
+    const operatorSet = new Set<string>();
+    productionRecords.forEach((record: any) => {
+        if (record.operatorId && typeof record.operatorId === 'string') {
+            operatorSet.add(record.operatorId);
+        }
+    });
+    return Array.from(operatorSet);
   }, [productionRecords]);
 
   const factories = useMemo(() => {
     if (!productionRecords) return [];
-    return [
-      ...new Set(productionRecords.map((record: any) => record.factory).filter(Boolean)),
-    ] as string[];
+    const factorySet = new Set<string>();
+    productionRecords.forEach((record: any) => {
+        if (record.factory && typeof record.factory === 'string') {
+            factorySet.add(record.factory);
+        }
+    });
+    return Array.from(factorySet);
   }, [productionRecords]);
 
   const filteredRecords = useMemo(() => {
