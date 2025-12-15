@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2 } from 'lucide-react';
+import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2, Edit, Save, XCircle } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -415,7 +415,11 @@ const ProductionFormContent = () => {
                     <ProductionTimer
                         title="Cronômetro de Produção"
                         initialTimeInMinutes={machiningTime || 0}
-                        onTimeChange={(time) => productionForm.setValue('machiningTime', time)}
+                        onTimeChange={(time) => {
+                            requestAnimationFrame(() => {
+                                productionForm.setValue('machiningTime', time)
+                            });
+                        }}
                     />
                     <Button type="submit" className="w-full">
                     Registrar Produção
@@ -688,7 +692,11 @@ const LossFormContent = () => {
                     <ProductionTimer 
                         title="Cronômetro de Perda"
                         initialTimeInMinutes={timeLost || 0}
-                        onTimeChange={(time) => lossForm.setValue('timeLost', time)}
+                        onTimeChange={(time) => {
+                            requestAnimationFrame(() => {
+                                lossForm.setValue('timeLost', time)
+                            });
+                        }}
                      />
                     <Button
                       type="submit"
@@ -715,6 +723,10 @@ const statusColorMap: { [key: string]: string } = {
 
 export default function ProductionRegistryPage() {
   const firestore = useFirestore();
+
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [editedRecord, setEditedRecord] = useState<any | null>(null);
+
 
   const productionRecordsQuery = firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc'), limit(10)) : null;
   const { data: productionRecords, loading: loadingProduction } = useCollection(productionRecordsQuery);
@@ -757,6 +769,60 @@ export default function ProductionRegistryPage() {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleEdit = (record: any) => {
+    setEditingRecordId(record.id);
+    setEditedRecord({ ...record, date: record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRecordId(null);
+    setEditedRecord(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!firestore || !editedRecord) return;
+    const { id, createdAt, ...dataToSave } = editedRecord;
+    // The 'date' is a string 'dd/MM/yyyy', it needs to be converted to a Date object for Firestore
+    if (typeof dataToSave.date === 'string') {
+        try {
+            dataToSave.date = parse(dataToSave.date, 'dd/MM/yyyy', new Date());
+        } catch (error) {
+            console.error("Error parsing date:", error);
+            toast({
+                title: 'Erro de Data',
+                description: 'O formato da data é inválido. Use dd/MM/yyyy.',
+                variant: 'destructive',
+            });
+            return;
+        }
+    }
+    const recordRef = doc(firestore, 'productionRecords', id);
+    try {
+      await updateDoc(recordRef, dataToSave);
+      toast({
+        title: 'Registro Atualizado',
+        description: 'O registro de produção foi atualizado com sucesso.',
+      });
+      handleCancelEdit();
+    } catch (error) {
+      console.error('Error updating record: ', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o registro.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setEditedRecord({ ...editedRecord, [name]: value });
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setEditedRecord({ ...editedRecord, [name]: value });
   };
 
   const { toast } = useToast();
@@ -829,67 +895,153 @@ export default function ProductionRegistryPage() {
                     ) : productionRecords && productionRecords.length > 0 ? (
                       productionRecords.map((record: any) => (
                         <TableRow key={record.id}>
-                          <TableCell>{record.operatorId}</TableCell>
-                          <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
-                          <TableCell>{record.factory}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{record.activityType}</Badge>
-                          </TableCell>
-                          <TableCell>{record.machine}</TableCell>
-                          <TableCell>{record.formsNumber}</TableCell>
-                          <TableCell>{record.operationsNumber}</TableCell>
-                          <TableCell>{record.quantityProduced}</TableCell>
-                          <TableCell>{record.machiningTime} min</TableCell>
-                           <TableCell>
-                                <Select
-                                value={record.status}
-                                onValueChange={(newStatus) =>
-                                    handleStatusChange(record.id, newStatus)
-                                }
-                                >
-                                <SelectTrigger className={cn("w-[180px] text-white", statusColorMap[record.status])}>
-                                    <SelectValue placeholder="Selecione um status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Fila de produção">
-                                    Fila de produção
-                                    </SelectItem>
-                                    <SelectItem value="Em produção">
-                                    Em produção
-                                    </SelectItem>
-                                    <SelectItem value="Encerrado">Encerrado</SelectItem>
-                                    <SelectItem value="Rejeitado">Rejeitado</SelectItem>
-                                    <SelectItem value="Enviado">Enviado</SelectItem>
-                                </SelectContent>
+                          {editingRecordId === record.id ? (
+                            <>
+                              <TableCell>
+                                <Select value={editedRecord.operatorId} onValueChange={(value) => handleSelectChange('operatorId', value)}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Daniel Solivo">Daniel Solivo</SelectItem>
+                                    <SelectItem value="Rodrigo Cantano">Rodrigo Cantano</SelectItem>
+                                    <SelectItem value="Gustavo Gozzi">Gustavo Gozzi</SelectItem>
+                                    <SelectItem value="William Martinucci">William Martinucci</SelectItem>
+                                  </SelectContent>
                                 </Select>
-                          </TableCell>
-                          <TableCell>{record.observations}</TableCell>
-                          <TableCell>
-                            {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
-                          </TableCell>
-                          <TableCell>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <Trash2 className="h-4 w-4 text-red-500" />
+                              </TableCell>
+                               <TableCell>
+                                <Input name="date" value={editedRecord.date} onChange={handleInputChange} />
+                              </TableCell>
+                              <TableCell>
+                                <Select value={editedRecord.factory} onValueChange={(value) => handleSelectChange('factory', value)}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="VALINHOS DOVE">VALINHOS DOVE</SelectItem>
+                                    <SelectItem value="VALINHOS SABONETE">VALINHOS SABONETE</SelectItem>
+                                    <SelectItem value="VINHEDO">VINHEDO</SelectItem>
+                                    <SelectItem value="POUSO ALEGRE">POUSO ALEGRE</SelectItem>
+                                    <SelectItem value="INDAIATUBA">INDAIATUBA</SelectItem>
+                                    <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
+                                    <SelectItem value="SUAPE">SUAPE</SelectItem>
+                                    <SelectItem value="IGARASSU">IGARASSU</SelectItem>
+                                    <SelectItem value="GARANHUS">GARANHUS</SelectItem>
+                                    <SelectItem value="TORRE">TORRE</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select value={editedRecord.activityType} onValueChange={(value) => handleSelectChange('activityType', value)}>
+                                   <SelectTrigger><SelectValue /></SelectTrigger>
+                                   <SelectContent>
+                                      <SelectItem value="usinagem">USINAGEM</SelectItem>
+                                      <SelectItem value="programacao">PROGRAMAÇÃO</SelectItem>
+                                      <SelectItem value="primeira-peca">PRIMEIRA PEÇA</SelectItem>
+                                   </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select value={editedRecord.machine} onValueChange={(value) => handleSelectChange('machine', value)}>
+                                     <SelectTrigger><SelectValue /></SelectTrigger>
+                                     <SelectContent>
+                                        <SelectItem value="TORNO CNC CENTUR 30">TORNO CNC CENTUR 30</SelectItem>
+                                        <SelectItem value="CENTRO DE USINAGEM D600">CENTRO DE USINAGEM D600</SelectItem>
+                                     </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell><Input name="formsNumber" value={editedRecord.formsNumber} onChange={handleInputChange} /></TableCell>
+                              <TableCell><Input name="operationsNumber" value={editedRecord.operationsNumber} onChange={handleInputChange} /></TableCell>
+                              <TableCell><Input type="number" name="quantityProduced" value={editedRecord.quantityProduced} onChange={handleInputChange} /></TableCell>
+                              <TableCell><Input type="number" name="machiningTime" value={editedRecord.machiningTime} onChange={handleInputChange} /></TableCell>
+                              <TableCell>
+                                 <Select value={editedRecord.status} onValueChange={(value) => handleSelectChange('status', value)}>
+                                    <SelectTrigger className={cn("w-[180px] text-white", statusColorMap[editedRecord.status])}><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Fila de produção">Fila de produção</SelectItem>
+                                        <SelectItem value="Em produção">Em produção</SelectItem>
+                                        <SelectItem value="Encerrado">Encerrado</SelectItem>
+                                        <SelectItem value="Rejeitado">Rejeitado</SelectItem>
+                                        <SelectItem value="Enviado">Enviado</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                              </TableCell>
+                              <TableCell><Textarea name="observations" value={editedRecord.observations} onChange={handleInputChange} /></TableCell>
+                              <TableCell>{record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}</TableCell>
+                              <TableCell className="flex gap-2">
+                                <Button variant="ghost" size="icon" onClick={handleSaveEdit}>
+                                  <Save className="h-4 w-4 text-green-500" />
                                 </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente o registro de produção.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete('productionRecords', record.id)}>
-                                    Excluir
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </TableCell>
+                                <Button variant="ghost" size="icon" onClick={handleCancelEdit}>
+                                  <XCircle className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </TableCell>
+                            </>
+                          ) : (
+                            <>
+                              <TableCell>{record.operatorId}</TableCell>
+                              <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
+                              <TableCell>{record.factory}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{record.activityType}</Badge>
+                              </TableCell>
+                              <TableCell>{record.machine}</TableCell>
+                              <TableCell>{record.formsNumber}</TableCell>
+                              <TableCell>{record.operationsNumber}</TableCell>
+                              <TableCell>{record.quantityProduced}</TableCell>
+                              <TableCell>{record.machiningTime} min</TableCell>
+                               <TableCell>
+                                    <Select
+                                    value={record.status}
+                                    onValueChange={(newStatus) =>
+                                        handleStatusChange(record.id, newStatus)
+                                    }
+                                    >
+                                    <SelectTrigger className={cn("w-[180px] text-white", statusColorMap[record.status])}>
+                                        <SelectValue placeholder="Selecione um status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Fila de produção">
+                                        Fila de produção
+                                        </SelectItem>
+                                        <SelectItem value="Em produção">
+                                        Em produção
+                                        </SelectItem>
+                                        <SelectItem value="Encerrado">Encerrado</SelectItem>
+                                        <SelectItem value="Rejeitado">Rejeitado</SelectItem>
+                                        <SelectItem value="Enviado">Enviado</SelectItem>
+                                    </SelectContent>
+                                    </Select>
+                              </TableCell>
+                              <TableCell>{record.observations}</TableCell>
+                              <TableCell>
+                                {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
+                              </TableCell>
+                              <TableCell className='flex gap-2'>
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(record)}>
+                                  <Edit className="h-4 w-4 text-blue-500" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente o registro de produção.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDelete('productionRecords', record.id)}>
+                                        Excluir
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </TableCell>
+                            </>
+                          )}
                         </TableRow>
                       ))
                     ) : (
@@ -999,5 +1151,3 @@ export default function ProductionRegistryPage() {
     </div>
   );
 }
-
-    
