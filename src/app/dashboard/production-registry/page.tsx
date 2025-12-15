@@ -73,6 +73,7 @@ const lossFormSchema = z.object({
   factory: z.string().optional(),
   timeLost: z.coerce.number().optional(),
   observations: z.string().optional(),
+  formsNumber: z.string().optional(),
 });
 
 type ProductionFormValues = z.infer<typeof productionFormSchema>;
@@ -82,10 +83,6 @@ const ProductionFormContent = () => {
     const { toast } = useToast();
     const firestore = useFirestore();
     const [isClient, setIsClient] = useState(false);
-
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
 
     const productionForm = useForm<ProductionFormValues>({
         resolver: zodResolver(productionFormSchema),
@@ -105,6 +102,7 @@ const ProductionFormContent = () => {
     });
 
      useEffect(() => {
+        setIsClient(true);
         if (isClient) {
             productionForm.reset({
                 ...productionForm.getValues(),
@@ -424,10 +422,6 @@ const LossFormContent = () => {
     const firestore = useFirestore();
      const [isClient, setIsClient] = useState(false);
 
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
-
     const lossForm = useForm<LossFormValues>({
         resolver: zodResolver(lossFormSchema),
         defaultValues: {
@@ -439,10 +433,12 @@ const LossFormContent = () => {
             factory: '',
             timeLost: 0,
             observations: '',
+            formsNumber: '',
         },
     });
 
      useEffect(() => {
+        setIsClient(true);
         if (isClient) {
             lossForm.reset({
                 ...lossForm.getValues(),
@@ -478,6 +474,7 @@ const LossFormContent = () => {
             factory: '',
             timeLost: 0,
             observations: '',
+            formsNumber: '',
         });
         } catch (error) {
         console.error('Error adding loss record: ', error);
@@ -575,6 +572,19 @@ const LossFormContent = () => {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                        control={lossForm.control}
+                        name="formsNumber"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Número do forms</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Ex: F-1024" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
                     <FormField
                       control={lossForm.control}
                       name="machine"
@@ -875,6 +885,7 @@ export default function ProductionRegistryPage() {
                       <TableHead>Operador</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Fábrica</TableHead>
+                      <TableHead>Nº Forms</TableHead>
                       <TableHead>Máquina</TableHead>
                       <TableHead>Motivo</TableHead>
                       <TableHead>Qtd. Peças Mortas</TableHead>
@@ -887,7 +898,7 @@ export default function ProductionRegistryPage() {
                   <TableBody>
                     {loadingLoss ? (
                        <TableRow>
-                        <TableCell colSpan={10} className="text-center h-24">
+                        <TableCell colSpan={11} className="text-center h-24">
                           Carregando...
                         </TableCell>
                       </TableRow>
@@ -897,6 +908,7 @@ export default function ProductionRegistryPage() {
                         <TableCell>{record.operatorId}</TableCell>
                         <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
                         <TableCell>{record.factory}</TableCell>
+                        <TableCell>{record.formsNumber}</TableCell>
                         <TableCell>{record.machine}</TableCell>
                         <TableCell>
                           <Badge
@@ -922,7 +934,7 @@ export default function ProductionRegistryPage() {
                     ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center h-24">
+                        <TableCell colSpan={11} className="text-center h-24">
                            Nenhum registro de perda.
                         </TableCell>
                       </TableRow>

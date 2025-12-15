@@ -101,6 +101,10 @@
         "observations": {
             "type": "string",
             "description": "Additional notes or observations about the loss."
+        },
+        "formsNumber": {
+          "type": "string",
+          "description": "The forms number associated with the activity."
         }
       },
       "required": ["operatorId", "date", "createdAt"]
@@ -124,5 +128,3 @@
     }
   }
 }
-
-    
