@@ -38,6 +38,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardLayout({
   children,
@@ -74,6 +75,76 @@ export default function DashboardLayout({
     },
   ];
 
+  const UserMenu = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="secondary" size="icon" className="rounded-full">
+          <Avatar>
+            <AvatarImage src="https://picsum.photos/seed/user-avatar/100/100" data-ai-hint="user avatar" alt="User" />
+            <AvatarFallback>UR</AvatarFallback>
+          </Avatar>
+          <span className="sr-only">Toggle user menu</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>Settings</DropdownMenuItem>
+        <DropdownMenuSeparator />
+         <DropdownMenuItem asChild>
+          <Link href="/login">
+            Log out
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const UserMenuFooter = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <SidebarMenuButton
+          className="justify-start"
+          tooltip="User Settings"
+        >
+          <Avatar className="h-7 w-7">
+            <AvatarImage src="https://picsum.photos/seed/user-avatar/100/100" data-ai-hint="user avatar" alt="User" />
+            <AvatarFallback>UR</AvatarFallback>
+          </Avatar>
+          <span className="text-sm font-medium">User</span>
+        </SidebarMenuButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56 mb-2 ml-2">
+        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>
+          <Settings className="mr-2 h-4 w-4" />
+          <span>Settings</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/login">
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Log out</span>
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const UserMenuPlaceholder = () => (
+     <div className="flex items-center justify-end">
+        <Skeleton className="h-10 w-10 rounded-full" />
+    </div>
+  );
+  
+  const UserMenuFooterPlaceholder = () => (
+    <div className="flex items-center gap-2 p-2">
+        <Skeleton className="h-7 w-7 rounded-full" />
+        <Skeleton className="h-4 w-12" />
+    </div>
+  );
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -99,37 +170,7 @@ export default function DashboardLayout({
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-          {isClient && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  className="justify-start"
-                  tooltip="User Settings"
-                >
-                  <Avatar className="h-7 w-7">
-                    <AvatarImage src="https://picsum.photos/seed/user-avatar/100/100" data-ai-hint="user avatar" alt="User" />
-                    <AvatarFallback>UR</AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm font-medium">User</span>
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56 mb-2 ml-2">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/login">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          {isClient ? <UserMenuFooter /> : <UserMenuFooterPlaceholder />}
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
@@ -138,30 +179,7 @@ export default function DashboardLayout({
           <div className="flex-1">
              {/* Can add page title or search bar here */}
           </div>
-          {isClient && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="secondary" size="icon" className="rounded-full">
-                  <Avatar>
-                    <AvatarImage src="https://picsum.photos/seed/user-avatar/100/100" data-ai-hint="user avatar" alt="User" />
-                    <AvatarFallback>UR</AvatarFallback>
-                  </Avatar>
-                  <span className="sr-only">Toggle user menu</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                 <DropdownMenuItem asChild>
-                  <Link href="/login">
-                    Log out
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          {isClient ? <UserMenu /> : <UserMenuPlaceholder />}
         </header>
         <main className="flex-1 p-4 lg:p-6">{children}</main>
       </SidebarInset>
