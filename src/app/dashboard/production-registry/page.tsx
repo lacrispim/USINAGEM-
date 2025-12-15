@@ -234,12 +234,16 @@ const ProductionFormContent = () => {
                             </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                            <SelectItem value="factory-1">
-                                Fábrica 1
-                            </SelectItem>
-                            <SelectItem value="factory-2">
-                                Fábrica 2
-                            </SelectItem>
+                                <SelectItem value="VALINHOS DOVE">VALINHOS DOVE</SelectItem>
+                                <SelectItem value="VALINHOS SABONETE">VALINHOS SABONETE</SelectItem>
+                                <SelectItem value="VINHEDO">VINHEDO</SelectItem>
+                                <SelectItem value="POUSO ALEGRE">POUSO ALEGRE</SelectItem>
+                                <SelectItem value="INDAIATUBA">INDAIATUBA</SelectItem>
+                                <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
+                                <SelectItem value="SUAPE">SUAPE</SelectItem>
+                                <SelectItem value="IGARASSU">IGARASSU</SelectItem>
+                                <SelectItem value="GARANHUS">GARANHUS</SelectItem>
+                                <SelectItem value="TORRE">TORRE</SelectItem>
                             </SelectContent>
                         </Select>
                         <FormMessage />
@@ -569,12 +573,16 @@ const LossFormContent = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="Garanhuns">
-                                Garanhuns
-                              </SelectItem>
-                              <SelectItem value="Valinhos">
-                                Valinhos
-                              </SelectItem>
+                                <SelectItem value="VALINHOS DOVE">VALINHOS DOVE</SelectItem>
+                                <SelectItem value="VALINHOS SABONETE">VALINHOS SABONETE</SelectItem>
+                                <SelectItem value="VINHEDO">VINHEDO</SelectItem>
+                                <SelectItem value="POUSO ALEGRE">POUSO ALEGRE</SelectItem>
+                                <SelectItem value="INDAIATUBA">INDAIATUBA</SelectItem>
+                                <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
+                                <SelectItem value="SUAPE">SUAPE</SelectItem>
+                                <SelectItem value="IGARASSU">IGARASSU</SelectItem>
+                                <SelectItem value="GARANHUS">GARANHUS</SelectItem>
+                                <SelectItem value="TORRE">TORRE</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -994,3 +1002,5 @@ export default function ProductionRegistryPage() {
     </div>
   );
 }
+
+    
