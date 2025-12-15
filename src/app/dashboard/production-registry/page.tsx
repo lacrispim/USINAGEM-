@@ -173,17 +173,30 @@ const ProductionFormContent = () => {
                     className="space-y-4"
                 >
                     <FormField
-                    control={productionForm.control}
-                    name="operatorId"
-                    render={({ field }) => (
+                      control={productionForm.control}
+                      name="operatorId"
+                      render={({ field }) => (
                         <FormItem>
-                        <FormLabel>ID do Operador</FormLabel>
-                        <FormControl>
-                            <Input placeholder="Ex: OP-001" {...field} />
-                        </FormControl>
-                        <FormMessage />
+                          <FormLabel>ID do Operador</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o operador" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Daniel Solivo">Daniel Solivo</SelectItem>
+                              <SelectItem value="Rodrigo Cantano">Rodrigo Cantano</SelectItem>
+                              <SelectItem value="Gustavo Gozzi">Gustavo Gozzi</SelectItem>
+                              <SelectItem value="William Martinucci">William Martinucci</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
                         </FormItem>
-                    )}
+                      )}
                     />
                     <FormField
                       control={productionForm.control}
@@ -501,9 +514,22 @@ const LossFormContent = () => {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>ID do Operador</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ex: OP-001" {...field} />
-                          </FormControl>
+                           <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o operador" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Daniel Solivo">Daniel Solivo</SelectItem>
+                              <SelectItem value="Rodrigo Cantano">Rodrigo Cantano</SelectItem>
+                              <SelectItem value="Gustavo Gozzi">Gustavo Gozzi</SelectItem>
+                              <SelectItem value="William Martinucci">William Martinucci</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -911,5 +937,3 @@ export default function ProductionRegistryPage() {
     </div>
   );
 }
-
-    
