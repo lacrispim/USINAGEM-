@@ -2,7 +2,7 @@
 
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -49,6 +49,11 @@ export default function RecordsPage() {
   const [operatorFilter, setOperatorFilter] = useState('');
   const [factoryFilter, setFactoryFilter] = useState('');
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
  const operators = useMemo(() => {
     if (!productionRecords) return [];
@@ -103,68 +108,70 @@ export default function RecordsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex flex-wrap items-center gap-4">
-            <Select value={operatorFilter} onValueChange={setOperatorFilter}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Filtrar por Operador" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Todos Operadores</SelectItem>
-                {operators.map((operator) => (
-                  <SelectItem key={operator} value={operator}>
-                    {operator}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {isClient && (
+            <div className="mb-4 flex flex-wrap items-center gap-4">
+              <Select value={operatorFilter} onValueChange={setOperatorFilter}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Filtrar por Operador" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos Operadores</SelectItem>
+                  {operators.map((operator) => (
+                    <SelectItem key={operator} value={operator}>
+                      {operator}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={factoryFilter} onValueChange={setFactoryFilter}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Filtrar por Fábrica" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Todas Fábricas</SelectItem>
-                {factories.map((factory) => (
-                  <SelectItem key={factory} value={factory}>
-                    {factory}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={factoryFilter} onValueChange={setFactoryFilter}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Filtrar por Fábrica" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todas Fábricas</SelectItem>
+                  {factories.map((factory) => (
+                    <SelectItem key={factory} value={factory}>
+                      {factory}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={'outline'}
-                  className={cn(
-                    'w-full justify-start text-left font-normal md:w-[240px]',
-                    !dateFilter && 'text-muted-foreground'
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateFilter ? (
-                    format(dateFilter, 'PPP', { locale: ptBR })
-                  ) : (
-                    <span>Filtrar por data</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={dateFilter}
-                  onSelect={setDateFilter}
-                  initialFocus
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={'outline'}
+                    className={cn(
+                      'w-full justify-start text-left font-normal md:w-[240px]',
+                      !dateFilter && 'text-muted-foreground'
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateFilter ? (
+                      format(dateFilter, 'PPP', { locale: ptBR })
+                    ) : (
+                      <span>Filtrar por data</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={dateFilter}
+                    onSelect={setDateFilter}
+                    initialFocus
+                    locale={ptBR}
+                  />
+                </PopoverContent>
+              </Popover>
 
-            <Button variant="ghost" onClick={clearFilters} className="flex items-center gap-2">
-                <X className="h-4 w-4" />
-                Limpar Filtros
-            </Button>
-          </div>
+              <Button variant="ghost" onClick={clearFilters} className="flex items-center gap-2">
+                  <X className="h-4 w-4" />
+                  Limpar Filtros
+              </Button>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <Table>
