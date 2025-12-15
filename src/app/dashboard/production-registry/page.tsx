@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2, Edit, Save, XCircle } from 'lucide-react';
+import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2, Edit, Save, XCircle, FileSpreadsheet } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -58,6 +58,7 @@ import { addDoc, collection, serverTimestamp, orderBy, query, limit, deleteDoc, 
 import { format, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
@@ -827,6 +828,27 @@ export default function ProductionRegistryPage() {
 
   const { toast } = useToast();
 
+  const exportToExcel = (data: any[], fileName: string) => {
+    if (!data || data.length === 0) {
+      toast({
+        title: 'Nenhum dado para exportar',
+        description: 'A tabela está vazia.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    const formattedData = data.map(record => ({
+      ...record,
+      date: record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date,
+      createdAt: record.createdAt?.toDate ? format(record.createdAt.toDate(), 'dd/MM/yyyy HH:mm:ss') : record.createdAt,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(formattedData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Dados');
+    XLSX.writeFile(workbook, `${fileName}.xlsx`);
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -861,10 +883,18 @@ export default function ProductionRegistryPage() {
           <div className="mt-8 space-y-8">
             <Card>
               <CardHeader>
-                <CardTitle>Registros de Produção Recentes</CardTitle>
-                <CardDescription>
-                  Últimas 10 entradas de produção bem-sucedida.
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>Registros de Produção Recentes</CardTitle>
+                        <CardDescription>
+                        Últimas 10 entradas de produção bem-sucedida.
+                        </CardDescription>
+                    </div>
+                    <Button onClick={() => exportToExcel(productionRecords, 'Registros_Producao')}>
+                        <FileSpreadsheet className="mr-2 h-4 w-4" />
+                        Exportar para Excel
+                    </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -1056,11 +1086,19 @@ export default function ProductionRegistryPage() {
               </CardContent>
             </Card>
             <Card>
-              <CardHeader>
-                <CardTitle>Registros de Perdas Recentes</CardTitle>
-                <CardDescription>
-                  Últimas 10 entradas de perdas de produção.
-                </CardDescription>
+               <CardHeader>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>Registros de Perdas Recentes</CardTitle>
+                        <CardDescription>
+                        Últimas 10 entradas de perdas de produção.
+                        </CardDescription>
+                    </div>
+                    <Button onClick={() => exportToExcel(lossRecords, 'Registros_Perdas')}>
+                        <FileSpreadsheet className="mr-2 h-4 w-4" />
+                        Exportar para Excel
+                    </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
