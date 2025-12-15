@@ -53,15 +53,15 @@ export default function RecordsPage() {
   const operators = useMemo(() => {
     if (!productionRecords) return [];
     return [
-      ...new Set(productionRecords.map((record: any) => record.operatorId)),
-    ];
+      ...new Set(productionRecords.map((record: any) => record.operatorId).filter(Boolean)),
+    ] as string[];
   }, [productionRecords]);
 
   const factories = useMemo(() => {
     if (!productionRecords) return [];
     return [
-      ...new Set(productionRecords.map((record: any) => record.factory)),
-    ];
+      ...new Set(productionRecords.map((record: any) => record.factory).filter(Boolean)),
+    ] as string[];
   }, [productionRecords]);
 
   const filteredRecords = useMemo(() => {
