@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Hourglass, Loader } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
+import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
 
 export default function RecordsPage() {
   const firestore = useFirestore();
@@ -41,6 +42,28 @@ export default function RecordsPage() {
   }, [productionRecords, lossRecords]);
 
 
+  const lossReasonData = useMemo(() => {
+    if (!lossRecords) {
+      return [];
+    }
+
+    const reasonMap = lossRecords.reduce((acc, record) => {
+      const reason = record.lossReason || 'Não especificado';
+      const time = record.timeLost || 0;
+      if (!acc[reason]) {
+        acc[reason] = 0;
+      }
+      acc[reason] += time;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(reasonMap).map(([name, value]) => ({
+      name,
+      value,
+    }));
+  }, [lossRecords]);
+
+
   const isLoading = loadingProduction || loadingLoss || totalHoursData.isLoading;
 
 
@@ -73,6 +96,9 @@ export default function RecordsPage() {
             </p>
           </CardContent>
         </Card>
+      </div>
+       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <LossReasonPieChart data={lossReasonData} loading={loadingLoss} />
       </div>
     </div>
   );
