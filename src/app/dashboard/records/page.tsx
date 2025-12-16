@@ -1,8 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Hourglass, Loader, Package, TriangleAlert } from 'lucide-react';
+import { Hourglass, Loader, Package, TriangleAlert, PlusCircle } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
@@ -73,11 +75,19 @@ export default function RecordsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Visão Supervisor</h1>
-        <p className="text-muted-foreground">
-          Uma visão geral dos dados de produção.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Visão Supervisor</h1>
+          <p className="text-muted-foreground">
+            Uma visão geral dos dados de produção.
+          </p>
+        </div>
+         <Button asChild>
+          <Link href="/dashboard/production-registry">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add New Record
+          </Link>
+        </Button>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
