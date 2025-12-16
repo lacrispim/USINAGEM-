@@ -9,6 +9,9 @@ const formSchema = z.object({
   machiningTime: z.coerce.number().positive('Machining time must be a positive number.'),
   materialType: z.string().min(1, 'Material type is required.'),
   historicalData: z.string().min(1, 'Historical data is required.'),
+  cuttingSpeed: z.coerce.number().positive('Cutting speed must be a positive number.'),
+  feedRate: z.coerce.number().positive('Feed rate must be a positive number.'),
+  depthOfCut: z.coerce.number().positive('Depth of cut must be a positive number.'),
 });
 
 export type RecommendationState = {
@@ -20,6 +23,9 @@ export type RecommendationState = {
     machiningTime?: string[];
     materialType?: string[];
     historicalData?: string[];
+    cuttingSpeed?: string[];
+    feedRate?: string[];
+    depthOfCut?: string[];
   };
 };
 
@@ -32,6 +38,9 @@ export async function getRecommendationsAction(
     machiningTime: formData.get('machiningTime'),
     materialType: formData.get('materialType'),
     historicalData: formData.get('historicalData'),
+    cuttingSpeed: formData.get('cuttingSpeed'),
+    feedRate: formData.get('feedRate'),
+    depthOfCut: formData.get('depthOfCut'),
   });
 
   if (!validatedFields.success) {

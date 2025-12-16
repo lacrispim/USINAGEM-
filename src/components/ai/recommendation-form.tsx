@@ -87,6 +87,23 @@ export function RecommendationForm() {
                     {state.errors?.machiningTime && <p className="text-sm font-medium text-destructive">{state.errors.machiningTime[0]}</p>}
                 </div>
             </div>
+             <div className="grid grid-cols-3 gap-4">
+                <div>
+                    <Label htmlFor="cuttingSpeed">Cutting Speed (m/min)</Label>
+                    <Input id="cuttingSpeed" name="cuttingSpeed" type="number" step="1" defaultValue="200" />
+                    {state.errors?.cuttingSpeed && <p className="text-sm font-medium text-destructive">{state.errors.cuttingSpeed[0]}</p>}
+                </div>
+                <div>
+                    <Label htmlFor="feedRate">Feed Rate (mm/rev)</Label>
+                    <Input id="feedRate" name="feedRate" type="number" step="0.01" defaultValue="0.15" />
+                    {state.errors?.feedRate && <p className="text-sm font-medium text-destructive">{state.errors.feedRate[0]}</p>}
+                </div>
+                 <div>
+                    <Label htmlFor="depthOfCut">Depth of Cut (mm)</Label>
+                    <Input id="depthOfCut" name="depthOfCut" type="number" step="0.1" defaultValue="2" />
+                    {state.errors?.depthOfCut && <p className="text-sm font-medium text-destructive">{state.errors.depthOfCut[0]}</p>}
+                </div>
+            </div>
             <div>
               <Label htmlFor="materialType">Material Type</Label>
               <Input id="materialType" name="materialType" defaultValue="Steel" />

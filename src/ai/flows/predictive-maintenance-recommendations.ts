@@ -20,6 +20,9 @@ const PredictiveMaintenanceRecommendationsInputSchema = z.object({
     .describe(
       'Historical data of tool performance, including wear rates, failure points, and machining parameters.'
     ),
+  cuttingSpeed: z.number().describe('The cutting speed (e.g., in m/min).'),
+  feedRate: z.number().describe('The feed rate (e.g., in mm/rev).'),
+  depthOfCut: z.number().describe('The depth of cut (e.g., in mm).'),
 });
 export type PredictiveMaintenanceRecommendationsInput = z.infer<
   typeof PredictiveMaintenanceRecommendationsInputSchema
@@ -46,17 +49,21 @@ const prompt = ai.definePrompt({
   name: 'predictiveMaintenanceRecommendationsPrompt',
   input: {schema: PredictiveMaintenanceRecommendationsInputSchema},
   output: {schema: PredictiveMaintenanceRecommendationsOutputSchema},
-  prompt: `You are an expert in machining and predictive maintenance.
+  prompt: `You are an expert in machining and predictive maintenance for CNC machines like a D600 Machining Center.
 
   Based on the provided machining data, generate specific recommendations for predictive maintenance.
   Include a confidence level (0-1) for your recommendations and the reasoning behind them.
 
-  Tool Wear: {{{toolWear}}}
-  Machining Time: {{{machiningTime}}}
-  Material Type: {{{materialType}}}
-  Historical Data: {{{historicalData}}}
+  - Tool Wear: {{{toolWear}}} mm
+  - Machining Time: {{{machiningTime}}} hours
+  - Material Type: {{{materialType}}}
+  - Cutting Speed: {{{cuttingSpeed}}} m/min
+  - Feed Rate: {{{feedRate}}} mm/rev
+  - Depth of Cut: {{{depthOfCut}}} mm
+  - Historical Data: {{{historicalData}}}
 
-  Consider factors like tool wear rate, material properties, and historical performance to provide actionable insights.
+  Consider factors like tool wear rate, material properties, cutting parameters, and historical performance to provide actionable insights.
+  For example, high cutting speeds on hard materials might accelerate tool wear.
   Make sure that the recommendation is clear and actionable.
   Ensure that the confidence level reflects the certainty of your assessment based on the available data.
   Give a short reasoning.
