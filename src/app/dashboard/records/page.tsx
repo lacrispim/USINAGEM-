@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Hourglass, Loader, Package } from 'lucide-react';
+import { Hourglass, Loader, Package, TriangleAlert } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
@@ -64,6 +64,7 @@ export default function RecordsPage() {
   }, [lossRecords]);
 
   const totalProductionRecords = productionRecords ? productionRecords.length : 0;
+  const totalLossRecords = lossRecords ? lossRecords.length : 0;
 
   const isLoading = loadingProduction || loadingLoss || totalHoursData.isLoading;
 
@@ -114,6 +115,26 @@ export default function RecordsPage() {
                 )}
               <p className="text-xs text-muted-foreground">
                 Total de registros na base de dados.
+              </p>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total de Registros de Perda
+              </CardTitle>
+              <TriangleAlert className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                {isLoading ? (
+                <div className="flex items-center justify-center h-10">
+                    <Loader className="animate-spin" />
+                </div>
+                ) : (
+                    <div className="text-2xl font-bold">{totalLossRecords}</div>
+                )}
+              <p className="text-xs text-muted-foreground">
+                Total de perdas registradas na base de dados.
               </p>
             </CardContent>
         </Card>
