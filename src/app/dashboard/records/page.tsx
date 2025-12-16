@@ -6,6 +6,8 @@ import { Hourglass, Loader, Package, TriangleAlert } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
+import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
+
 
 export default function RecordsPage() {
   const firestore = useFirestore();
@@ -141,6 +143,7 @@ export default function RecordsPage() {
       </div>
        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LossReasonPieChart data={lossReasonData} loading={loadingLoss} />
+        <MachiningTimeByFactoryChart data={productionRecords || []} loading={loadingProduction} />
       </div>
     </div>
   );
