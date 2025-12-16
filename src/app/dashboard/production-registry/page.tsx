@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2, Edit, Save, XCircle, FileSpreadsheet } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
@@ -860,22 +859,7 @@ export default function ProductionRegistryPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="operator-mode" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="supervisor-view">
-            <Monitor className="mr-2 h-4 w-4" />
-            Visão Supervisor
-          </TabsTrigger>
-          <TabsTrigger value="operator-mode">
-            <Smartphone className="mr-2 h-4 w-4" />
-            Modo Operador
-          </TabsTrigger>
-          <TabsTrigger value="optimization">
-            <TrendingUp className="mr-2 h-4 w-4" />
-            Otimização
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="operator-mode">
+      <div>
           <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <ProductionFormContent />
             <LossFormContent />
@@ -1184,8 +1168,7 @@ export default function ProductionRegistryPage() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-      </Tabs>
+      </div>
     </div>
   );
 }
