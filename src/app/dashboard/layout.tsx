@@ -54,11 +54,6 @@ export default function DashboardLayout({
 
   const menuItems = [
     {
-      href: '/dashboard',
-      label: 'Dashboard',
-      icon: LayoutDashboard,
-    },
-    {
       href: '/dashboard/production-registry',
       label: 'Registro de Produção',
       icon: FileText,
