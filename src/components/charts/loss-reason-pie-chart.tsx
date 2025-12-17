@@ -1,6 +1,6 @@
 'use client';
 
-import { Pie, PieChart, Cell, LabelList, Label } from 'recharts';
+import { Pie, PieChart, Cell, Label } from 'recharts';
 import {
   Card,
   CardContent,
@@ -104,13 +104,6 @@ export function LossReasonPieChart({ data, loading, totalMinutes }: LossReasonPi
                         return null;
                     }}
                    />
-                  <LabelList
-                    dataKey="value"
-                    position="outside"
-                    offset={12}
-                    className="fill-black text-sm"
-                    formatter={(value: number) => `${value} min`}
-                  />
                   {data.map((_, index) => (
                     <Cell
                       key={`cell-${index}`}
