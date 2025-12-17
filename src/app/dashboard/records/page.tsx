@@ -22,7 +22,7 @@ import { collection, query } from 'firebase/firestore';
 import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
-import { getWeek, getYear, getMonth, format } from 'date-fns';
+import { getWeek, getYear, getMonth, format, getISOWeek, startOfMonth, endOfMonth, eachWeekOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Select,
@@ -37,6 +37,8 @@ export default function RecordsPage() {
   const firestore = useFirestore();
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [selectedWeek, setSelectedWeek] = useState<string>('all');
+
 
   const productionRecordsQuery = firestore
     ? query(collection(firestore, 'productionRecords'))
@@ -49,38 +51,77 @@ export default function RecordsPage() {
     : null;
   const { data: lossRecords, loading: loadingLoss } =
     useCollection(lossRecordsQuery);
-
-  const { availableYears, availableMonths, filteredProductionRecords } = useMemo(() => {
+    
+  const { availableYears, availableMonths, availableWeeks, filteredProductionRecords } = useMemo(() => {
     if (!productionRecords) {
-      return { availableYears: [], availableMonths: [], filteredProductionRecords: [] };
+        return { availableYears: [], availableMonths: [], availableWeeks: [], filteredProductionRecords: [] };
     }
 
     const years = new Set<number>();
-    const months = new Set<number>();
-
     productionRecords.forEach((record) => {
-      if (record.date?.toDate) {
-        const recordDate = record.date.toDate();
-        years.add(getYear(recordDate));
-        if (selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10)) {
-            months.add(getMonth(recordDate));
+        if (record.date?.toDate) {
+            years.add(getYear(record.date.toDate()));
         }
-      }
     });
-
     const sortedYears = Array.from(years).sort((a, b) => b - a);
+
+    const year = selectedYear === 'all' ? null : parseInt(selectedYear, 10);
+
+    const months = new Set<number>();
+    if (year) {
+        productionRecords.forEach((record) => {
+            if (record.date?.toDate && getYear(record.date.toDate()) === year) {
+                months.add(getMonth(record.date.toDate()));
+            }
+        });
+    }
     const sortedMonths = Array.from(months).sort((a, b) => a - b);
     
+    const month = selectedMonth === 'all' ? null : parseInt(selectedMonth, 10);
+    
+    const weeks = new Set<number>();
+    if (year && month !== null) {
+        productionRecords.forEach((record) => {
+            const recordDate = record.date?.toDate;
+            if (recordDate && getYear(recordDate) === year && getMonth(recordDate) === month) {
+                weeks.add(getISOWeek(recordDate));
+            }
+        });
+    }
+    const sortedWeeks = Array.from(weeks).sort((a, b) => a - b);
+
+
     const filtered = productionRecords.filter((record) => {
         if (!record.date?.toDate) return false;
         const recordDate = record.date.toDate();
+        
         const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
+        if (!yearMatch) return false;
+        
         const monthMatch = selectedMonth === 'all' || getMonth(recordDate) === parseInt(selectedMonth, 10);
-        return yearMatch && monthMatch;
+        if (!monthMatch) return false;
+
+        const weekMatch = selectedWeek === 'all' || getISOWeek(recordDate) === parseInt(selectedWeek, 10);
+        if (!weekMatch) return false;
+
+        return true;
     });
 
-    return { availableYears: sortedYears, availableMonths: sortedMonths, filteredProductionRecords: filtered };
-  }, [productionRecords, selectedYear, selectedMonth]);
+    return { availableYears: sortedYears, availableMonths: sortedMonths, availableWeeks: sortedWeeks, filteredProductionRecords: filtered };
+  }, [productionRecords, selectedYear, selectedMonth, selectedWeek]);
+
+
+  // Reset month and week when year changes
+  useState(() => {
+    setSelectedMonth('all');
+    setSelectedWeek('all');
+  }, [selectedYear]);
+
+  // Reset week when month changes
+  useState(() => {
+    setSelectedWeek('all');
+  }, [selectedMonth]);
+
 
   const totalHoursData = useMemo(() => {
     const initialHours = 540;
@@ -244,7 +285,7 @@ export default function RecordsPage() {
                 Tempo de usinagem (em minutos) por dia para cada fábrica.
               </CardDescription>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
                 <div className="grid w-full sm:w-36 gap-1.5">
                     <Label htmlFor="year-filter">Ano</Label>
                     <Select value={selectedYear} onValueChange={setSelectedYear}>
@@ -277,6 +318,22 @@ export default function RecordsPage() {
                         </SelectContent>
                     </Select>
                 </div>
+                <div className="grid w-full sm:w-48 gap-1.5">
+                    <Label htmlFor="week-filter">Semana</Label>
+                    <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedMonth === 'all'}>
+                        <SelectTrigger id="week-filter">
+                        <SelectValue placeholder="Selecione a semana" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="all">Todas as Semanas</SelectItem>
+                        {availableWeeks.map((week) => (
+                            <SelectItem key={week} value={String(week)}>
+                                {`Semana ${week}`}
+                            </SelectItem>
+                        ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
           </div>
         </CardHeader>
@@ -284,6 +341,7 @@ export default function RecordsPage() {
           <MachiningTimeTrendChart
             data={filteredProductionRecords}
             loading={loadingProduction}
+            isWeekView={selectedWeek !== 'all'}
           />
         </CardContent>
       </Card>

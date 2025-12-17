@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
+  Tooltip,
 } from 'recharts';
 import {
   Card,
@@ -33,7 +34,7 @@ interface MachiningTimeTrendChartProps {
     date?: { toDate: () => Date };
   }[];
   loading: boolean;
-  isWeekView?: boolean; // This prop is no longer used for filtering but kept to avoid breaking changes if used elsewhere.
+  isWeekView?: boolean;
 }
 
 const FACTORY_COLORS: { [key: string]: string } = {
@@ -53,6 +54,7 @@ const FACTORY_COLORS: { [key: string]: string } = {
 export function MachiningTimeTrendChart({
   data,
   loading,
+  isWeekView,
 }: MachiningTimeTrendChartProps) {
   const { chartData, factories } = useMemo(() => {
     if (!data) {
@@ -101,7 +103,10 @@ export function MachiningTimeTrendChart({
   }, {} as any);
 
   const xAxisFormatter = (value: string) => {
-    return format(new Date(value), 'dd/MM');
+    const date = new Date(value);
+    // add a day to the date to show correct day of week
+    date.setDate(date.getDate() + 1);
+    return isWeekView ? format(date, 'EEE', { locale: ptBR }) : format(date, 'dd/MM');
   }
 
 
