@@ -69,7 +69,7 @@ export function MachiningTimeTrendChart({
         const dateObj = record.date.toDate();
         const dateStr = format(dateObj, 'yyyy-MM-dd');
         const factory = record.factory;
-        const timeInMinutes = record.machiningTime || 0;
+        const timeInHours = (record.machiningTime || 0) / 60; // Convert to hours
 
         if (!dailyData[dateStr]) {
           dailyData[dateStr] = {};
@@ -77,7 +77,7 @@ export function MachiningTimeTrendChart({
         if (!dailyData[dateStr][factory]) {
           dailyData[dateStr][factory] = 0;
         }
-        dailyData[dateStr][factory] += timeInMinutes;
+        dailyData[dateStr][factory] += timeInHours;
         factorySet.add(factory);
       }
     });
@@ -129,7 +129,7 @@ export function MachiningTimeTrendChart({
                   tickMargin={8}
                 />
                 <YAxis
-                  tickFormatter={(value) => `${value} min`}
+                  tickFormatter={(value) => `${value.toFixed(1)}h`}
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
@@ -137,7 +137,7 @@ export function MachiningTimeTrendChart({
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent
-                     formatter={(value, name) => [`${(value as number).toFixed(0)} min`, name]}
+                     formatter={(value, name) => [`${(value as number).toFixed(2)}h`, name]}
                      indicator="dot"
                   />}
                 />
