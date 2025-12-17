@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,16 +10,48 @@ import { collection, query } from 'firebase/firestore';
 import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
+import { getWeek } from 'date-fns';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 
 export default function RecordsPage() {
   const firestore = useFirestore();
+  const [selectedWeek, setSelectedWeek] = useState<string>('all');
 
   const productionRecordsQuery = firestore ? query(collection(firestore, 'productionRecords')) : null;
   const { data: productionRecords, loading: loadingProduction } = useCollection(productionRecordsQuery);
 
   const lossRecordsQuery = firestore ? query(collection(firestore, 'lossRecords')) : null;
   const { data: lossRecords, loading: loadingLoss } = useCollection(lossRecordsQuery);
+
+  const { availableWeeks, filteredProductionRecords } = useMemo(() => {
+    if (!productionRecords) {
+      return { availableWeeks: [], filteredProductionRecords: [] };
+    }
+
+    const weeks = new Set<number>();
+    productionRecords.forEach(record => {
+      if (record.date?.toDate) {
+        weeks.add(getWeek(record.date.toDate(), { weekStartsOn: 1 }));
+      }
+    });
+    const sortedWeeks = Array.from(weeks).sort((a, b) => a - b);
+    
+    const filtered = selectedWeek === 'all' 
+      ? productionRecords
+      : productionRecords.filter(record => 
+          record.date?.toDate && getWeek(record.date.toDate(), { weekStartsOn: 1 }) === parseInt(selectedWeek, 10)
+        );
+
+    return { availableWeeks: sortedWeeks, filteredProductionRecords: filtered };
+  }, [productionRecords, selectedWeek]);
 
   const totalHoursData = useMemo(() => {
     const initialHours = 540;
@@ -163,9 +195,37 @@ export default function RecordsPage() {
         <LossReasonPieChart data={lossReasonData} loading={loadingLoss} totalMinutes={totalLostMinutes} />
         <MachiningTimeByFactoryChart data={productionRecords || []} loading={loadingProduction} />
       </div>
-       <div className="grid grid-cols-1 gap-6">
-        <MachiningTimeTrendChart data={productionRecords || []} loading={loadingProduction} />
-      </div>
+       <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Tendência do Tempo de Usinagem por Fábrica</CardTitle>
+              <CardDescription>
+                Tempo de usinagem (em minutos) por dia para cada fábrica.
+              </CardDescription>
+            </div>
+            <div className="mt-4 sm:mt-0 sm:w-48">
+              <Label htmlFor="week-filter">Filtrar por Semana</Label>
+              <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+                <SelectTrigger id="week-filter">
+                  <SelectValue placeholder="Selecione a semana" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as Semanas</SelectItem>
+                  {availableWeeks.map(week => (
+                    <SelectItem key={week} value={String(week)}>
+                      Semana {week}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <MachiningTimeTrendChart data={filteredProductionRecords} loading={loadingProduction} isWeekView={selectedWeek !== 'all'}/>
+        </CardContent>
+      </Card>
     </div>
   );
 }

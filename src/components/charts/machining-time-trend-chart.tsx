@@ -23,7 +23,8 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Loader } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, getDay } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface MachiningTimeTrendChartProps {
   data: {
@@ -32,6 +33,7 @@ interface MachiningTimeTrendChartProps {
     date?: { toDate: () => Date };
   }[];
   loading: boolean;
+  isWeekView?: boolean;
 }
 
 const FACTORY_COLORS: { [key: string]: string } = {
@@ -51,6 +53,7 @@ const FACTORY_COLORS: { [key: string]: string } = {
 export function MachiningTimeTrendChart({
   data,
   loading,
+  isWeekView = false
 }: MachiningTimeTrendChartProps) {
   const { chartData, factories } = useMemo(() => {
     if (!data) {
@@ -62,7 +65,8 @@ export function MachiningTimeTrendChart({
 
     data.forEach((record) => {
       if (record.factory && record.date && record.date.toDate) {
-        const dateStr = format(record.date.toDate(), 'yyyy-MM-dd');
+        const dateObj = record.date.toDate();
+        const dateStr = format(dateObj, 'yyyy-MM-dd');
         const factory = record.factory;
         const timeInMinutes = record.machiningTime || 0;
 
@@ -79,15 +83,24 @@ export function MachiningTimeTrendChart({
 
     const sortedFactories = Array.from(factorySet).sort();
 
-    const chartData = Object.entries(dailyData)
+    let chartData = Object.entries(dailyData)
       .map(([date, factoryTimes]) => ({
         date,
         ...factoryTimes,
       }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    if (isWeekView) {
+      const dayOrder = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+      chartData = chartData.sort((a, b) => {
+        const dayA = getDay(new Date(a.date));
+        const dayB = getDay(new Date(b.date));
+        return dayA - dayB;
+      });
+    }
+
     return { chartData, factories: sortedFactories };
-  }, [data]);
+  }, [data, isWeekView]);
   
   const chartConfig = factories.reduce((acc, factory) => {
     acc[factory] = {
@@ -97,17 +110,17 @@ export function MachiningTimeTrendChart({
     return acc;
   }, {} as any);
 
+  const xAxisFormatter = (value: string) => {
+    if (isWeekView) {
+      return format(new Date(value), 'EEE', { locale: ptBR });
+    }
+    return format(new Date(value), 'dd/MM');
+  }
+
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Tendência do Tempo de Usinagem por Fábrica</CardTitle>
-        <CardDescription>
-          Tempo de usinagem (em minutos) por dia para cada fábrica.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
+    
+        loading ? (
           <div className="flex h-[350px] w-full items-center justify-center">
             <Loader className="h-8 w-8 animate-spin" />
           </div>
@@ -118,7 +131,7 @@ export function MachiningTimeTrendChart({
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="date"
-                  tickFormatter={(value) => format(new Date(value), 'dd/MM')}
+                  tickFormatter={xAxisFormatter}
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
@@ -164,8 +177,7 @@ export function MachiningTimeTrendChart({
               Nenhum dado de produção para exibir.
             </p>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        )
+      
   );
 }
