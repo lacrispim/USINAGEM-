@@ -56,26 +56,42 @@ export default function RecordsPage() {
         return { availableYears: [], availableWeeks: [], filteredProductionRecords: [] };
     }
 
-    const years = new Set<number>();
+    const recordYears = new Set<number>();
     productionRecords.forEach((record) => {
         if (record.date?.toDate) {
-            years.add(getYear(record.date.toDate()));
+            recordYears.add(getYear(record.date.toDate()));
         }
     });
-    const sortedYears = Array.from(years).sort((a, b) => b - a);
 
+    // Add future years up to 2026
+    const currentYear = new Date().getFullYear();
+    for (let y = currentYear; y <= 2026; y++) {
+        recordYears.add(y);
+    }
+
+    const sortedYears = Array.from(recordYears).sort((a, b) => b - a);
     const year = selectedYear === 'all' ? null : parseInt(selectedYear, 10);
     
-    const weeks = new Set<number>();
+    let weeks: number[] = [];
     if (year) {
+        const weeksSet = new Set<number>();
         productionRecords.forEach((record) => {
             const recordDate = record.date?.toDate;
             if (recordDate && getYear(recordDate) === year) {
-                weeks.add(getISOWeek(recordDate));
+                weeksSet.add(getISOWeek(recordDate));
             }
         });
+        
+        // If the selected year is a future year or the current year, add all weeks
+        if (year >= new Date().getFullYear()) {
+             // There are 52 or 53 weeks in a year. Let's stick to 52 for consistency.
+            for (let i = 1; i <= 52; i++) {
+                weeksSet.add(i);
+            }
+        }
+
+        weeks = Array.from(weeksSet).sort((a, b) => a - b);
     }
-    const sortedWeeks = Array.from(weeks).sort((a, b) => a - b);
 
 
     const filtered = productionRecords.filter((record) => {
@@ -93,7 +109,7 @@ export default function RecordsPage() {
         return true;
     });
 
-    return { availableYears: sortedYears, availableWeeks: sortedWeeks, filteredProductionRecords: filtered };
+    return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filtered };
   }, [productionRecords, selectedYear, selectedWeek]);
 
 
