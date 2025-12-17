@@ -1,6 +1,6 @@
 'use client';
 
-import { Pie, PieChart, Cell } from 'recharts';
+import { Pie, PieChart, Cell, LabelList } from 'recharts';
 import {
   Card,
   CardContent,
@@ -12,8 +12,6 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
 } from '@/components/ui/chart';
 import { Loader } from 'lucide-react';
 
@@ -59,8 +57,7 @@ export function LossReasonPieChart({ data, loading }: LossReasonPieChartProps) {
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent 
-                    formatter={(value) => `${value} min`}
-                    hideLabel 
+                    formatter={(value, name) => [`${value} min`, name]}
                    />}
                 />
                 <Pie
@@ -69,7 +66,15 @@ export function LossReasonPieChart({ data, loading }: LossReasonPieChartProps) {
                   nameKey="name"
                   innerRadius={60}
                   strokeWidth={5}
+                  labelLine={false}
                 >
+                  <LabelList
+                    dataKey="value"
+                    position="outside"
+                    offset={12}
+                    className="fill-foreground text-sm"
+                    formatter={(value: number) => `${value} min`}
+                  />
                   {data.map((_, index) => (
                     <Cell
                       key={`cell-${index}`}
@@ -77,10 +82,6 @@ export function LossReasonPieChart({ data, loading }: LossReasonPieChartProps) {
                     />
                   ))}
                 </Pie>
-                <ChartLegend
-                  content={<ChartLegendContent nameKey="name" />}
-                  className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-                />
               </PieChart>
             </ChartContainer>
           </div>
