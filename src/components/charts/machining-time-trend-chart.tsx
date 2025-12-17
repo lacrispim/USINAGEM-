@@ -6,17 +6,11 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  Rectangle,
   ResponsiveContainer,
   XAxis,
   YAxis,
 } from 'recharts';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   ChartContainer,
   ChartTooltip,
@@ -108,6 +102,53 @@ export function MachiningTimeTrendChart({
     return isWeekView ? format(date, 'EEE', { locale: ptBR }) : format(date, 'dd/MM');
   }
 
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const date = new Date(label);
+      date.setDate(date.getDate() + 1);
+      const formattedLabel = isWeekView ? format(date, 'EEE', { locale: ptBR }) : format(date, 'dd/MM/yyyy');
+      
+      const total = payload.reduce((acc: number, item: any) => acc + item.value, 0);
+
+      return (
+        <div className="rounded-lg border bg-background p-2.5 shadow-sm">
+          <div className="flex flex-col gap-1.5">
+             <div className="flex items-center justify-between">
+                <span className="text-[0.8rem] font-semibold">{formattedLabel}</span>
+                <span className="text-[0.75rem] text-muted-foreground font-semibold">{total.toFixed(1)}h</span>
+             </div>
+            <div className='flex flex-col gap-1'>
+            {payload.slice().reverse().map((p: any, index: number) => (
+              <div key={index} className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: p.fill }} />
+                  <span className="text-[0.8rem] text-muted-foreground">{p.name}</span>
+                </div>
+                <span className="font-bold text-right text-[0.8rem]">{p.value.toFixed(1)}h</span>
+              </div>
+            ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const CustomLegend = (props: any) => {
+    const { payload } = props;
+    return (
+      <div className="flex justify-center gap-4 pt-4">
+        {payload.map((entry: any, index: number) => (
+          <div key={`item-${index}`} className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: entry.color }} />
+            <span className="text-xs text-muted-foreground">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
 
   return (
     
@@ -118,8 +159,8 @@ export function MachiningTimeTrendChart({
         ) : chartData && chartData.length > 0 ? (
           <div className="h-[350px] w-full">
             <ChartContainer config={chartConfig} className="h-full w-full">
-              <BarChart data={chartData}>
-                <CartesianGrid vertical={false} />
+              <BarChart data={chartData} barGap={4}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
                   tickFormatter={xAxisFormatter}
@@ -128,19 +169,16 @@ export function MachiningTimeTrendChart({
                   tickMargin={8}
                 />
                 <YAxis
-                  tickFormatter={(value) => `${value.toFixed(1)}h`}
+                  tickFormatter={(value) => `${value.toFixed(0)}`}
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
                 />
                 <ChartTooltip
                   cursor={false}
-                  content={<ChartTooltipContent
-                     formatter={(value, name) => [`${(value as number).toFixed(2)}h`, name]}
-                     indicator="dot"
-                  />}
+                  content={<CustomTooltip />}
                 />
-                 <Legend />
+                 <Legend content={<CustomLegend />} />
                 {factories.map((factory) => (
                   <Bar
                     key={factory}
