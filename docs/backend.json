@@ -43,21 +43,57 @@
           "description": "The time spent on machining, in minutes."
         },
         "status": {
-            "type": "string",
-            "description": "The status of the production activity.",
-            "enum": ["Fila de produção", "Em produção", "Encerrado", "Rejeitado", "Enviado"]
+          "type": "string",
+          "description": "The status of the production activity.",
+          "enum": [
+            "Fila de produção",
+            "Em produção",
+            "Encerrado",
+            "Rejeitado",
+            "Enviado"
+          ]
         },
         "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "The timestamp when the record was created."
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the record was created."
         },
         "observations": {
-            "type": "string",
-            "description": "Additional notes or observations about the production activity."
+          "type": "string",
+          "description": "Additional notes or observations about the production activity."
+        },
+        "material": {
+          "type": "string",
+          "description": "The type of material being machined (e.g., Aço 1045, Alumínio 6061)."
+        },
+        "rawMaterialDimensions": {
+          "type": "string",
+          "description": "The dimensions of the raw material (e.g., 'D:100mm L:200mm' or '100x50x30mm')."
+        },
+        "geometryComplexity": {
+          "type": "string",
+          "description": "The complexity of the part's geometry.",
+          "enum": [
+            "Baixa",
+            "Média",
+            "Alta"
+          ]
+        },
+        "toolCount": {
+          "type": "number",
+          "description": "The number of distinct tools used (for machining centers)."
+        },
+        "fixtureType": {
+          "type": "string",
+          "description": "The type of fixture used to hold the part (for machining centers)."
         }
       },
-      "required": ["operatorId", "date", "createdAt", "status"]
+      "required": [
+        "operatorId",
+        "date",
+        "createdAt",
+        "status"
+      ]
     },
     "lossRecord": {
       "title": "Loss Record",
@@ -94,20 +130,24 @@
           "description": "The time lost due to the issue."
         },
         "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "The timestamp when the record was created."
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the record was created."
         },
         "observations": {
-            "type": "string",
-            "description": "Additional notes or observations about the loss."
+          "type": "string",
+          "description": "Additional notes or observations about the loss."
         },
         "formsNumber": {
           "type": "string",
           "description": "The forms number associated with the activity."
         }
       },
-      "required": ["operatorId", "date", "createdAt"]
+      "required": [
+        "operatorId",
+        "date",
+        "createdAt"
+      ]
     }
   },
   "auth": {
