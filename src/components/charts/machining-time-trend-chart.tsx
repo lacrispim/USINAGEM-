@@ -7,7 +7,6 @@ import {
   CartesianGrid,
   Legend,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -20,6 +19,7 @@ import {
 } from '@/components/ui/card';
 import {
   ChartContainer,
+  ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Loader } from 'lucide-react';
