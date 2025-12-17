@@ -32,12 +32,14 @@ export function MachiningTimeByFactoryChart({
 
     const factoryData = data.reduce(
       (acc, record) => {
-        const factory = record.factory || 'Não especificada';
-        const timeInMinutes = record.machiningTime || 0;
-        if (!acc[factory]) {
-          acc[factory] = 0;
+        if (record.factory) {
+          const factory = record.factory;
+          const timeInMinutes = record.machiningTime || 0;
+          if (!acc[factory]) {
+            acc[factory] = 0;
+          }
+          acc[factory] += timeInMinutes;
         }
-        acc[factory] += timeInMinutes;
         return acc;
       },
       {} as Record<string, number>
