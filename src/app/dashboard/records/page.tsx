@@ -66,6 +66,13 @@ export default function RecordsPage() {
       value,
     }));
   }, [lossRecords]);
+  
+  const totalLostMinutes = useMemo(() => {
+    if (!lossRecords) {
+        return 0;
+    }
+    return lossRecords.reduce((sum, record) => sum + (record.timeLost || 0), 0);
+  }, [lossRecords]);
 
   const totalProductionRecords = productionRecords ? productionRecords.length : 0;
   const totalLossRecords = lossRecords ? lossRecords.length : 0;
@@ -152,7 +159,7 @@ export default function RecordsPage() {
         </Card>
       </div>
        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <LossReasonPieChart data={lossReasonData} loading={loadingLoss} />
+        <LossReasonPieChart data={lossReasonData} loading={loadingLoss} totalMinutes={totalLostMinutes} />
         <MachiningTimeByFactoryChart data={productionRecords || []} loading={loadingProduction} />
       </div>
     </div>

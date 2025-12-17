@@ -1,6 +1,6 @@
 'use client';
 
-import { Pie, PieChart, Cell, LabelList } from 'recharts';
+import { Pie, PieChart, Cell, LabelList, Label } from 'recharts';
 import {
   Card,
   CardContent,
@@ -18,6 +18,7 @@ import { Loader } from 'lucide-react';
 interface LossReasonPieChartProps {
   data: { name: string; value: number }[];
   loading: boolean;
+  totalMinutes: number;
 }
 
 const CHART_COLORS = [
@@ -28,7 +29,13 @@ const CHART_COLORS = [
   'hsl(var(--chart-1))',
 ];
 
-export function LossReasonPieChart({ data, loading }: LossReasonPieChartProps) {
+const formatMinutesToHHMM = (totalMinutes: number) => {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+};
+
+export function LossReasonPieChart({ data, loading, totalMinutes }: LossReasonPieChartProps) {
   const chartConfig = data.reduce((acc, item, index) => {
     acc[item.name] = {
       label: item.name,
@@ -64,10 +71,39 @@ export function LossReasonPieChart({ data, loading }: LossReasonPieChartProps) {
                   data={data}
                   dataKey="value"
                   nameKey="name"
-                  innerRadius={60}
+                  innerRadius={80}
+                  outerRadius={110}
                   strokeWidth={5}
-                  labelLine={false}
                 >
+                   <Label
+                    content={({ viewBox }) => {
+                        if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+                            return (
+                                <g>
+                                    <text
+                                        x={viewBox.cx}
+                                        y={viewBox.cy ? viewBox.cy - 10 : 0}
+                                        textAnchor="middle"
+                                        dominantBaseline="central"
+                                        className="fill-foreground text-3xl font-bold"
+                                    >
+                                        {formatMinutesToHHMM(totalMinutes)}
+                                    </text>
+                                     <text
+                                        x={viewBox.cx}
+                                        y={viewBox.cy ? viewBox.cy + 15 : 0}
+                                        textAnchor="middle"
+                                        dominantBaseline="central"
+                                        className="fill-muted-foreground text-sm"
+                                    >
+                                        Total Horas
+                                    </text>
+                                </g>
+                            );
+                        }
+                        return null;
+                    }}
+                   />
                   <LabelList
                     dataKey="value"
                     position="outside"
