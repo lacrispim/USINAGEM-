@@ -9,6 +9,7 @@ import { useFirestore, useCollection } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
+import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
 
 
 export default function RecordsPage() {
@@ -161,6 +162,9 @@ export default function RecordsPage() {
        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LossReasonPieChart data={lossReasonData} loading={loadingLoss} totalMinutes={totalLostMinutes} />
         <MachiningTimeByFactoryChart data={productionRecords || []} loading={loadingProduction} />
+      </div>
+       <div className="grid grid-cols-1 gap-6">
+        <MachiningTimeTrendChart data={productionRecords || []} loading={loadingProduction} />
       </div>
     </div>
   );
