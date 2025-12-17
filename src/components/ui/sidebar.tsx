@@ -175,7 +175,28 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { isMobile, state, openMobile, setOpenMobile, setOpen } = useSidebar()
+    
+    // Add a button to toggle the sidebar on desktop when it's collapsible.
+    React.useEffect(() => {
+        if(collapsible !== "offcanvas") {
+            const button = document.querySelector("[data-sidebar=trigger]")
+            const rail = document.querySelector("[data-sidebar=rail]")
+
+            if(!button && !rail) {
+                const trigger = document.createElement("button")
+                trigger.setAttribute("data-sidebar", "trigger")
+                trigger.setAttribute("aria-label", "Toggle Sidebar")
+                trigger.setAttribute("title", "Toggle Sidebar")
+                trigger.className = "hidden"
+                document.body.appendChild(trigger)
+
+                trigger.addEventListener("click", () => {
+                    setOpen((open) => !open)
+                })
+            }
+        }
+    }, [collapsible, setOpen])
 
     if (collapsible === "none") {
       return (
@@ -250,6 +271,7 @@ const Sidebar = React.forwardRef<
             data-sidebar="sidebar"
             className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
           >
+            {collapsible === "icon" && <SidebarRail />}
             {children}
           </div>
         </div>

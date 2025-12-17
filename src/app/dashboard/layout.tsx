@@ -46,7 +46,7 @@ const CustomSidebarTrigger = () => {
     <Button
       variant="ghost"
       size="icon"
-      className="h-10 w-10"
+      className="h-10 w-10 md:hidden" // Hide on desktop, show on mobile
       onClick={() => toggleSidebar()}
     >
       <PanelLeft />
