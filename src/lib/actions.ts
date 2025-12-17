@@ -44,10 +44,20 @@ export type PredictionState = {
 
 // Function to convert file to data URI
 async function fileToDataUri(file: File): Promise<string> {
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const base64 = buffer.toString('base64');
-    return `data:${file.type};base64,${base64}`;
+    const reader = new FileReader();
+    return new Promise((resolve, reject) => {
+        reader.onload = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result);
+            } else {
+                reject(new Error('Failed to read file as data URI'));
+            }
+        };
+        reader.onerror = (error) => {
+            reject(error);
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
 
