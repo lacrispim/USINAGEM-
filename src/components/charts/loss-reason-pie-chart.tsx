@@ -108,7 +108,7 @@ export function LossReasonPieChart({ data, loading, totalMinutes }: LossReasonPi
                     dataKey="value"
                     position="outside"
                     offset={12}
-                    className="fill-foreground text-sm"
+                    className="fill-black text-sm"
                     formatter={(value: number) => `${value} min`}
                   />
                   {data.map((_, index) => (
