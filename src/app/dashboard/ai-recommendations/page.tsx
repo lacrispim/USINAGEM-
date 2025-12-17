@@ -5,10 +5,10 @@ export default function AiRecommendationsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">
-          IA de Manutenção Preditiva
+          Previsão de Tempo de Usinagem
         </h1>
         <p className="text-muted-foreground">
-          Receba recomendações inteligentes para otimizar o desempenho da ferramenta e prevenir falhas.
+          Utilize IA para estimar o tempo de fabricação de uma peça com base em suas características.
         </p>
       </div>
       <RecommendationForm />
