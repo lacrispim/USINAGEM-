@@ -22,7 +22,7 @@ import { collection, query } from 'firebase/firestore';
 import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
-import { getWeek, getYear, getMonth, format, getISOWeek, startOfMonth, endOfMonth, eachWeekOfInterval } from 'date-fns';
+import { getYear, format, getISOWeek, eachWeekOfInterval, startOfYear, endOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Select,
@@ -36,7 +36,6 @@ import { Label } from '@/components/ui/label';
 export default function RecordsPage() {
   const firestore = useFirestore();
   const [selectedYear, setSelectedYear] = useState<string>('all');
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
 
 
@@ -52,9 +51,9 @@ export default function RecordsPage() {
   const { data: lossRecords, loading: loadingLoss } =
     useCollection(lossRecordsQuery);
     
-  const { availableYears, availableMonths, availableWeeks, filteredProductionRecords } = useMemo(() => {
+  const { availableYears, availableWeeks, filteredProductionRecords } = useMemo(() => {
     if (!productionRecords) {
-        return { availableYears: [], availableMonths: [], availableWeeks: [], filteredProductionRecords: [] };
+        return { availableYears: [], availableWeeks: [], filteredProductionRecords: [] };
     }
 
     const years = new Set<number>();
@@ -66,24 +65,12 @@ export default function RecordsPage() {
     const sortedYears = Array.from(years).sort((a, b) => b - a);
 
     const year = selectedYear === 'all' ? null : parseInt(selectedYear, 10);
-
-    const months = new Set<number>();
-    if (year) {
-        productionRecords.forEach((record) => {
-            if (record.date?.toDate && getYear(record.date.toDate()) === year) {
-                months.add(getMonth(record.date.toDate()));
-            }
-        });
-    }
-    const sortedMonths = Array.from(months).sort((a, b) => a - b);
-    
-    const month = selectedMonth === 'all' ? null : parseInt(selectedMonth, 10);
     
     const weeks = new Set<number>();
-    if (year && month !== null) {
+    if (year) {
         productionRecords.forEach((record) => {
             const recordDate = record.date?.toDate;
-            if (recordDate && getYear(recordDate) === year && getMonth(recordDate) === month) {
+            if (recordDate && getYear(recordDate) === year) {
                 weeks.add(getISOWeek(recordDate));
             }
         });
@@ -98,29 +85,22 @@ export default function RecordsPage() {
         const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
         if (!yearMatch) return false;
         
-        const monthMatch = selectedMonth === 'all' || getMonth(recordDate) === parseInt(selectedMonth, 10);
-        if (!monthMatch) return false;
-
-        const weekMatch = selectedWeek === 'all' || getISOWeek(recordDate) === parseInt(selectedWeek, 10);
-        if (!weekMatch) return false;
+        if (selectedYear !== 'all') {
+            const weekMatch = selectedWeek === 'all' || getISOWeek(recordDate) === parseInt(selectedWeek, 10);
+            if (!weekMatch) return false;
+        }
 
         return true;
     });
 
-    return { availableYears: sortedYears, availableMonths: sortedMonths, availableWeeks: sortedWeeks, filteredProductionRecords: filtered };
-  }, [productionRecords, selectedYear, selectedMonth, selectedWeek]);
+    return { availableYears: sortedYears, availableWeeks: sortedWeeks, filteredProductionRecords: filtered };
+  }, [productionRecords, selectedYear, selectedWeek]);
 
 
-  // Reset month and week when year changes
+  // Reset week when year changes
   useState(() => {
-    setSelectedMonth('all');
     setSelectedWeek('all');
   }, [selectedYear]);
-
-  // Reset week when month changes
-  useState(() => {
-    setSelectedWeek('all');
-  }, [selectedMonth]);
 
 
   const totalHoursData = useMemo(() => {
@@ -294,24 +274,8 @@ export default function RecordsPage() {
                     </Select>
                 </div>
                 <div className="grid w-full sm:w-48 gap-1.5">
-                    <Label htmlFor="month-filter">Mês</Label>
-                    <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={selectedYear === 'all'}>
-                        <SelectTrigger id="month-filter">
-                        <SelectValue placeholder="Selecione o mês" />
-                        </SelectTrigger>
-                        <SelectContent>
-                        <SelectItem value="all">Todos os Meses</SelectItem>
-                        {availableMonths.map((month) => (
-                            <SelectItem key={month} value={String(month)}>
-                                {format(new Date(2000, month), 'MMMM', { locale: ptBR })}
-                            </SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="grid w-full sm:w-48 gap-1.5">
                     <Label htmlFor="week-filter">Semana</Label>
-                    <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedMonth === 'all'}>
+                    <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all'}>
                         <SelectTrigger id="week-filter">
                         <SelectValue placeholder="Selecione a semana" />
                         </SelectTrigger>
