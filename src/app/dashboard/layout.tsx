@@ -26,13 +26,11 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
-  SidebarTrigger,
   SidebarInset,
   useSidebar
 } from '@/components/ui/sidebar';
 import {
   BrainCircuit,
-  LayoutDashboard,
   LogOut,
   Settings,
   FileText,
