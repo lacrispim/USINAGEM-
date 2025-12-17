@@ -28,6 +28,7 @@ import {
   SidebarFooter,
   SidebarTrigger,
   SidebarInset,
+  useSidebar
 } from '@/components/ui/sidebar';
 import {
   BrainCircuit,
@@ -36,9 +37,26 @@ import {
   Settings,
   FileText,
   Eye,
+  PanelLeft,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const CustomSidebarTrigger = () => {
+  const { toggleSidebar } = useSidebar();
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-10 w-10"
+      onClick={() => toggleSidebar()}
+    >
+      <PanelLeft />
+      <span className="sr-only">Toggle Sidebar</span>
+    </Button>
+  );
+};
+
 
 export default function DashboardLayout({
   children,
@@ -142,7 +160,7 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <Sidebar>
+      <Sidebar collapsible="icon">
         <SidebarHeader>
           <Logo />
         </SidebarHeader>
@@ -170,7 +188,7 @@ export default function DashboardLayout({
       </Sidebar>
       <SidebarInset>
         <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
-          <SidebarTrigger className="md:hidden" />
+          <CustomSidebarTrigger />
           <div className="flex-1">
              {/* Can add page title or search bar here */}
           </div>
