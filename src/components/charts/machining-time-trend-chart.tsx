@@ -9,7 +9,6 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
-  Tooltip,
 } from 'recharts';
 import {
   Card,
@@ -43,11 +42,11 @@ const FACTORY_COLORS: { [key: string]: string } = {
   'VINHEDO': 'hsl(var(--chart-3))',
   'POUSO ALEGRE': 'hsl(var(--chart-4))',
   'INDAIATUBA': 'hsl(var(--chart-5))',
-  'AGUAÍ': 'hsl(var(--chart-1))',
-  'SUAPE': 'hsl(var(--chart-2))',
-  'IGARASSU': 'hsl(var(--chart-3))',
-  'GARANHUS': 'hsl(var(--chart-4))',
-  'TORRE': 'hsl(var(--chart-5))',
+  'AGUAÍ': 'hsl(var(--chart-6))',
+  'SUAPE': 'hsl(var(--chart-7))',
+  'IGARASSU': 'hsl(var(--chart-8))',
+  'GARANHUS': 'hsl(var(--chart-9))',
+  'TORRE': 'hsl(var(--chart-10))',
 };
 
 
