@@ -36,6 +36,7 @@ import {
   FileText,
   Eye,
   PanelLeft,
+  Wrench
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -84,6 +85,11 @@ export default function DashboardLayout({
       href: '/dashboard/ai-recommendations',
       label: 'AI Maintenance',
       icon: BrainCircuit,
+    },
+    {
+      href: '/dashboard/technical-specifications',
+      label: 'Especificações Técnicas',
+      icon: Wrench,
     },
   ];
 
