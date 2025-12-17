@@ -19,6 +19,7 @@ const MachiningTimePredictionInputSchema = z.object({
   toolCount: z.number().optional().describe('The number of distinct tools used (especially for machining centers).'),
   fixtureType: z.string().optional().describe('The type of fixture used to hold the part (especially for machining centers).'),
   historicalData: z.string().describe('Historical data of similar parts, including machining times, setup times, and any issues encountered.'),
+  partDrawing: z.string().optional().describe("A data URI of the part's drawing. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
 });
 export type MachiningTimePredictionInput = z.infer<
   typeof MachiningTimePredictionInputSchema
@@ -54,17 +55,22 @@ const prompt = ai.definePrompt({
   {{#if toolCount}}- **Número de Ferramentas Distintas:** {{{toolCount}}}{{/if}}
   {{#if fixtureType}}- **Tipo de Fixação:** {{{fixtureType}}}{{/if}}
   - **Dados Históricos de Peças Similares:** {{{historicalData}}}
+  {{#if partDrawing}}
+  - **Desenho Técnico da Peça:**
+    {{media url=partDrawing}}
+  {{/if}}
 
   **Seu Raciocínio Deve Considerar:**
-  1.  **Tipo de Máquina:** O Centur 30 (torno) e o D600 (centro de usinagem) têm tempos de operação diferentes. Tornos são geralmente para peças de revolução, enquanto centros de usinagem lidam com geometrias mais complexas e prismáticas.
-  2.  **Material:** Materiais mais duros (como Aço 1045) exigem velocidades de corte menores e, portanto, mais tempo, em comparação com materiais mais macios (como Alumínio).
-  3.  **Remoção de Material:** Calcule o volume de material a ser removido com base nas dimensões do bruto. Quanto mais material a remover, maior o tempo.
-  4.  **Complexidade:** Geometrias 'Alta' complexidade implicam mais passes de ferramenta, possivelmente reposicionamento da peça, e um tempo de programação e setup mais longo. Geometria 'Baixa' implica menos operações.
-  5.  **Operações no Centro de Usinagem:** Para o D600, um número maior de ferramentas ({{{toolCount}}}) significa mais tempo gasto em trocas de ferramenta. O tipo de fixação ({{{fixtureType}}}) pode influenciar o tempo de setup. Uma morsa é rápida, um dispositivo dedicado pode ser mais demorado para alinhar.
+  1.  **Análise do Desenho (se fornecido):** Analise a imagem do desenho para entender a geometria, tolerâncias, acabamentos de superfície e outras operações especiais. Isso é CRUCIAL para uma estimativa precisa.
+  2.  **Tipo de Máquina:** O Centur 30 (torno) e o D600 (centro de usinagem) têm tempos de operação diferentes. Tornos são geralmente para peças de revolução, enquanto centros de usinagem lidam com geometrias mais complexas e prismáticas.
+  3.  **Material:** Materiais mais duros (como Aço 1045) exigem velocidades de corte menores e, portanto, mais tempo, em comparação com materiais mais macios (como Alumínio).
+  4.  **Remoção de Material:** Calcule o volume de material a ser removido com base nas dimensões do bruto e na geometria final da peça (visível no desenho). Quanto mais material a remover, maior o tempo.
+  5.  **Complexidade:** Geometrias 'Alta' complexidade, especialmente as visualizadas no desenho, implicam mais passes de ferramenta, possivelmente reposicionamento da peça, e um tempo de programação e setup mais longo. Geometria 'Baixa' implica menos operações.
+  6.  **Operações no Centro de Usinagem:** Para o D600, um número maior de ferramentas ({{{toolCount}}}) significa mais tempo gasto em trocas de ferramenta. O tipo de fixação ({{{fixtureType}}}) pode influenciar o tempo de setup. Uma morsa é rápida, um dispositivo dedicado pode ser mais demorado para alinhar.
 
   **Instruções de Saída:**
   - Forneça uma estimativa de tempo realista em **minutos**.
-  - No campo 'reasoning', explique claramente como você chegou a essa estimativa, citando os fatores mais impactantes (ex: "O alto número de ferramentas e a complexidade da geometria são os principais fatores que aumentam o tempo total...").
+  - No campo 'reasoning', explique claramente como você chegou a essa estimativa, citando os fatores mais impactantes (ex: "Baseado no desenho, a peça exige múltiplas operações de fresamento e furação. O alto número de ferramentas e a complexidade da geometria são os principais fatores que aumentam o tempo total...").
   - Lembre-se que a saída deve corresponder ao esquema de saída, e todos os campos devem ser preenchidos.
   `,
 });
