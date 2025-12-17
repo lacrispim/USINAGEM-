@@ -39,14 +39,15 @@ import {
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 const CustomSidebarTrigger = () => {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, isMobile } = useSidebar();
   return (
     <Button
       variant="ghost"
       size="icon"
-      className="h-10 w-10 md:hidden" // Hide on desktop, show on mobile
+      className={cn('h-10 w-10', isMobile ? 'flex' : 'hidden md:flex')}
       onClick={() => toggleSidebar()}
     >
       <PanelLeft />
@@ -185,12 +186,14 @@ export default function DashboardLayout({
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
+        <header className="flex h-14 items-center justify-between border-b bg-card px-4 lg:h-[60px] lg:px-6">
           <CustomSidebarTrigger />
           <div className="flex-1">
              {/* Can add page title or search bar here */}
           </div>
-          {isClient ? <UserMenu /> : <UserMenuPlaceholder />}
+          <div className="flex items-center gap-4">
+            {isClient ? <UserMenu /> : <UserMenuPlaceholder />}
+          </div>
         </header>
         <main className="flex-1 p-4 lg:p-6">{children}</main>
       </SidebarInset>
