@@ -22,7 +22,8 @@ import { collection, query } from 'firebase/firestore';
 import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
-import { getWeek } from 'date-fns';
+import { getWeek, getYear, getMonth, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   Select,
   SelectContent,
@@ -34,7 +35,8 @@ import { Label } from '@/components/ui/label';
 
 export default function RecordsPage() {
   const firestore = useFirestore();
-  const [selectedWeek, setSelectedWeek] = useState<string>('all');
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
   const productionRecordsQuery = firestore
     ? query(collection(firestore, 'productionRecords'))
@@ -48,31 +50,37 @@ export default function RecordsPage() {
   const { data: lossRecords, loading: loadingLoss } =
     useCollection(lossRecordsQuery);
 
-  const { availableWeeks, filteredProductionRecords } = useMemo(() => {
+  const { availableYears, availableMonths, filteredProductionRecords } = useMemo(() => {
     if (!productionRecords) {
-      return { availableWeeks: [], filteredProductionRecords: [] };
+      return { availableYears: [], availableMonths: [], filteredProductionRecords: [] };
     }
 
-    const weeks = new Set<number>();
+    const years = new Set<number>();
+    const months = new Set<number>();
+
     productionRecords.forEach((record) => {
       if (record.date?.toDate) {
-        weeks.add(getWeek(record.date.toDate(), { weekStartsOn: 1 }));
+        const recordDate = record.date.toDate();
+        years.add(getYear(recordDate));
+        if (selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10)) {
+            months.add(getMonth(recordDate));
+        }
       }
     });
-    const sortedWeeks = Array.from(weeks).sort((a, b) => a - b);
 
-    const filtered =
-      selectedWeek === 'all'
-        ? productionRecords
-        : productionRecords.filter(
-            (record) =>
-              record.date?.toDate &&
-              getWeek(record.date.toDate(), { weekStartsOn: 1 }) ===
-                parseInt(selectedWeek, 10)
-          );
+    const sortedYears = Array.from(years).sort((a, b) => b - a);
+    const sortedMonths = Array.from(months).sort((a, b) => a - b);
+    
+    const filtered = productionRecords.filter((record) => {
+        if (!record.date?.toDate) return false;
+        const recordDate = record.date.toDate();
+        const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
+        const monthMatch = selectedMonth === 'all' || getMonth(recordDate) === parseInt(selectedMonth, 10);
+        return yearMatch && monthMatch;
+    });
 
-    return { availableWeeks: sortedWeeks, filteredProductionRecords: filtered };
-  }, [productionRecords, selectedWeek]);
+    return { availableYears: sortedYears, availableMonths: sortedMonths, filteredProductionRecords: filtered };
+  }, [productionRecords, selectedYear, selectedMonth]);
 
   const totalHoursData = useMemo(() => {
     const initialHours = 540;
@@ -227,7 +235,7 @@ export default function RecordsPage() {
       </div>
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <CardTitle>
                 Tendência do Tempo de Usinagem por Fábrica
@@ -236,21 +244,39 @@ export default function RecordsPage() {
                 Tempo de usinagem (em minutos) por dia para cada fábrica.
               </CardDescription>
             </div>
-            <div className="mt-4 sm:mt-0 sm:w-48">
-              <Label htmlFor="week-filter">Filtrar por Semana</Label>
-              <Select value={selectedWeek} onValueChange={setSelectedWeek}>
-                <SelectTrigger id="week-filter">
-                  <SelectValue placeholder="Selecione a semana" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Semanas</SelectItem>
-                  {availableWeeks.map((week) => (
-                    <SelectItem key={week} value={String(week)}>
-                      Semana {week}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                <div className="grid w-full sm:w-36 gap-1.5">
+                    <Label htmlFor="year-filter">Ano</Label>
+                    <Select value={selectedYear} onValueChange={setSelectedYear}>
+                        <SelectTrigger id="year-filter">
+                        <SelectValue placeholder="Selecione o ano" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="all">Todos os Anos</SelectItem>
+                        {availableYears.map((year) => (
+                            <SelectItem key={year} value={String(year)}>
+                            {year}
+                            </SelectItem>
+                        ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid w-full sm:w-48 gap-1.5">
+                    <Label htmlFor="month-filter">Mês</Label>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={selectedYear === 'all'}>
+                        <SelectTrigger id="month-filter">
+                        <SelectValue placeholder="Selecione o mês" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="all">Todos os Meses</SelectItem>
+                        {availableMonths.map((month) => (
+                            <SelectItem key={month} value={String(month)}>
+                                {format(new Date(2000, month), 'MMMM', { locale: ptBR })}
+                            </SelectItem>
+                        ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
           </div>
         </CardHeader>
@@ -258,7 +284,6 @@ export default function RecordsPage() {
           <MachiningTimeTrendChart
             data={filteredProductionRecords}
             loading={loadingProduction}
-            isWeekView={selectedWeek !== 'all'}
           />
         </CardContent>
       </Card>

@@ -33,7 +33,7 @@ interface MachiningTimeTrendChartProps {
     date?: { toDate: () => Date };
   }[];
   loading: boolean;
-  isWeekView?: boolean;
+  isWeekView?: boolean; // This prop is no longer used for filtering but kept to avoid breaking changes if used elsewhere.
 }
 
 const FACTORY_COLORS: { [key: string]: string } = {
@@ -53,7 +53,6 @@ const FACTORY_COLORS: { [key: string]: string } = {
 export function MachiningTimeTrendChart({
   data,
   loading,
-  isWeekView = false
 }: MachiningTimeTrendChartProps) {
   const { chartData, factories } = useMemo(() => {
     if (!data) {
@@ -83,24 +82,15 @@ export function MachiningTimeTrendChart({
 
     const sortedFactories = Array.from(factorySet).sort();
 
-    let chartData = Object.entries(dailyData)
+    const chartData = Object.entries(dailyData)
       .map(([date, factoryTimes]) => ({
         date,
         ...factoryTimes,
       }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    if (isWeekView) {
-      const dayOrder = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-      chartData = chartData.sort((a, b) => {
-        const dayA = getDay(new Date(a.date));
-        const dayB = getDay(new Date(b.date));
-        return dayA - dayB;
-      });
-    }
-
     return { chartData, factories: sortedFactories };
-  }, [data, isWeekView]);
+  }, [data]);
   
   const chartConfig = factories.reduce((acc, factory) => {
     acc[factory] = {
@@ -111,9 +101,6 @@ export function MachiningTimeTrendChart({
   }, {} as any);
 
   const xAxisFormatter = (value: string) => {
-    if (isWeekView) {
-      return format(new Date(value), 'EEE', { locale: ptBR });
-    }
     return format(new Date(value), 'dd/MM');
   }
 
