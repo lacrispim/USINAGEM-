@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react';
 import {
-  Area,
-  AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   Legend,
   ResponsiveContainer,
@@ -127,7 +127,7 @@ export function MachiningTimeTrendChart({
         ) : chartData && chartData.length > 0 ? (
           <div className="h-[350px] w-full">
             <ChartContainer config={chartConfig} className="h-full w-full">
-              <AreaChart data={chartData}>
+              <BarChart data={chartData}>
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="date"
@@ -151,24 +151,15 @@ export function MachiningTimeTrendChart({
                 />
                  <Legend />
                 {factories.map((factory) => (
-                    <defs key={factory}>
-                        <linearGradient id={`color-${factory.replace(/\s/g, '-')}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={FACTORY_COLORS[factory]} stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor={FACTORY_COLORS[factory]} stopOpacity={0}/>
-                        </linearGradient>
-                    </defs>
-                ))}
-                {factories.map((factory) => (
-                  <Area
+                  <Bar
                     key={factory}
                     dataKey={factory}
-                    type="monotone"
-                    fill={`url(#color-${factory.replace(/\s/g, '-')})`}
-                    stroke={FACTORY_COLORS[factory]}
+                    fill={FACTORY_COLORS[factory]}
                     stackId="a"
+                    radius={[4, 4, 0, 0]}
                   />
                 ))}
-              </AreaChart>
+              </BarChart>
             </ChartContainer>
           </div>
         ) : (
