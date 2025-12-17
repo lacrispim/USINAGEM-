@@ -5,10 +5,10 @@ export default function AiRecommendationsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">
-          Predictive Maintenance AI
+          IA de Manutenção Preditiva
         </h1>
         <p className="text-muted-foreground">
-          Get smart recommendations to optimize tool performance and prevent failures.
+          Receba recomendações inteligentes para otimizar o desempenho da ferramenta e prevenir falhas.
         </p>
       </div>
       <RecommendationForm />

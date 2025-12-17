@@ -37,12 +37,12 @@ function SubmitButton() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          Generating...
+          Gerando...
         </>
       ) : (
         <>
           <BrainCircuit className="mr-2 h-4 w-4" />
-          Get Recommendations
+          Obter Recomendações
         </>
       )}
     </Button>
@@ -58,7 +58,7 @@ export function RecommendationForm() {
     if (state.status === 'error' && state.message) {
       toast({
         variant: 'destructive',
-        title: 'Error',
+        title: 'Erro',
         description: state.message,
       });
     }
@@ -68,54 +68,54 @@ export function RecommendationForm() {
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle>Input Machining Data</CardTitle>
+          <CardTitle>Inserir Dados de Usinagem</CardTitle>
           <CardDescription>
-            Provide the following data to receive predictive maintenance advice.
+            Forneça os dados a seguir para receber conselhos de manutenção preditiva.
           </CardDescription>
         </CardHeader>
         <form action={formAction}>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <Label htmlFor="toolWear">Tool Wear (mm)</Label>
+                    <Label htmlFor="toolWear">Desgaste da Ferramenta (mm)</Label>
                     <Input id="toolWear" name="toolWear" type="number" step="0.01" defaultValue="0.08" />
                     {state.errors?.toolWear && <p className="text-sm font-medium text-destructive">{state.errors.toolWear[0]}</p>}
                 </div>
                 <div>
-                    <Label htmlFor="machiningTime">Machining Time (hours)</Label>
+                    <Label htmlFor="machiningTime">Tempo de Usinagem (horas)</Label>
                     <Input id="machiningTime" name="machiningTime" type="number" defaultValue="50" />
                     {state.errors?.machiningTime && <p className="text-sm font-medium text-destructive">{state.errors.machiningTime[0]}</p>}
                 </div>
             </div>
              <div className="grid grid-cols-3 gap-4">
                 <div>
-                    <Label htmlFor="cuttingSpeed">Cutting Speed (m/min)</Label>
+                    <Label htmlFor="cuttingSpeed">Velocidade de Corte (m/min)</Label>
                     <Input id="cuttingSpeed" name="cuttingSpeed" type="number" step="1" defaultValue="200" />
                     {state.errors?.cuttingSpeed && <p className="text-sm font-medium text-destructive">{state.errors.cuttingSpeed[0]}</p>}
                 </div>
                 <div>
-                    <Label htmlFor="feedRate">Feed Rate (mm/rev)</Label>
+                    <Label htmlFor="feedRate">Taxa de Avanço (mm/rev)</Label>
                     <Input id="feedRate" name="feedRate" type="number" step="0.01" defaultValue="0.15" />
                     {state.errors?.feedRate && <p className="text-sm font-medium text-destructive">{state.errors.feedRate[0]}</p>}
                 </div>
                  <div>
-                    <Label htmlFor="depthOfCut">Depth of Cut (mm)</Label>
+                    <Label htmlFor="depthOfCut">Profundidade de Corte (mm)</Label>
                     <Input id="depthOfCut" name="depthOfCut" type="number" step="0.1" defaultValue="2" />
                     {state.errors?.depthOfCut && <p className="text-sm font-medium text-destructive">{state.errors.depthOfCut[0]}</p>}
                 </div>
             </div>
             <div>
-              <Label htmlFor="materialType">Material Type</Label>
-              <Input id="materialType" name="materialType" defaultValue="Steel" />
+              <Label htmlFor="materialType">Tipo de Material</Label>
+              <Input id="materialType" name="materialType" defaultValue="Aço" />
               {state.errors?.materialType && <p className="text-sm font-medium text-destructive">{state.errors.materialType[0]}</p>}
             </div>
             <div>
-              <Label htmlFor="historicalData">Historical Data</Label>
+              <Label htmlFor="historicalData">Dados Históricos</Label>
               <Textarea
                 id="historicalData"
                 name="historicalData"
-                placeholder="e.g., Previous tool failures occurred at 0.15mm wear..."
-                defaultValue="Normal wear rate for this tool is 0.001mm/hour. No failures in the last 100 hours. Vibrations are stable."
+                placeholder="Ex: Falhas anteriores da ferramenta ocorreram com 0.15mm de desgaste..."
+                defaultValue="A taxa de desgaste normal para esta ferramenta é de 0,001 mm/hora. Nenhuma falha nas últimas 100 horas. As vibrações estão estáveis."
               />
               {state.errors?.historicalData && <p className="text-sm font-medium text-destructive">{state.errors.historicalData[0]}</p>}
             </div>
@@ -132,16 +132,16 @@ export function RecommendationForm() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ThumbsUp className="text-primary" />
-                Maintenance Recommendation
+                Recomendação de Manutenção
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Recommendation</Label>
+                <Label>Recomendação</Label>
                 <p className="font-semibold text-lg">{state.data.recommendations}</p>
               </div>
                <div>
-                <Label>Confidence Level</Label>
+                <Label>Nível de Confiança</Label>
                 <div className="flex items-center gap-2">
                     <Progress value={state.data.confidenceLevel * 100} className="w-[60%]" />
                     <span className="text-sm font-medium text-muted-foreground">
@@ -150,7 +150,7 @@ export function RecommendationForm() {
                 </div>
               </div>
                <div>
-                <Label>Reasoning</Label>
+                <Label>Justificativa</Label>
                 <p className="text-sm text-muted-foreground">{state.data.reasoning}</p>
               </div>
             </CardContent>
@@ -158,7 +158,7 @@ export function RecommendationForm() {
         ) : (
           <div className="text-center text-muted-foreground">
              <Lightbulb className="mx-auto h-12 w-12" />
-             <p className="mt-4">Your AI recommendations will appear here.</p>
+             <p className="mt-4">Suas recomendações de IA aparecerão aqui.</p>
           </div>
         )}
       </div>

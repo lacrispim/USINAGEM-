@@ -83,7 +83,7 @@ export default function DashboardLayout({
     },
     {
       href: '/dashboard/ai-recommendations',
-      label: 'AI Maintenance',
+      label: 'Manutenção IA',
       icon: BrainCircuit,
     },
     {

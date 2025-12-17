@@ -49,25 +49,25 @@ const prompt = ai.definePrompt({
   name: 'predictiveMaintenanceRecommendationsPrompt',
   input: {schema: PredictiveMaintenanceRecommendationsInputSchema},
   output: {schema: PredictiveMaintenanceRecommendationsOutputSchema},
-  prompt: `You are an expert in machining and predictive maintenance for CNC machines like a D600 Machining Center.
+  prompt: `Você é um especialista em usinagem e manutenção preditiva para máquinas CNC como um Centro de Usinagem D600.
 
-  Based on the provided machining data, generate specific recommendations for predictive maintenance.
-  Include a confidence level (0-1) for your recommendations and the reasoning behind them.
+  Com base nos dados de usinagem fornecidos, gere recomendações específicas para manutenção preditiva em português.
+  Inclua um nível de confiança (0-1) para suas recomendações e a justificativa por trás delas.
 
-  - Tool Wear: {{{toolWear}}} mm
-  - Machining Time: {{{machiningTime}}} hours
-  - Material Type: {{{materialType}}}
-  - Cutting Speed: {{{cuttingSpeed}}} m/min
-  - Feed Rate: {{{feedRate}}} mm/rev
-  - Depth of Cut: {{{depthOfCut}}} mm
-  - Historical Data: {{{historicalData}}}
+  - Desgaste da Ferramenta: {{{toolWear}}} mm
+  - Tempo de Usinagem: {{{machiningTime}}} horas
+  - Tipo de Material: {{{materialType}}}
+  - Velocidade de Corte: {{{cuttingSpeed}}} m/min
+  - Taxa de Avanço: {{{feedRate}}} mm/rev
+  - Profundidade de Corte: {{{depthOfCut}}} mm
+  - Dados Históricos: {{{historicalData}}}
 
-  Consider factors like tool wear rate, material properties, cutting parameters, and historical performance to provide actionable insights.
-  For example, high cutting speeds on hard materials might accelerate tool wear.
-  Make sure that the recommendation is clear and actionable.
-  Ensure that the confidence level reflects the certainty of your assessment based on the available data.
-  Give a short reasoning.
-  Remember the output must match the output schema, and all fields must be filled.
+  Considere fatores como taxa de desgaste da ferramenta, propriedades do material, parâmetros de corte e desempenho histórico para fornecer insights acionáveis.
+  Por exemplo, altas velocidades de corte em materiais duros podem acelerar o desgaste da ferramenta.
+  Certifique-se de que a recomendação seja clara e acionável.
+  Garanta que o nível de confiança reflita a certeza de sua avaliação com base nos dados disponíveis.
+  Dê uma justificativa curta.
+  Lembre-se que a saída deve corresponder ao esquema de saída, e todos os campos devem ser preenchidos.
   `,
 });
 

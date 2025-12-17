@@ -5,13 +5,13 @@ import type { PredictiveMaintenanceRecommendationsOutput } from '@/ai/flows/pred
 import { z } from 'zod';
 
 const formSchema = z.object({
-  toolWear: z.coerce.number().positive('Tool wear must be a positive number.'),
-  machiningTime: z.coerce.number().positive('Machining time must be a positive number.'),
-  materialType: z.string().min(1, 'Material type is required.'),
-  historicalData: z.string().min(1, 'Historical data is required.'),
-  cuttingSpeed: z.coerce.number().positive('Cutting speed must be a positive number.'),
-  feedRate: z.coerce.number().positive('Feed rate must be a positive number.'),
-  depthOfCut: z.coerce.number().positive('Depth of cut must be a positive number.'),
+  toolWear: z.coerce.number().positive('O desgaste da ferramenta deve ser um número positivo.'),
+  machiningTime: z.coerce.number().positive('O tempo de usinagem deve ser um número positivo.'),
+  materialType: z.string().min(1, 'O tipo de material é obrigatório.'),
+  historicalData: z.string().min(1, 'Os dados históricos são obrigatórios.'),
+  cuttingSpeed: z.coerce.number().positive('A velocidade de corte deve ser um número positivo.'),
+  feedRate: z.coerce.number().positive('A taxa de avanço deve ser um número positivo.'),
+  depthOfCut: z.coerce.number().positive('A profundidade de corte deve ser um número positivo.'),
 });
 
 export type RecommendationState = {
@@ -46,7 +46,7 @@ export async function getRecommendationsAction(
   if (!validatedFields.success) {
     return {
       status: 'error',
-      message: 'Invalid form data. Please correct the errors and try again.',
+      message: 'Dados do formulário inválidos. Corrija os erros e tente novamente.',
       errors: validatedFields.error.flatten().fieldErrors,
     };
   }
@@ -55,14 +55,14 @@ export async function getRecommendationsAction(
     const result = await getPredictiveMaintenanceRecommendations(validatedFields.data);
     return {
       status: 'success',
-      message: 'Recommendations generated successfully.',
+      message: 'Recomendações geradas com sucesso.',
       data: result,
     };
   } catch (error) {
     console.error(error);
     return {
       status: 'error',
-      message: 'An unexpected error occurred while generating recommendations. Please try again later.',
+      message: 'Ocorreu um erro inesperado ao gerar as recomendações. Tente novamente mais tarde.',
     };
   }
 }
