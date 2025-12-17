@@ -278,11 +278,9 @@ export default function RecordsPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle>
-                Tendência do Tempo de Usinagem por Fábrica
-              </CardTitle>
+              <CardTitle>Análise diária do Tempo de Usinagem</CardTitle>
               <CardDescription>
-                Tempo de usinagem (em minutos) por dia para cada fábrica.
+                Análise diária do tempo de usinagem (em minutos) por fábrica.
               </CardDescription>
             </div>
              <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
