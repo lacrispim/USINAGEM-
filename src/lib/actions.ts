@@ -4,7 +4,7 @@ import { getMachiningTimePrediction, MachiningTimePredictionOutput } from '@/ai/
 import { z } from 'zod';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
 
 
 const formSchema = z.object({
@@ -17,10 +17,9 @@ const formSchema = z.object({
   historicalData: z.string().min(1, 'Os dados históricos são obrigatórios.'),
   partDrawing: z
     .any()
-    .refine((file) => file?.size, 'O desenho da peça é obrigatório.')
-    .refine((file) => file?.size <= MAX_FILE_SIZE, `O tamanho máximo da imagem é 5MB.`)
+    .refine((file) => !file || file.size === 0 || file.size <= MAX_FILE_SIZE, `O tamanho máximo da imagem é 5MB.`)
     .refine(
-      (file) => ACCEPTED_IMAGE_TYPES.includes(file?.type),
+      (file) => !file || file.size === 0 || ACCEPTED_IMAGE_TYPES.includes(file.type),
       ".jpg, .jpeg, .png e .webp são os únicos formatos suportados."
     )
     .optional(),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState, useRef } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { getMachiningTimePredictionAction, type PredictionState } from '@/lib/actions';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Lightbulb, Timer, UploadCloud, X } from 'lucide-react';
+import { BrainCircuit, Lightbulb, Loader, Timer, UploadCloud, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import Image from 'next/image';
@@ -24,19 +24,12 @@ const initialState: PredictionState = {
   message: '',
 };
 
-function SubmitButton() {
-    // This hook is not available in the current react-dom version
-    // const { pending } = useFormStatus();
-    const pending = false;
-
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <Button type="submit" disabled={pending} className="w-full">
       {pending ? (
         <>
-          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
+          <Loader className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
           Prevendo...
         </>
       ) : (
@@ -51,7 +44,7 @@ function SubmitButton() {
 
 
 export function RecommendationForm() {
-  const [state, formAction] = useActionState(getMachiningTimePredictionAction, initialState);
+  const [state, formAction, isPending] = useActionState(getMachiningTimePredictionAction, initialState);
   const { toast } = useToast();
   const [selectedMachine, setSelectedMachine] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -61,6 +54,18 @@ export function RecommendationForm() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+            variant: 'destructive',
+            title: 'Erro',
+            description: 'O tamanho máximo da imagem é 5MB.',
+        });
+        setPreviewUrl(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+        return;
+      }
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
     } else {
@@ -74,16 +79,6 @@ export function RecommendationForm() {
         fileInputRef.current.value = '';
     }
   }
-
-  useEffect(() => {
-    if (state.status === 'error' && state.message) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: state.message,
-      });
-    }
-  }, [state, toast]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -195,7 +190,7 @@ export function RecommendationForm() {
             </div>
           </CardContent>
           <CardFooter>
-            <SubmitButton />
+            <SubmitButton pending={isPending} />
           </CardFooter>
         </form>
       </Card>
@@ -220,6 +215,11 @@ export function RecommendationForm() {
               </div>
             </CardContent>
           </Card>
+        ) : state.status === 'error' && state.message ? (
+             <div className="text-center text-destructive">
+                <Lightbulb className="mx-auto h-12 w-12" />
+                <p className="mt-4">{state.message}</p>
+             </div>
         ) : (
           <div className="text-center text-muted-foreground">
              <Lightbulb className="mx-auto h-12 w-12" />
