@@ -86,11 +86,6 @@ export default function DashboardLayout({
       label: 'Manutenção IA',
       icon: BrainCircuit,
     },
-    {
-      href: '/dashboard/technical-specifications',
-      label: 'Especificações Técnicas',
-      icon: Wrench,
-    },
   ];
 
   const UserMenu = () => (
