@@ -275,15 +275,8 @@ export default function RecordsPage() {
         />
       </div>
       <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>Análise diária do Tempo de Usinagem</CardTitle>
-              <CardDescription>
-                Análise diária do tempo de usinagem (em minutos) por fábrica.
-              </CardDescription>
-            </div>
-             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+        <CardHeader className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto self-end">
                 <div className="grid w-full sm:w-36 gap-1.5">
                     <Label htmlFor="year-filter">Ano</Label>
                     <Select value={selectedYear} onValueChange={setSelectedYear}>
@@ -333,7 +326,12 @@ export default function RecordsPage() {
                     </Select>
                 </div>
             </div>
-          </div>
+            <div>
+              <CardTitle>Análise diária do Tempo de Usinagem</CardTitle>
+              <CardDescription>
+                Análise diária do tempo de usinagem (em minutos) por fábrica.
+              </CardDescription>
+            </div>
         </CardHeader>
         <CardContent>
           <MachiningTimeTrendChart
