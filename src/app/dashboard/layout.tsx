@@ -104,7 +104,7 @@ export default function DashboardLayout({
         <DropdownMenuSeparator />
         <DropdownMenuItem>Settings</DropdownMenuItem>
         <DropdownMenuSeparator />
-         <DropdownMenuItem asChild>
+         <DropdownMenuItem>
           <Link href="/login">
             Log out
           </Link>
@@ -135,7 +135,7 @@ export default function DashboardLayout({
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem>
           <Link href="/login">
             <LogOut className="mr-2 h-4 w-4" />
             <span>Log out</span>
