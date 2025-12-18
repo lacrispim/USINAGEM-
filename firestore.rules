@@ -43,6 +43,7 @@
  *   identifiers (like `userId`) are set correctly, linking the document
  *   to its owner in the path. These identifiers are immutable on update.
  *
+ * Force re-provisioning.
  */
 rules_version = '2';
 service cloud.firestore {
