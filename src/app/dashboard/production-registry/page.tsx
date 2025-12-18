@@ -71,9 +71,6 @@ const productionFormSchema = z.object({
   machiningTime: z.coerce.number().optional(),
   status: z.string().optional(),
   observations: z.string().optional(),
-  material: z.string().optional(),
-  rawMaterialDimensions: z.string().optional(),
-  geometryComplexity: z.string().optional(),
   toolCount: z.coerce.number().optional(),
   fixtureType: z.string().optional(),
 });
@@ -112,9 +109,6 @@ const ProductionFormContent = () => {
             machiningTime: 0,
             status: 'Em produção',
             observations: '',
-            material: '',
-            rawMaterialDimensions: '',
-            geometryComplexity: '',
             toolCount: 0,
             fixtureType: '',
         },
@@ -166,9 +160,6 @@ const ProductionFormContent = () => {
             machiningTime: 0,
             status: 'Em produção',
             observations: '',
-            material: '',
-            rawMaterialDimensions: '',
-            geometryComplexity: '',
             toolCount: 0,
             fixtureType: '',
         });
@@ -377,54 +368,6 @@ const ProductionFormContent = () => {
                         <FormMessage />
                         </FormItem>
                     )}
-                    />
-                    <FormField
-                      control={productionForm.control}
-                      name="material"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Material da Peça</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ex: Aço 1045, Alumínio 6061" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={productionForm.control}
-                      name="rawMaterialDimensions"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Dimensões do Bruto</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ex: D:100mm L:200mm ou 100x50x30mm" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={productionForm.control}
-                      name="geometryComplexity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Complexidade da Geometria</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione a complexidade" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Baixa">Baixa</SelectItem>
-                              <SelectItem value="Média">Média</SelectItem>
-                              <SelectItem value="Alta">Alta</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
                     />
                     {selectedMachine === 'CENTRO DE USINAGEM D600' && (
                         <>
