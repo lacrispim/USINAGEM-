@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Avatar,
   AvatarFallback,
@@ -41,6 +41,8 @@ import {
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { useAuth, useUser } from '@/firebase';
+import { signOut } from 'firebase/auth';
 
 const CustomSidebarTrigger = () => {
   const { toggleSidebar, isMobile } = useSidebar();
@@ -64,11 +66,28 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const auth = useAuth();
+  const { user, loading } = useUser();
   const [isClient, setIsClient] = React.useState(false);
 
   React.useEffect(() => {
     setIsClient(true);
   }, []);
+
+  React.useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+
+  const handleLogout = async () => {
+    if (auth) {
+      await signOut(auth);
+      router.push('/login');
+    }
+  };
 
   const menuItems = [
     {
@@ -87,27 +106,34 @@ export default function DashboardLayout({
       icon: BrainCircuit,
     },
   ];
+  
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return 'UR';
+    const names = name.split(' ');
+    if (names.length > 1) {
+      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
 
   const UserMenu = () => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="secondary" size="icon" className="rounded-full">
           <Avatar>
-            <AvatarImage src="https://picsum.photos/seed/user-avatar/100/100" data-ai-hint="user avatar" alt="User" />
-            <AvatarFallback>UR</AvatarFallback>
+            <AvatarImage src={user?.photoURL ?? "https://picsum.photos/seed/user-avatar/100/100"} data-ai-hint="user avatar" alt={user?.displayName ?? "User"} />
+            <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
           </Avatar>
           <span className="sr-only">Toggle user menu</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem>Settings</DropdownMenuItem>
         <DropdownMenuSeparator />
-         <DropdownMenuItem asChild>
-          <Link href="/login">
+         <DropdownMenuItem onClick={handleLogout}>
             Log out
-          </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -121,25 +147,23 @@ export default function DashboardLayout({
           tooltip="User Settings"
         >
           <Avatar className="h-7 w-7">
-            <AvatarImage src="https://picsum.photos/seed/user-avatar/100/100" data-ai-hint="user avatar" alt="User" />
-            <AvatarFallback>UR</AvatarFallback>
+            <AvatarImage src={user?.photoURL ?? "https://picsum.photos/seed/user-avatar/100/100"} data-ai-hint="user avatar" alt={user?.displayName ?? "User"} />
+            <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
           </Avatar>
-          <span className="text-sm font-medium">User</span>
+          <span className="text-sm font-medium">{user?.displayName || 'User'}</span>
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 mb-2 ml-2">
-        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/login">
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Log out</span>
-          </Link>
+        <DropdownMenuItem onClick={handleLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -157,6 +181,14 @@ export default function DashboardLayout({
         <Skeleton className="h-4 w-12" />
     </div>
   );
+  
+  if (loading || !user) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Skeleton className="h-12 w-12 rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>

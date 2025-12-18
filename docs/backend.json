@@ -159,7 +159,9 @@
     }
   },
   "auth": {
-    "providers": []
+    "providers": [
+      "email-password"
+    ]
   },
   "firestore": {
     "/productionRecords/{productionRecordId}": {
