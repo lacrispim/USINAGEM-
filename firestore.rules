@@ -141,5 +141,13 @@ service cloud.firestore {
       allow update: if isExistingOwner(userId) && isUpdatingOwnRecord();
       allow delete: if isExistingOwner(userId);
     }
+    
+    match /productionRecords/{recordId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /lossRecords/{recordId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }
