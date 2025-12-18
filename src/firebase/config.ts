@@ -5,10 +5,9 @@
 import { FirebaseOptions } from "firebase/app";
 
 export const firebaseConfig: FirebaseOptions = {
-  "apiKey": "API_KEY",
-  "authDomain": "coffee-spark-sample-app-bc73f.firebaseapp.com",
   "projectId": "coffee-spark-sample-app-bc73f",
-  "storageBucket": "coffee-spark-sample-app-bc73f.appspot.com",
-  "messagingSenderId": "1019056637845",
-  "appId": "1:1019056637845:web:e4f6b6e45f1b13593b4822"
+  "appId": "1:198751668692:web:3fb688f93402472118ee41",
+  "apiKey": "AIzaSyAI1XkNMBqRNPt59plsuP3-MFskCwgibqQ",
+  "authDomain": "coffee-spark-sample-app-bc73f.firebaseapp.com",
+  "messagingSenderId": "198751668692"
 };
