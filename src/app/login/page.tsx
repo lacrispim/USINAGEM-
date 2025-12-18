@@ -65,7 +65,11 @@ export default function LoginPage() {
           </div>
         </CardHeader>
         <CardContent>
+<<<<<<< HEAD
           <form onSubmit={handleLogin}>
+=======
+          <form>
+>>>>>>> 0319ad85957280a0a0e96ba67c65490ec2d3b8c5
             <div className="grid gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
@@ -74,8 +78,11 @@ export default function LoginPage() {
                   type="email"
                   placeholder="m@example.com"
                   required
+<<<<<<< HEAD
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+=======
+>>>>>>> 0319ad85957280a0a0e96ba67c65490ec2d3b8c5
                 />
               </div>
               <div className="grid gap-2">
@@ -88,6 +95,7 @@ export default function LoginPage() {
                     Forgot your password?
                   </Link>
                 </div>
+<<<<<<< HEAD
                 <Input 
                   id="password" 
                   type="password" 
@@ -99,6 +107,15 @@ export default function LoginPage() {
               <Button type="submit" className="w-full">
                 Login
               </Button>
+=======
+                <Input id="password" type="password" required />
+              </div>
+              <Link href="/dashboard/production-registry" className="w-full">
+                <Button className="w-full">
+                  Login
+                </Button>
+              </Link>
+>>>>>>> 0319ad85957280a0a0e96ba67c65490ec2d3b8c5
             </div>
           </form>
           <div className="mt-4 text-center text-sm">

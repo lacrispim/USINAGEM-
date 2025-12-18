@@ -14,6 +14,7 @@
           "type": "string",
           "description": "Reference to User. (Relationship: User 1:N MachiningRecord). The ID of the user who created this record."
         },
+<<<<<<< HEAD
         "material": {
           "type": "string",
           "description": "The material being machined."
@@ -23,6 +24,9 @@
           "description": "The cutting tool used for machining."
         },
         "speed": {
+=======
+        "toolCount": {
+>>>>>>> 0319ad85957280a0a0e96ba67c65490ec2d3b8c5
           "type": "number",
           "description": "The cutting speed used in the machining process."
         },

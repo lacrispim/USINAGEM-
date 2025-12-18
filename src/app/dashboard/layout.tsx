@@ -132,7 +132,12 @@ export default function DashboardLayout({
         <DropdownMenuSeparator />
         <DropdownMenuItem>Settings</DropdownMenuItem>
         <DropdownMenuSeparator />
+<<<<<<< HEAD
          <DropdownMenuItem onClick={handleLogout}>
+=======
+         <DropdownMenuItem>
+          <Link href="/login">
+>>>>>>> 0319ad85957280a0a0e96ba67c65490ec2d3b8c5
             Log out
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -161,9 +166,17 @@ export default function DashboardLayout({
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+<<<<<<< HEAD
         <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
+=======
+        <DropdownMenuItem>
+          <Link href="/login">
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Log out</span>
+          </Link>
+>>>>>>> 0319ad85957280a0a0e96ba67c65490ec2d3b8c5
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
