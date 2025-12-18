@@ -52,7 +52,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp, orderBy, query, limit, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { format, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -827,10 +827,14 @@ export default function ProductionRegistryPage() {
   const [editedRecord, setEditedRecord] = useState<any | null>(null);
 
 
-  const productionRecordsQuery = firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc'), limit(10)) : null;
+  const productionRecordsQuery = useMemoFirebase(() => 
+    firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc'), limit(10)) : null
+  , [firestore]);
   const { data: productionRecords, loading: loadingProduction } = useCollection(productionRecordsQuery);
   
-  const lossRecordsQuery = firestore ? query(collection(firestore, 'lossRecords'), orderBy('createdAt', 'desc'), limit(10)) : null;
+  const lossRecordsQuery = useMemoFirebase(() => 
+    firestore ? query(collection(firestore, 'lossRecords'), orderBy('createdAt', 'desc'), limit(10)) : null
+  , [firestore]);
   const { data: lossRecords, loading: loadingLoss } = useCollection(lossRecordsQuery);
 
   const handleDelete = async (collectionName: string, id: string) => {

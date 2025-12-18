@@ -17,7 +17,7 @@ import {
   TriangleAlert,
   PlusCircle,
 } from 'lucide-react';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
@@ -39,15 +39,15 @@ export default function RecordsPage() {
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
 
 
-  const productionRecordsQuery = firestore
+  const productionRecordsQuery = useMemoFirebase(() => firestore
     ? query(collection(firestore, 'productionRecords'))
-    : null;
+    : null, [firestore]);
   const { data: productionRecords, loading: loadingProduction } =
     useCollection(productionRecordsQuery);
 
-  const lossRecordsQuery = firestore
+  const lossRecordsQuery = useMemoFirebase(() => firestore
     ? query(collection(firestore, 'lossRecords'))
-    : null;
+    : null, [firestore]);
   const { data: lossRecords, loading: loadingLoss } =
     useCollection(lossRecordsQuery);
     
