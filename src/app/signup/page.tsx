@@ -43,9 +43,9 @@ export default function SignupPage() {
             await updateProfile(userCredential.user, { displayName: name });
             toast({
                 title: 'Conta Criada!',
-                description: 'Sua conta foi criada com sucesso. Faça o login.',
+                description: 'Bem-vindo! Você será redirecionado.',
             });
-            router.push('/login');
+            router.push('/dashboard/production-registry');
         } catch (error: any) {
             let errorMessage = 'Ocorreu um erro ao criar a conta.';
             if (error.code === 'auth/email-already-in-use') {
