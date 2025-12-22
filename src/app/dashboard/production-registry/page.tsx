@@ -771,12 +771,12 @@ export default function ProductionRegistryPage() {
 
 
   const productionRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc'), limit(10)) : null
+    firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc')) : null
   , [firestore]);
   const { data: productionRecords, loading: loadingProduction } = useCollection(productionRecordsQuery);
   
   const lossRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'lossRecords'), orderBy('createdAt', 'desc'), limit(10)) : null
+    firestore ? query(collection(firestore, 'lossRecords'), orderBy('createdAt', 'desc')) : null
   , [firestore]);
   const { data: lossRecords, loading: loadingLoss } = useCollection(lossRecordsQuery);
 
