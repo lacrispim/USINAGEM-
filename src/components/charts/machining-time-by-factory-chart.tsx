@@ -77,13 +77,16 @@ export function MachiningTimeByFactoryChart({
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <ChartContainer config={chartConfig}>
-                <BarChart data={chartData} barSize={40}>
+                <BarChart data={chartData} barSize={40} margin={{ bottom: 40 }}>
                     <CartesianGrid vertical={false} />
                     <XAxis
-                    dataKey="name"
-                    tickLine={false}
-                    tickMargin={10}
-                    axisLine={false}
+                      dataKey="name"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={5}
+                      angle={-45}
+                      textAnchor="end"
+                      interval={0}
                     />
                     <YAxis
                     domain={[0, Math.ceil(maxHours / 10) * 10 + 10]}
