@@ -51,9 +51,9 @@ export default function RecordsPage() {
   const { data: lossRecords, loading: loadingLoss } =
     useCollection(lossRecordsQuery);
     
-  const { availableYears, availableWeeks, filteredProductionRecords } = useMemo(() => {
-    if (!productionRecords) {
-        return { availableYears: [], availableWeeks: [], filteredProductionRecords: [] };
+  const { availableYears, availableWeeks, filteredProductionRecords, filteredLossRecords } = useMemo(() => {
+    if (!productionRecords || !lossRecords) {
+        return { availableYears: [], availableWeeks: [], filteredProductionRecords: [], filteredLossRecords: [] };
     }
 
     const recordYears = new Set<number>();
@@ -63,7 +63,6 @@ export default function RecordsPage() {
         }
     });
 
-    // Add future years up to 2026
     const currentYear = new Date().getFullYear();
     for (let y = currentYear; y <= 2026; y++) {
         recordYears.add(y);
@@ -82,9 +81,7 @@ export default function RecordsPage() {
             }
         });
         
-        // If the selected year is a future year or the current year, add all weeks
         if (year >= new Date().getFullYear()) {
-             // There are 52 or 53 weeks in a year. Let's stick to 52 for consistency.
             for (let i = 1; i <= 52; i++) {
                 weeksSet.add(i);
             }
@@ -94,23 +91,28 @@ export default function RecordsPage() {
     }
 
 
-    const filtered = productionRecords.filter((record) => {
-        if (!record.date?.toDate) return false;
-        const recordDate = record.date.toDate();
-        
-        const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
-        if (!yearMatch) return false;
-        
-        if (selectedYear !== 'all') {
-            const weekMatch = selectedWeek === 'all' || getISOWeek(recordDate) === parseInt(selectedWeek, 10);
-            if (!weekMatch) return false;
-        }
+    const filterRecords = (records: any[]) => {
+      return records.filter((record) => {
+          if (!record.date?.toDate) return false;
+          const recordDate = record.date.toDate();
+          
+          const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
+          if (!yearMatch) return false;
+          
+          if (selectedYear !== 'all') {
+              const weekMatch = selectedWeek === 'all' || getISOWeek(recordDate) === parseInt(selectedWeek, 10);
+              if (!weekMatch) return false;
+          }
 
-        return true;
-    });
+          return true;
+      });
+    }
 
-    return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filtered };
-  }, [productionRecords, selectedYear, selectedWeek]);
+    const filteredProd = filterRecords(productionRecords);
+    const filteredLoss = filterRecords(lossRecords);
+
+    return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss };
+  }, [productionRecords, lossRecords, selectedYear, selectedWeek]);
 
 
   // Reset week when year changes
@@ -121,15 +123,15 @@ export default function RecordsPage() {
 
   const totalHoursData = useMemo(() => {
     const initialHours = 540;
-    if (!productionRecords || !lossRecords) {
+    if (!filteredProductionRecords || !filteredLossRecords) {
       return { remainingHours: initialHours, isLoading: true };
     }
 
-    const totalMachiningMinutes = productionRecords.reduce(
+    const totalMachiningMinutes = filteredProductionRecords.reduce(
       (sum, record) => sum + (record.machiningTime || 0),
       0
     );
-    const totalLostMinutes = lossRecords.reduce(
+    const totalLostMinutes = filteredLossRecords.reduce(
       (sum, record) => sum + (record.timeLost || 0),
       0
     );
@@ -139,17 +141,17 @@ export default function RecordsPage() {
     const remainingHours = initialHours - hoursToDeduct;
 
     return {
-      remainingHours: remainingHours.toFixed(1), // Using one decimal place for precision
+      remainingHours: remainingHours.toFixed(1),
       isLoading: false,
     };
-  }, [productionRecords, lossRecords]);
+  }, [filteredProductionRecords, filteredLossRecords]);
 
   const lossReasonData = useMemo(() => {
-    if (!lossRecords) {
+    if (!filteredLossRecords) {
       return [];
     }
 
-    const reasonMap = lossRecords.reduce((acc, record) => {
+    const reasonMap = filteredLossRecords.reduce((acc, record) => {
       const reason = record.lossReason || 'Não especificado';
       const time = record.timeLost || 0;
       if (!acc[reason]) {
@@ -163,19 +165,19 @@ export default function RecordsPage() {
       name,
       value,
     }));
-  }, [lossRecords]);
+  }, [filteredLossRecords]);
 
   const totalLostMinutes = useMemo(() => {
-    if (!lossRecords) {
+    if (!filteredLossRecords) {
       return 0;
     }
-    return lossRecords.reduce((sum, record) => sum + (record.timeLost || 0), 0);
-  }, [lossRecords]);
+    return filteredLossRecords.reduce((sum, record) => sum + (record.timeLost || 0), 0);
+  }, [filteredLossRecords]);
 
-  const totalProductionRecords = productionRecords
-    ? productionRecords.length
+  const totalProductionRecords = filteredProductionRecords
+    ? filteredProductionRecords.length
     : 0;
-  const totalLossRecords = lossRecords ? lossRecords.length : 0;
+  const totalLossRecords = filteredLossRecords ? filteredLossRecords.length : 0;
 
   const isLoading = loadingProduction || loadingLoss || totalHoursData.isLoading;
 
@@ -234,7 +236,7 @@ export default function RecordsPage() {
               <div className="text-2xl font-bold">{totalProductionRecords}</div>
             )}
             <p className="text-xs text-muted-foreground">
-              Total de registros na base de dados.
+              Total de registros no período selecionado.
             </p>
           </CardContent>
         </Card>
@@ -254,7 +256,7 @@ export default function RecordsPage() {
               <div className="text-2xl font-bold">{totalLossRecords}</div>
             )}
             <p className="text-xs text-muted-foreground">
-              Total de perdas registradas na base de dados.
+              Total de perdas registradas no período.
             </p>
           </CardContent>
         </Card>
@@ -266,7 +268,7 @@ export default function RecordsPage() {
           totalMinutes={totalLostMinutes}
         />
         <MachiningTimeByFactoryChart
-          data={productionRecords || []}
+          data={filteredProductionRecords || []}
           loading={loadingProduction}
         />
       </div>
