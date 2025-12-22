@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -115,16 +115,14 @@ export default function RecordsPage() {
   }, [productionRecords, lossRecords, selectedYear, selectedWeek]);
 
 
-  // Reset week when year changes
-  useState(() => {
+  useEffect(() => {
     setSelectedWeek('all');
   }, [selectedYear]);
 
 
   const totalHoursData = useMemo(() => {
-    const initialHours = 540;
     if (!filteredProductionRecords || !filteredLossRecords) {
-      return { remainingHours: initialHours, isLoading: true };
+      return { totalHours: '0.0', isLoading: true };
     }
 
     const totalMachiningMinutes = filteredProductionRecords.reduce(
@@ -136,15 +134,15 @@ export default function RecordsPage() {
       0
     );
 
-    const totalMinutesToDeduct = totalMachiningMinutes + totalLostMinutes;
-    const hoursToDeduct = totalMinutesToDeduct / 60;
-    const remainingHours = initialHours - hoursToDeduct;
+    const totalMinutes = totalMachiningMinutes + totalLostMinutes;
+    const totalHours = totalMinutes / 60;
 
     return {
-      remainingHours: remainingHours.toFixed(1),
+      totalHours: totalHours.toFixed(1),
       isLoading: false,
     };
   }, [filteredProductionRecords, filteredLossRecords]);
+
 
   const lossReasonData = useMemo(() => {
     if (!filteredLossRecords) {
@@ -201,7 +199,7 @@ export default function RecordsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Horas Totais de Usinagem Restantes
+              Horas Totais de Usinagem Utilizadas
             </CardTitle>
             <Hourglass className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -212,11 +210,11 @@ export default function RecordsPage() {
               </div>
             ) : (
               <div className="text-2xl font-bold">
-                {totalHoursData.remainingHours}h
+                {totalHoursData.totalHours}h
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              Restante de um total de 540 horas.
+              Soma de tempo de usinagem e tempo perdido.
             </p>
           </CardContent>
         </Card>
