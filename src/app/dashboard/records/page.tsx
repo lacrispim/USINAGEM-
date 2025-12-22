@@ -126,11 +126,11 @@ export default function RecordsPage() {
     }
 
     const totalMachiningMinutes = filteredProductionRecords.reduce(
-      (sum, record) => sum + (record.machiningTime || 0),
+      (sum, record) => sum + (Number(record.machiningTime) || 0),
       0
     );
     const totalLostMinutes = filteredLossRecords.reduce(
-      (sum, record) => sum + (record.timeLost || 0),
+      (sum, record) => sum + (Number(record.timeLost) || 0),
       0
     );
 
@@ -151,7 +151,7 @@ export default function RecordsPage() {
 
     const reasonMap = filteredLossRecords.reduce((acc, record) => {
       const reason = record.lossReason || 'Não especificado';
-      const time = record.timeLost || 0;
+      const time = Number(record.timeLost) || 0;
       if (!acc[reason]) {
         acc[reason] = 0;
       }
@@ -169,7 +169,7 @@ export default function RecordsPage() {
     if (!filteredLossRecords) {
       return 0;
     }
-    return filteredLossRecords.reduce((sum, record) => sum + (record.timeLost || 0), 0);
+    return filteredLossRecords.reduce((sum, record) => sum + (Number(record.timeLost) || 0), 0);
   }, [filteredLossRecords]);
 
   const totalProductionRecords = filteredProductionRecords
