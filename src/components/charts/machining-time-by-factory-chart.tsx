@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import {
   Card,
   CardContent,
@@ -34,7 +34,7 @@ export function MachiningTimeByFactoryChart({
       (acc, record) => {
         if (record.factory) {
           const factory = record.factory;
-          const timeInMinutes = record.machiningTime || 0;
+          const timeInMinutes = Number(record.machiningTime) || 0;
           if (!acc[factory]) {
             acc[factory] = 0;
           }
@@ -57,6 +57,8 @@ export function MachiningTimeByFactoryChart({
       color: 'hsl(var(--chart-1))',
     },
   };
+  
+  const maxHours = Math.max(...chartData.map(d => d.hours), 0);
 
   return (
     <Card>
@@ -73,32 +75,35 @@ export function MachiningTimeByFactoryChart({
           </div>
         ) : chartData && chartData.length > 0 ? (
           <div className="h-[300px] w-full">
-            <ChartContainer config={chartConfig}>
-              <BarChart data={chartData}>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="name"
-                  tickLine={false}
-                  tickMargin={10}
-                  axisLine={false}
-                />
-                <YAxis
-                  dataKey="hours"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={10}
-                  unit="h"
-                />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent 
-                    formatter={(value) => `${(value as number).toFixed(2)}h`}
-                    indicator="dot"
-                  />}
-                />
-                <Bar dataKey="hours" fill="var(--color-hours)" radius={4} />
-              </BarChart>
-            </ChartContainer>
+            <ResponsiveContainer width="100%" height="100%">
+                <ChartContainer config={chartConfig}>
+                <BarChart data={chartData} barSize={40}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                    dataKey="name"
+                    tickLine={false}
+                    tickMargin={10}
+                    axisLine={false}
+                    />
+                    <YAxis
+                    domain={[0, Math.ceil(maxHours / 10) * 10 + 10]}
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                    unit="h"
+                    />
+                    <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent 
+                        formatter={(value) => `${(value as number).toFixed(2)}h`}
+                        indicator="dot"
+                    />}
+                    />
+                    <Bar dataKey="hours" fill="var(--color-hours)" radius={4} />
+                </BarChart>
+                </ChartContainer>
+            </ResponsiveContainer>
           </div>
         ) : (
           <div className="flex h-[300px] w-full flex-col items-center justify-center">
