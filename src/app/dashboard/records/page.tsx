@@ -57,16 +57,17 @@ export default function RecordsPage() {
     }
 
     const recordYears = new Set<number>();
-    productionRecords.forEach((record) => {
+    const allRecords = [...productionRecords, ...lossRecords];
+
+    allRecords.forEach((record) => {
         if (record.date?.toDate) {
-            recordYears.add(getYear(record.date.toDate()));
+            const year = getYear(record.date.toDate());
+            // Ensure we only add valid, 4-digit years to the filter
+            if (year > 2000) {
+                 recordYears.add(year);
+            }
         }
     });
-
-    const currentYear = new Date().getFullYear();
-    for (let y = currentYear; y <= 2026; y++) {
-        recordYears.add(y);
-    }
 
     const sortedYears = Array.from(recordYears).sort((a, b) => b - a);
     const year = selectedYear === 'all' ? null : parseInt(selectedYear, 10);
@@ -74,15 +75,16 @@ export default function RecordsPage() {
     let weeks: number[] = [];
     if (year) {
         const weeksSet = new Set<number>();
-        productionRecords.forEach((record) => {
+        allRecords.forEach((record) => {
             const recordDate = record.date?.toDate;
             if (recordDate && getYear(recordDate) === year) {
                 weeksSet.add(getISOWeek(recordDate));
             }
         });
-        
-        if (year >= new Date().getFullYear()) {
-            for (let i = 1; i <= 52; i++) {
+
+        // If the selected year is the current year, populate all weeks up to 52
+        if (year === new Date().getFullYear()) {
+             for (let i = 1; i <= 52; i++) {
                 weeksSet.add(i);
             }
         }
@@ -121,7 +123,7 @@ export default function RecordsPage() {
 
 
   const totalHoursData = useMemo(() => {
-    if (!filteredProductionRecords || !filteredLossRecords) {
+    if (loadingProduction || loadingLoss) {
       return { totalHours: '0.0', isLoading: true };
     }
 
@@ -141,7 +143,7 @@ export default function RecordsPage() {
       totalHours: totalHours.toFixed(1),
       isLoading: false,
     };
-  }, [filteredProductionRecords, filteredLossRecords]);
+  }, [filteredProductionRecords, filteredLossRecords, loadingProduction, loadingLoss]);
 
 
   const lossReasonData = useMemo(() => {
@@ -177,7 +179,7 @@ export default function RecordsPage() {
     : 0;
   const totalLossRecords = filteredLossRecords ? filteredLossRecords.length : 0;
 
-  const isLoading = loadingProduction || loadingLoss || totalHoursData.isLoading;
+  const isLoading = loadingProduction || loadingLoss;
 
   return (
     <div className="flex flex-col gap-6">
