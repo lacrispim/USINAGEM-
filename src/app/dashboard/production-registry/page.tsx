@@ -765,9 +765,13 @@ const statusColorMap: { [key: string]: string } = {
 
 export default function ProductionRegistryPage() {
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [editedRecord, setEditedRecord] = useState<any | null>(null);
+  
+  const [editingLossRecordId, setEditingLossRecordId] = useState<string | null>(null);
+  const [editedLossRecord, setEditedLossRecord] = useState<any | null>(null);
 
 
   const productionRecordsQuery = useMemoFirebase(() => 
@@ -817,6 +821,8 @@ export default function ProductionRegistryPage() {
     }
   };
 
+  // --- Funções de Edição para Registros de Produção ---
+
   const handleEdit = (record: any) => {
     setEditingRecordId(record.id);
     setEditedRecord({ ...record, date: record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date });
@@ -830,7 +836,7 @@ export default function ProductionRegistryPage() {
   const handleSaveEdit = async () => {
     if (!firestore || !editedRecord) return;
     const { id, createdAt, ...dataToSave } = editedRecord;
-    // The 'date' is a string 'dd/MM/yyyy', it needs to be converted to a Date object for Firestore
+    
     if (typeof dataToSave.date === 'string') {
         try {
             dataToSave.date = parse(dataToSave.date, 'dd/MM/yyyy', new Date());
@@ -871,7 +877,63 @@ export default function ProductionRegistryPage() {
     setEditedRecord({ ...editedRecord, [name]: value });
   };
 
-  const { toast } = useToast();
+
+  // --- Funções de Edição para Registros de Perda ---
+  const handleEditLoss = (record: any) => {
+    setEditingLossRecordId(record.id);
+    setEditedLossRecord({ ...record, date: record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date });
+  };
+
+  const handleCancelEditLoss = () => {
+    setEditingLossRecordId(null);
+    setEditedLossRecord(null);
+  };
+  
+  const handleSaveEditLoss = async () => {
+    if (!firestore || !editedLossRecord) return;
+    const { id, createdAt, ...dataToSave } = editedLossRecord;
+
+    if (typeof dataToSave.date === 'string') {
+        try {
+            dataToSave.date = parse(dataToSave.date, 'dd/MM/yyyy', new Date());
+        } catch (error) {
+            console.error("Error parsing date:", error);
+            toast({
+                title: 'Erro de Data',
+                description: 'O formato da data é inválido. Use dd/MM/yyyy.',
+                variant: 'destructive',
+            });
+            return;
+        }
+    }
+
+    const recordRef = doc(firestore, 'lossRecords', id);
+    try {
+      await updateDoc(recordRef, dataToSave);
+      toast({
+        title: 'Registro de Perda Atualizado',
+        description: 'O registro de perda foi atualizado com sucesso.',
+      });
+      handleCancelEditLoss();
+    } catch (error) {
+      console.error('Error updating loss record: ', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o registro de perda.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleLossInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setEditedLossRecord({ ...editedLossRecord, [name]: value });
+  };
+
+  const handleLossSelectChange = (name: string, value: string) => {
+    setEditedLossRecord({ ...editedLossRecord, [name]: value });
+  };
+
 
   const exportToExcel = (data: any[], fileName: string) => {
     if (!data || data.length === 0) {
@@ -917,7 +979,7 @@ export default function ProductionRegistryPage() {
                     <div>
                         <CardTitle>Registros de Produção Recentes</CardTitle>
                         <CardDescription>
-                        Últimas 10 entradas de produção bem-sucedida.
+                        Últimas entradas de produção bem-sucedida.
                         </CardDescription>
                     </div>
                     <Button onClick={() => exportToExcel(productionRecords, 'Registros_Producao')}>
@@ -1121,7 +1183,7 @@ export default function ProductionRegistryPage() {
                     <div>
                         <CardTitle>Registros de Perdas Recentes</CardTitle>
                         <CardDescription>
-                        Últimas 10 entradas de perdas de produção.
+                        Entradas de perdas de produção.
                         </CardDescription>
                     </div>
                     <Button onClick={() => exportToExcel(lossRecords, 'Registros_Perdas')}>
@@ -1157,49 +1219,111 @@ export default function ProductionRegistryPage() {
                     ) : lossRecords && lossRecords.length > 0 ? (
                       lossRecords.map((record: any) => (
                       <TableRow key={record.id}>
-                        <TableCell>{record.operatorId}</TableCell>
-                        <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
-                        <TableCell>{record.factory}</TableCell>
-                        <TableCell>{record.formsNumber}</TableCell>
-                        <TableCell>{record.machine}</TableCell>
-                        <TableCell>
-                          <Badge
-                            className="bg-yellow-400 text-black hover:bg-yellow-500"
-                          >
-                            {record.lossReason}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-red-500">
-                          {record.deadPartsQuantity}
-                        </TableCell>
-                        <TableCell>{record.timeLost}</TableCell>
-                        <TableCell>{record.observations}</TableCell>
-                        <TableCell>
-                           {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
-                        </TableCell>
-                        <TableCell>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente o registro de perda.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete('lossRecords', record.id)}>
-                                    Excluir
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                        </TableCell>
+                        {editingLossRecordId === record.id ? (
+                            <>
+                                <TableCell>
+                                    <Select value={editedLossRecord.operatorId} onValueChange={(value) => handleLossSelectChange('operatorId', value)}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Daniel Solivo">Daniel Solivo</SelectItem>
+                                            <SelectItem value="Rodrigo Cantano">Rodrigo Cantano</SelectItem>
+                                            <SelectItem value="Gustavo Gozzi">Gustavo Gozzi</SelectItem>
+                                            <SelectItem value="William Martinucci">William Martinucci</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </TableCell>
+                                <TableCell><Input name="date" value={editedLossRecord.date} onChange={handleLossInputChange} /></TableCell>
+                                <TableCell>
+                                    <Select value={editedLossRecord.factory} onValueChange={(value) => handleLossSelectChange('factory', value)}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="VALINHOS DOVE">VALINHOS DOVE</SelectItem>
+                                            <SelectItem value="VALINHOS SABONETE">VALINHOS SABONETE</SelectItem>
+                                            <SelectItem value="VINHEDO">VINHEDO</SelectItem>
+                                            <SelectItem value="POUSO ALEGRE">POUSO ALEGRE</SelectItem>
+                                            <SelectItem value="INDAIATUBA">INDAIATUBA</SelectItem>
+                                            <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
+                                            <SelectItem value="SUAPE">SUAPE</SelectItem>
+                                            <SelectItem value="IGARASSU">IGARASSU</SelectItem>
+                                            <SelectItem value="GARANHUS">GARANHUS</SelectItem>
+                                            <SelectItem value="TORRE">TORRE</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </TableCell>
+                                <TableCell><Input name="formsNumber" value={editedLossRecord.formsNumber} onChange={handleLossInputChange} /></TableCell>
+                                <TableCell>
+                                    <Select value={editedLossRecord.machine} onValueChange={(value) => handleLossSelectChange('machine', value)}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="TORNO CNC CENTUR 30">TORNO CNC CENTUR 30</SelectItem>
+                                            <SelectItem value="CENTRO DE USINAGEM D600">CENTRO DE USINAGEM D600</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </TableCell>
+                                <TableCell><Textarea name="lossReason" value={editedLossRecord.lossReason} onChange={handleLossInputChange} /></TableCell>
+                                <TableCell><Input type="number" name="deadPartsQuantity" value={editedLossRecord.deadPartsQuantity} onChange={handleLossInputChange} /></TableCell>
+                                <TableCell><Input type="number" name="timeLost" value={editedLossRecord.timeLost} onChange={handleLossInputChange} /></TableCell>
+                                <TableCell><Textarea name="observations" value={editedLossRecord.observations} onChange={handleLossInputChange} /></TableCell>
+                                <TableCell>{record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}</TableCell>
+                                <TableCell className="flex gap-2">
+                                    <Button variant="ghost" size="icon" onClick={handleSaveEditLoss}>
+                                        <Save className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" onClick={handleCancelEditLoss}>
+                                        <XCircle className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                </TableCell>
+                            </>
+                        ) : (
+                            <>
+                                <TableCell>{record.operatorId}</TableCell>
+                                <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
+                                <TableCell>{record.factory}</TableCell>
+                                <TableCell>{record.formsNumber}</TableCell>
+                                <TableCell>{record.machine}</TableCell>
+                                <TableCell>
+                                    <Badge
+                                    className="bg-yellow-400 text-black hover:bg-yellow-500"
+                                    >
+                                    {record.lossReason}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-red-500">
+                                    {record.deadPartsQuantity}
+                                </TableCell>
+                                <TableCell>{record.timeLost} min</TableCell>
+                                <TableCell>{record.observations}</TableCell>
+                                <TableCell>
+                                    {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
+                                </TableCell>
+                                <TableCell className="flex gap-2">
+                                    <Button variant="ghost" size="icon" onClick={() => handleEditLoss(record)}>
+                                        <Edit className="h-4 w-4 text-blue-500" />
+                                    </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon">
+                                            <Trash2 className="h-4 w-4 text-red-500" />
+                                        </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                            Essa ação não pode ser desfeita. Isso excluirá permanentemente o registro de perda.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDelete('lossRecords', record.id)}>
+                                            Excluir
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </TableCell>
+                             </>
+                        )}
                       </TableRow>
                     ))
                     ) : (
