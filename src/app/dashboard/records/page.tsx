@@ -22,8 +22,7 @@ import { collection, query } from 'firebase/firestore';
 import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
-import { getYear, format, getISOWeek, eachWeekOfInterval, startOfYear, endOfYear } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { getYear, format, getISOWeek } from 'date-fns';
 import {
   Select,
   SelectContent,
@@ -32,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { OperatorTimeTrendChart } from '@/components/charts/operator-time-trend-chart';
 
 export default function RecordsPage() {
   const firestore = useFirestore();
@@ -62,8 +62,7 @@ export default function RecordsPage() {
     allRecords.forEach((record) => {
         if (record.date?.toDate) {
             const year = getYear(record.date.toDate());
-            // Ensure we only add valid, 4-digit years to the filter
-            if (year > 2000) {
+            if (year > 2000 && year < 3000) {
                  recordYears.add(year);
             }
         }
@@ -81,14 +80,7 @@ export default function RecordsPage() {
                 weeksSet.add(getISOWeek(recordDate));
             }
         });
-
-        // If the selected year is the current year, populate all weeks up to 52
-        if (year === new Date().getFullYear()) {
-             for (let i = 1; i <= 52; i++) {
-                weeksSet.add(i);
-            }
-        }
-
+        
         weeks = Array.from(weeksSet).sort((a, b) => a - b);
     }
 
@@ -261,6 +253,42 @@ export default function RecordsPage() {
           </CardContent>
         </Card>
       </div>
+
+       <div className="flex justify-end gap-4">
+            <div className="grid w-full sm:w-36 gap-1.5">
+                <Label htmlFor="year-filter">Ano</Label>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                    <SelectTrigger id="year-filter">
+                    <SelectValue placeholder="Selecione o ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="all">Todos os Anos</SelectItem>
+                    {availableYears.map((year) => (
+                        <SelectItem key={year} value={String(year)}>
+                        {year}
+                        </SelectItem>
+                    ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="grid w-full sm:w-48 gap-1.5">
+                <Label htmlFor="week-filter">Semana</Label>
+                <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all'}>
+                    <SelectTrigger id="week-filter">
+                    <SelectValue placeholder="Selecione a semana" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="all">Todas as Semanas</SelectItem>
+                    {availableWeeks.map((week) => (
+                        <SelectItem key={week} value={String(week)}>
+                            {`Semana ${week}`}
+                        </SelectItem>
+                    ))}
+                    </SelectContent>
+                </Select>
+            </div>
+        </div>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LossReasonPieChart
           data={lossReasonData}
@@ -273,41 +301,7 @@ export default function RecordsPage() {
         />
       </div>
       <Card>
-        <CardHeader className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto self-end">
-                <div className="grid w-full sm:w-36 gap-1.5">
-                    <Label htmlFor="year-filter">Ano</Label>
-                    <Select value={selectedYear} onValueChange={setSelectedYear}>
-                        <SelectTrigger id="year-filter">
-                        <SelectValue placeholder="Selecione o ano" />
-                        </SelectTrigger>
-                        <SelectContent>
-                        <SelectItem value="all">Todos os Anos</SelectItem>
-                        {availableYears.map((year) => (
-                            <SelectItem key={year} value={String(year)}>
-                            {year}
-                            </SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="grid w-full sm:w-48 gap-1.5">
-                    <Label htmlFor="week-filter">Semana</Label>
-                    <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all'}>
-                        <SelectTrigger id="week-filter">
-                        <SelectValue placeholder="Selecione a semana" />
-                        </SelectTrigger>
-                        <SelectContent>
-                        <SelectItem value="all">Todas as Semanas</SelectItem>
-                        {availableWeeks.map((week) => (
-                            <SelectItem key={week} value={String(week)}>
-                                {`Semana ${week}`}
-                            </SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
+        <CardHeader>
             <div>
               <CardTitle>Análise diária do Tempo de Usinagem</CardTitle>
               <CardDescription>
@@ -323,6 +317,12 @@ export default function RecordsPage() {
           />
         </CardContent>
       </Card>
+      <OperatorTimeTrendChart
+        productionData={filteredProductionRecords}
+        lossData={filteredLossRecords}
+        loading={isLoading}
+        isWeekView={selectedWeek !== 'all'}
+      />
     </div>
   );
 }
