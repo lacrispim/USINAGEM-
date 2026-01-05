@@ -90,6 +90,35 @@ const lossFormSchema = z.object({
 type ProductionFormValues = z.infer<typeof productionFormSchema>;
 type LossFormValues = z.infer<typeof lossFormSchema>;
 
+const initialProductionValues = {
+  operatorId: '',
+  date: format(new Date(), 'dd/MM/yyyy'),
+  factory: '',
+  formsNumber: '',
+  activityType: '',
+  machine: '',
+  quantityProduced: 0,
+  operationsNumber: '',
+  machiningTime: 0,
+  status: 'Em produção',
+  observations: '',
+  toolCount: 0,
+  fixtureType: '',
+};
+
+const initialLossValues = {
+    operatorId: '',
+    date: format(new Date(), 'dd/MM/yyyy'),
+    machine: '',
+    lossReason: '',
+    deadPartsQuantity: 0,
+    factory: '',
+    timeLost: 0,
+    observations: '',
+    formsNumber: '',
+};
+
+
 const ProductionFormContent = () => {
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -97,21 +126,7 @@ const ProductionFormContent = () => {
 
     const productionForm = useForm<ProductionFormValues>({
         resolver: zodResolver(productionFormSchema),
-        defaultValues: {
-            operatorId: '',
-            date: '',
-            factory: '',
-            formsNumber: '',
-            activityType: '',
-            machine: '',
-            quantityProduced: 0,
-            operationsNumber: '',
-            machiningTime: 0,
-            status: 'Em produção',
-            observations: '',
-            toolCount: 0,
-            fixtureType: '',
-        },
+        defaultValues: initialProductionValues,
     });
 
      useEffect(() => {
@@ -148,21 +163,7 @@ const ProductionFormContent = () => {
             title: 'Produção Registrada',
             description: 'Os dados de produção foram salvos com sucesso.',
         });
-        productionForm.reset({
-             operatorId: '',
-            date: format(new Date(), 'dd/MM/yyyy'),
-            factory: '',
-            formsNumber: '',
-            activityType: '',
-            machine: '',
-            quantityProduced: 0,
-            operationsNumber: '',
-            machiningTime: 0,
-            status: 'Em produção',
-            observations: '',
-            toolCount: 0,
-            fixtureType: '',
-        });
+        productionForm.reset(initialProductionValues);
         } catch (error) {
         console.error('Error adding production record: ', error);
         toast({
@@ -199,7 +200,7 @@ const ProductionFormContent = () => {
                           <FormLabel>ID do Operador</FormLabel>
                           <Select
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -238,7 +239,7 @@ const ProductionFormContent = () => {
                         <FormLabel>Fábrica</FormLabel>
                         <Select
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                         >
                             <FormControl>
                             <SelectTrigger>
@@ -270,7 +271,7 @@ const ProductionFormContent = () => {
                             <FormLabel>Status</FormLabel>
                             <Select
                                 onValueChange={field.onChange}
-                                defaultValue={field.value}
+                                value={field.value}
                             >
                                 <FormControl>
                                 <SelectTrigger>
@@ -320,7 +321,7 @@ const ProductionFormContent = () => {
                         <FormLabel>Tipo de Atividade</FormLabel>
                         <Select
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                         >
                             <FormControl>
                             <SelectTrigger>
@@ -349,7 +350,7 @@ const ProductionFormContent = () => {
                         <FormLabel>Máquina</FormLabel>
                         <Select
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                         >
                             <FormControl>
                             <SelectTrigger>
@@ -480,17 +481,7 @@ const LossFormContent = () => {
 
     const lossForm = useForm<LossFormValues>({
         resolver: zodResolver(lossFormSchema),
-        defaultValues: {
-            operatorId: '',
-            date: '',
-            machine: '',
-            lossReason: '',
-            deadPartsQuantity: 0,
-            factory: '',
-            timeLost: 0,
-            observations: '',
-            formsNumber: '',
-        },
+        defaultValues: initialLossValues,
     });
 
      useEffect(() => {
@@ -521,17 +512,7 @@ const LossFormContent = () => {
             title: 'Perda Registrada',
             description: 'O registro de perda foi salvo com sucesso.',
         });
-        lossForm.reset({
-             operatorId: '',
-            date: format(new Date(), 'dd/MM/yyyy'),
-            machine: '',
-            lossReason: '',
-            deadPartsQuantity: 0,
-            factory: '',
-            timeLost: 0,
-            observations: '',
-            formsNumber: '',
-        });
+        lossForm.reset(initialLossValues);
         } catch (error) {
         console.error('Error adding loss record: ', error);
         toast({
@@ -569,7 +550,7 @@ const LossFormContent = () => {
                           <FormLabel>ID do Operador</FormLabel>
                            <Select
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -608,7 +589,7 @@ const LossFormContent = () => {
                           <FormLabel>Fábrica</FormLabel>
                           <Select
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -653,7 +634,7 @@ const LossFormContent = () => {
                           <FormLabel>Máquina</FormLabel>
                           <Select
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger>
