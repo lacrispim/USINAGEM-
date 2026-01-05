@@ -3,10 +3,6 @@
 import { getMachiningTimePrediction, MachiningTimePredictionOutput } from '@/ai/flows/predict-machining-time-flow';
 import { z } from 'zod';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
-
-
 const formSchema = z.object({
   machine: z.string().min(1, 'A seleção da máquina é obrigatória.'),
   material: z.string().min(1, 'O tipo de material é obrigatório.'),
@@ -15,14 +11,7 @@ const formSchema = z.object({
   toolCount: z.coerce.number().optional(),
   fixtureType: z.string().optional(),
   historicalData: z.string().min(1, 'Os dados históricos são obrigatórios.'),
-  partDrawing: z
-    .any()
-    .refine((file) => !file || file.size === 0 || file.size <= MAX_FILE_SIZE, `O tamanho máximo da imagem é 5MB.`)
-    .refine(
-      (file) => !file || file.size === 0 || ACCEPTED_IMAGE_TYPES.includes(file.type),
-      ".jpg, .jpeg, .png e .webp são os únicos formatos suportados."
-    )
-    .optional(),
+  partDrawing: z.string().optional(),
 });
 
 
@@ -42,25 +31,6 @@ export type PredictionState = {
   };
 };
 
-// Function to convert file to data URI
-async function fileToDataUri(file: File): Promise<string> {
-    const reader = new FileReader();
-    return new Promise((resolve, reject) => {
-        reader.onload = () => {
-            if (typeof reader.result === 'string') {
-                resolve(reader.result);
-            } else {
-                reject(new Error('Failed to read file as data URI'));
-            }
-        };
-        reader.onerror = (error) => {
-            reject(error);
-        };
-        reader.readAsDataURL(file);
-    });
-}
-
-
 export async function getMachiningTimePredictionAction(
   prevState: PredictionState,
   formData: FormData
@@ -74,7 +44,7 @@ export async function getMachiningTimePredictionAction(
     toolCount: formData.get('toolCount'),
     fixtureType: formData.get('fixtureType'),
     historicalData: formData.get('historicalData'),
-    partDrawing: formData.get('partDrawing'),
+    partDrawing: formData.get('partDrawing') || undefined,
   });
 
   if (!validatedFields.success) {
@@ -86,17 +56,7 @@ export async function getMachiningTimePredictionAction(
   }
 
   try {
-    const { partDrawing, ...otherData } = validatedFields.data;
-    
-    let partDrawingDataUri;
-    if (partDrawing && partDrawing.size > 0) {
-        partDrawingDataUri = await fileToDataUri(partDrawing);
-    }
-
-    const result = await getMachiningTimePrediction({
-        ...otherData,
-        partDrawing: partDrawingDataUri,
-    });
+    const result = await getMachiningTimePrediction(validatedFields.data);
     
     return {
       status: 'success',

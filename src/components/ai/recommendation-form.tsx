@@ -49,6 +49,7 @@ export function RecommendationForm() {
   const [selectedMachine, setSelectedMachine] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dataUriRef = useRef<HTMLInputElement>(null);
 
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,10 +67,22 @@ export function RecommendationForm() {
         }
         return;
       }
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setPreviewUrl(result);
+        if (dataUriRef.current) {
+          dataUriRef.current.value = result;
+        }
+      };
+      reader.readAsDataURL(file);
+
     } else {
       setPreviewUrl(null);
+       if (dataUriRef.current) {
+          dataUriRef.current.value = '';
+        }
     }
   };
 
@@ -77,6 +90,9 @@ export function RecommendationForm() {
     setPreviewUrl(null);
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
+    }
+    if (dataUriRef.current) {
+        dataUriRef.current.value = '';
     }
   }
 
@@ -149,7 +165,7 @@ export function RecommendationForm() {
             )}
             
             <div>
-                <Label htmlFor="partDrawing">Desenho da Peça</Label>
+                <Label htmlFor="partDrawing-input">Desenho da Peça</Label>
                 <div className="mt-1 flex justify-center rounded-lg border border-dashed border-input px-6 py-10">
                     <div className="text-center">
                     {previewUrl ? (
@@ -164,17 +180,19 @@ export function RecommendationForm() {
                     )}
                     <div className="mt-4 flex text-sm leading-6 text-muted-foreground">
                         <Label
-                        htmlFor="partDrawing"
+                        htmlFor="partDrawing-input"
                         className="relative cursor-pointer rounded-md font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/90"
                         >
                         <span>Carregar um arquivo</span>
-                        <Input id="partDrawing" name="partDrawing" type="file" className="sr-only" accept="image/*" onChange={handleFileChange} ref={fileInputRef}/>
+                        <Input id="partDrawing-input" name="partDrawing-input" type="file" className="sr-only" accept="image/*" onChange={handleFileChange} ref={fileInputRef}/>
                         </Label>
                         <p className="pl-1">ou arraste e solte</p>
                     </div>
                     <p className="text-xs leading-5 text-muted-foreground">PNG, JPG, GIF até 5MB</p>
                     </div>
                 </div>
+                {/* Hidden input to store the data URI */}
+                <input type="hidden" name="partDrawing" ref={dataUriRef} />
                 {state.errors?.partDrawing && <p className="text-sm font-medium text-destructive">{state.errors.partDrawing[0]}</p>}
             </div>
 
