@@ -73,15 +73,8 @@ export default function RecordsPage() {
     
     let weeks: number[] = [];
     if (year) {
-        const weeksSet = new Set<number>();
-        allRecords.forEach((record) => {
-            const recordDate = record.date?.toDate;
-            if (recordDate && getYear(recordDate) === year) {
-                weeksSet.add(getISOWeek(recordDate));
-            }
-        });
-        
-        weeks = Array.from(weeksSet).sort((a, b) => a - b);
+      // Se um ano for selecionado, gere uma lista de 1 a 52 semanas.
+      weeks = Array.from({ length: 52 }, (_, i) => i + 1);
     }
 
 
