@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
 import {
   Card,
   CardContent,
@@ -19,11 +19,15 @@ import { Loader } from 'lucide-react';
 interface MachiningTimeByFactoryChartProps {
   data: { factory?: string; machiningTime?: number }[];
   loading: boolean;
+  selectedFactory: string | null;
+  onFactorySelect: (factory: string | null) => void;
 }
 
 export function MachiningTimeByFactoryChart({
   data,
   loading,
+  selectedFactory,
+  onFactorySelect
 }: MachiningTimeByFactoryChartProps) {
   const chartData = useMemo(() => {
     if (!data) {
@@ -65,7 +69,7 @@ export function MachiningTimeByFactoryChart({
       <CardHeader>
         <CardTitle>Horas de Usinagem por Fábrica</CardTitle>
         <CardDescription>
-          Total de horas de usinagem para cada fábrica.
+          Total de horas de usinagem para cada fábrica. Clique em uma barra para filtrar.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -77,7 +81,12 @@ export function MachiningTimeByFactoryChart({
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <ChartContainer config={chartConfig}>
-                <BarChart data={chartData} barSize={40} margin={{ bottom: 40 }}>
+                <BarChart 
+                    data={chartData} 
+                    barSize={40} 
+                    margin={{ bottom: 40 }}
+                    onClick={(e) => onFactorySelect(e?.activeLabel || null)}
+                >
                     <CartesianGrid vertical={false} />
                     <XAxis
                       dataKey="name"
@@ -97,13 +106,22 @@ export function MachiningTimeByFactoryChart({
                     unit="h"
                     />
                     <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent 
-                        formatter={(value) => `${(value as number).toFixed(2)}h`}
-                        indicator="dot"
-                    />}
+                        cursor={{fill: 'hsl(var(--accent))', radius: 4}}
+                        content={<ChartTooltipContent 
+                            formatter={(value) => `${(value as number).toFixed(2)}h`}
+                            indicator="dot"
+                        />}
                     />
-                    <Bar dataKey="hours" fill="var(--color-hours)" radius={4} />
+                    <Bar dataKey="hours" radius={4}>
+                      {chartData.map((entry, index) => (
+                          <Cell 
+                              key={`cell-${index}`} 
+                              cursor="pointer" 
+                              fill={'var(--color-hours)'} 
+                              opacity={selectedFactory ? (selectedFactory === entry.name ? 1 : 0.3) : 1}
+                          />
+                      ))}
+                    </Bar>
                 </BarChart>
                 </ChartContainer>
             </ResponsiveContainer>

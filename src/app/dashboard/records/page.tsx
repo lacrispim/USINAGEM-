@@ -37,6 +37,7 @@ export default function RecordsPage() {
   const firestore = useFirestore();
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
+  const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
 
 
   const productionRecordsQuery = useMemoFirebase(() => firestore
@@ -73,7 +74,6 @@ export default function RecordsPage() {
     
     let weeks: number[] = [];
     if (year) {
-      // Se um ano for selecionado, gere uma lista de 1 a 52 semanas.
       weeks = Array.from({ length: 52 }, (_, i) => i + 1);
     }
 
@@ -91,6 +91,9 @@ export default function RecordsPage() {
               if (!weekMatch) return false;
           }
 
+          const factoryMatch = !selectedFactory || record.factory === selectedFactory;
+          if (!factoryMatch) return false;
+
           return true;
       });
     }
@@ -99,12 +102,16 @@ export default function RecordsPage() {
     const filteredLoss = filterRecords(lossRecords);
 
     return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss };
-  }, [productionRecords, lossRecords, selectedYear, selectedWeek]);
+  }, [productionRecords, lossRecords, selectedYear, selectedWeek, selectedFactory]);
 
 
   useEffect(() => {
     setSelectedWeek('all');
   }, [selectedYear]);
+
+  useEffect(() => {
+    setSelectedFactory(null);
+  }, [selectedYear, selectedWeek]);
 
 
   const totalHoursData = useMemo(() => {
@@ -165,6 +172,10 @@ export default function RecordsPage() {
   const totalLossRecords = filteredLossRecords ? filteredLossRecords.length : 0;
 
   const isLoading = loadingProduction || loadingLoss;
+  
+  const handleFactorySelect = (factoryName: string | null) => {
+    setSelectedFactory(current => current === factoryName ? null : factoryName);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -289,8 +300,10 @@ export default function RecordsPage() {
           totalMinutes={totalLostMinutes}
         />
         <MachiningTimeByFactoryChart
-          data={filteredProductionRecords || []}
+          data={productionRecords || []}
           loading={loadingProduction}
+          selectedFactory={selectedFactory}
+          onFactorySelect={handleFactorySelect}
         />
       </div>
       <Card>
