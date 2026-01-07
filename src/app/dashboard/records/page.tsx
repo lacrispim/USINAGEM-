@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
-import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
 import { getYear, format, getISOWeek } from 'date-fns';
@@ -32,6 +31,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { OperatorDailyTimeChart } from '@/components/charts/operator-daily-time-chart';
+import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 
 export default function RecordsPage() {
   const firestore = useFirestore();
@@ -156,14 +156,7 @@ export default function RecordsPage() {
     return Object.entries(reasonMap).map(([name, value]) => ({
       name,
       value,
-    }));
-  }, [filteredLossRecords]);
-
-  const totalLostMinutes = useMemo(() => {
-    if (!filteredLossRecords) {
-      return 0;
-    }
-    return filteredLossRecords.reduce((sum, record) => sum + (Number(record.timeLost) || 0), 0);
+    })).sort((a,b) => b.value - a.value);
   }, [filteredLossRecords]);
 
   const totalProductionRecords = filteredProductionRecords
@@ -294,10 +287,9 @@ export default function RecordsPage() {
         </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <LossReasonPieChart
+        <LossReasonChart
           data={lossReasonData}
           loading={loadingLoss}
-          totalMinutes={totalLostMinutes}
         />
         <MachiningTimeByFactoryChart
           data={productionRecords || []}
