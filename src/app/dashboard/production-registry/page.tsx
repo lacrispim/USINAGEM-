@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2, Edit, Save, XCircle, FileSpreadsheet } from 'lucide-react';
+import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2, Edit, Save, XCircle, FileSpreadsheet, User } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -31,7 +31,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -58,6 +58,7 @@ import { format, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
+import { Label } from '@/components/ui/label';
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
@@ -118,6 +119,13 @@ const initialLossValues = {
     formsNumber: '',
 };
 
+const operatorList = [
+    "Daniel Solivo",
+    "Rodrigo Cantano",
+    "Gustavo Gozzi",
+    "William Martinucci"
+];
+
 
 const ProductionFormContent = () => {
     const { toast } = useToast();
@@ -133,7 +141,7 @@ const ProductionFormContent = () => {
         setIsClient(true);
         if (isClient) {
             productionForm.reset({
-                ...productionForm.getValues(),
+                ...initialProductionValues,
                 date: format(new Date(), 'dd/MM/yyyy'),
             });
         }
@@ -163,7 +171,10 @@ const ProductionFormContent = () => {
             title: 'Produção Registrada',
             description: 'Os dados de produção foram salvos com sucesso.',
         });
-        productionForm.reset(initialProductionValues);
+        productionForm.reset({
+            ...initialProductionValues,
+            date: format(new Date(), 'dd/MM/yyyy'),
+        });
         } catch (error) {
         console.error('Error adding production record: ', error);
         toast({
@@ -208,10 +219,7 @@ const ProductionFormContent = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="Daniel Solivo">Daniel Solivo</SelectItem>
-                              <SelectItem value="Rodrigo Cantano">Rodrigo Cantano</SelectItem>
-                              <SelectItem value="Gustavo Gozzi">Gustavo Gozzi</SelectItem>
-                              <SelectItem value="William Martinucci">William Martinucci</SelectItem>
+                              {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -488,7 +496,7 @@ const LossFormContent = () => {
         setIsClient(true);
         if (isClient) {
             lossForm.reset({
-                ...lossForm.getValues(),
+                ...initialLossValues,
                 date: format(new Date(), 'dd/MM/yyyy'),
             });
         }
@@ -512,7 +520,10 @@ const LossFormContent = () => {
             title: 'Perda Registrada',
             description: 'O registro de perda foi salvo com sucesso.',
         });
-        lossForm.reset(initialLossValues);
+        lossForm.reset({
+            ...initialLossValues,
+            date: format(new Date(), 'dd/MM/yyyy'),
+        });
         } catch (error) {
         console.error('Error adding loss record: ', error);
         toast({
@@ -558,10 +569,7 @@ const LossFormContent = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="Daniel Solivo">Daniel Solivo</SelectItem>
-                              <SelectItem value="Rodrigo Cantano">Rodrigo Cantano</SelectItem>
-                              <SelectItem value="Gustavo Gozzi">Gustavo Gozzi</SelectItem>
-                              <SelectItem value="William Martinucci">William Martinucci</SelectItem>
+                                {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -753,6 +761,8 @@ export default function ProductionRegistryPage() {
   
   const [editingLossRecordId, setEditingLossRecordId] = useState<string | null>(null);
   const [editedLossRecord, setEditedLossRecord] = useState<any | null>(null);
+  
+  const [selectedOperator, setSelectedOperator] = useState<string>('all');
 
 
   const productionRecordsQuery = useMemoFirebase(() => 
@@ -764,6 +774,18 @@ export default function ProductionRegistryPage() {
     firestore ? query(collection(firestore, 'lossRecords'), orderBy('createdAt', 'desc')) : null
   , [firestore]);
   const { data: lossRecords, loading: loadingLoss } = useCollection(lossRecordsQuery);
+
+  const filteredProductionRecords = useMemo(() => {
+    if (!productionRecords) return [];
+    if (selectedOperator === 'all') return productionRecords;
+    return productionRecords.filter(record => record.operatorId === selectedOperator);
+  }, [productionRecords, selectedOperator]);
+
+  const filteredLossRecords = useMemo(() => {
+    if (!lossRecords) return [];
+    if (selectedOperator === 'all') return lossRecords;
+    return lossRecords.filter(record => record.operatorId === selectedOperator);
+  }, [lossRecords, selectedOperator]);
 
   const handleDelete = async (collectionName: string, id: string) => {
     if (!firestore) return;
@@ -954,6 +976,27 @@ export default function ProductionRegistryPage() {
             <LossFormContent />
           </div>
           <div className="mt-8 space-y-8">
+            <div className="flex justify-end">
+                <div className="grid w-full max-w-xs gap-1.5">
+                    <Label htmlFor="operator-filter">Filtrar por Técnico</Label>
+                    <Select value={selectedOperator} onValueChange={setSelectedOperator}>
+                        <SelectTrigger id="operator-filter">
+                            <div className='flex items-center gap-2'>
+                                <User className="h-4 w-4 text-muted-foreground" />
+                                <SelectValue placeholder="Selecione o técnico" />
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos os Técnicos</SelectItem>
+                            {operatorList.map((op) => (
+                                <SelectItem key={op} value={op}>
+                                    {op}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -963,7 +1006,7 @@ export default function ProductionRegistryPage() {
                         Últimas entradas de produção bem-sucedida.
                         </CardDescription>
                     </div>
-                    <Button onClick={() => exportToExcel(productionRecords, 'Registros_Producao')}>
+                    <Button onClick={() => exportToExcel(filteredProductionRecords, 'Registros_Producao')}>
                         <FileSpreadsheet className="mr-2 h-4 w-4" />
                         Exportar para Excel
                     </Button>
@@ -995,8 +1038,8 @@ export default function ProductionRegistryPage() {
                           Carregando...
                         </TableCell>
                       </TableRow>
-                    ) : productionRecords && productionRecords.length > 0 ? (
-                      productionRecords.map((record: any) => (
+                    ) : filteredProductionRecords && filteredProductionRecords.length > 0 ? (
+                      filteredProductionRecords.map((record: any) => (
                         <TableRow key={record.id}>
                           {editingRecordId === record.id ? (
                             <>
@@ -1004,10 +1047,7 @@ export default function ProductionRegistryPage() {
                                 <Select value={editedRecord.operatorId} onValueChange={(value) => handleSelectChange('operatorId', value)}>
                                   <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="Daniel Solivo">Daniel Solivo</SelectItem>
-                                    <SelectItem value="Rodrigo Cantano">Rodrigo Cantano</SelectItem>
-                                    <SelectItem value="Gustavo Gozzi">Gustavo Gozzi</SelectItem>
-                                    <SelectItem value="William Martinucci">William Martinucci</SelectItem>
+                                    {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </TableCell>
@@ -1167,7 +1207,7 @@ export default function ProductionRegistryPage() {
                         Entradas de perdas de produção.
                         </CardDescription>
                     </div>
-                    <Button onClick={() => exportToExcel(lossRecords, 'Registros_Perdas')}>
+                    <Button onClick={() => exportToExcel(filteredLossRecords, 'Registros_Perdas')}>
                         <FileSpreadsheet className="mr-2 h-4 w-4" />
                         Exportar para Excel
                     </Button>
@@ -1197,8 +1237,8 @@ export default function ProductionRegistryPage() {
                           Carregando...
                         </TableCell>
                       </TableRow>
-                    ) : lossRecords && lossRecords.length > 0 ? (
-                      lossRecords.map((record: any) => (
+                    ) : filteredLossRecords && filteredLossRecords.length > 0 ? (
+                      filteredLossRecords.map((record: any) => (
                       <TableRow key={record.id}>
                         {editingLossRecordId === record.id ? (
                             <>
@@ -1206,10 +1246,7 @@ export default function ProductionRegistryPage() {
                                     <Select value={editedLossRecord.operatorId} onValueChange={(value) => handleLossSelectChange('operatorId', value)}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="Daniel Solivo">Daniel Solivo</SelectItem>
-                                            <SelectItem value="Rodrigo Cantano">Rodrigo Cantano</SelectItem>
-                                            <SelectItem value="Gustavo Gozzi">Gustavo Gozzi</SelectItem>
-                                            <SelectItem value="William Martinucci">William Martinucci</SelectItem>
+                                            {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </TableCell>
