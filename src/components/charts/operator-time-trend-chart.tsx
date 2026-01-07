@@ -63,14 +63,16 @@ export function OperatorTimeTrendChart({
         const dateObj = record.date.toDate();
         const dateStr = format(dateObj, 'yyyy-MM-dd');
         const operator = record.operatorId;
-        const timeInHours = ((record.machiningTime || 0) + (record.timeLost || 0)) / 60;
+        // Correctly sum machiningTime from production and timeLost from losses
+        const timeInMinutes = (record.machiningTime || 0) + (record.timeLost || 0);
 
-        if (timeInHours > 0) {
+        if (timeInMinutes > 0) {
+            const timeInHours = timeInMinutes / 60;
             if (!dailyData[dateStr]) {
-            dailyData[dateStr] = {};
+                dailyData[dateStr] = {};
             }
             if (!dailyData[dateStr][operator]) {
-            dailyData[dateStr][operator] = 0;
+                dailyData[dateStr][operator] = 0;
             }
             dailyData[dateStr][operator] += timeInHours;
             operatorSet.add(operator);
