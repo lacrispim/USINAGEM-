@@ -31,7 +31,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { OperatorTimeTrendChart } from '@/components/charts/operator-time-trend-chart';
 
 export default function RecordsPage() {
   const firestore = useFirestore();
@@ -323,12 +322,6 @@ export default function RecordsPage() {
           />
         </CardContent>
       </Card>
-      <OperatorTimeTrendChart
-        productionData={filteredProductionRecords}
-        lossData={filteredLossRecords}
-        loading={isLoading}
-        isWeekView={selectedWeek !== 'all'}
-      />
     </div>
   );
 }
