@@ -63,7 +63,6 @@ export function OperatorTimeTrendChart({
         const dateObj = record.date.toDate();
         const dateStr = format(dateObj, 'yyyy-MM-dd');
         const operator = record.operatorId;
-        // Correctly sum machiningTime from production and timeLost from losses
         const timeInMinutes = (record.machiningTime || 0) + (record.timeLost || 0);
 
         if (timeInMinutes > 0) {
