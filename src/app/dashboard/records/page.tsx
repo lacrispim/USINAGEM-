@@ -147,9 +147,9 @@ export default function RecordsPage() {
       let reason = record.lossReason || 'Não especificado';
       const time = Number(record.timeLost) || 0;
 
-      // Group all "setup" related reasons into a single "SETUP" category
-      if (reason.toLowerCase().includes('setup')) {
-        reason = 'SETUP';
+      // Group all "REUNIÃO" related reasons into a single "REUNIÃO" category
+      if (reason.toLowerCase().includes('reunião')) {
+        reason = 'REUNIÃO';
       }
 
       if (!acc[reason]) {
