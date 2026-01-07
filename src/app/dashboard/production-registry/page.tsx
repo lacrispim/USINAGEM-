@@ -83,12 +83,21 @@ const lossFormSchema = z.object({
   date: z.string().min(1, 'A data da perda é obrigatória.'),
   machine: z.string().optional(),
   lossReason: z.string().optional(),
+  otherLossReason: z.string().optional(),
   deadPartsQuantity: z.coerce.number().optional(),
   factory: z.string().optional(),
   timeLost: z.coerce.number().optional(),
   observations: z.string().optional(),
   formsNumber: z.string().optional(),
-});
+}).refine(data => {
+    if (data.lossReason === 'Outro' && !data.otherLossReason) {
+      return false;
+    }
+    return true;
+  }, {
+    message: 'Por favor, especifique o motivo da perda.',
+    path: ['otherLossReason'],
+  });
 
 type ProductionFormValues = z.infer<typeof productionFormSchema>;
 type LossFormValues = z.infer<typeof lossFormSchema>;
@@ -114,6 +123,7 @@ const initialLossValues = {
     date: format(new Date(), 'dd/MM/yyyy'),
     machine: '',
     lossReason: '',
+    otherLossReason: '',
     deadPartsQuantity: 0,
     factory: '',
     timeLost: 0,
@@ -509,30 +519,44 @@ const LossFormContent = () => {
         name: 'timeLost',
     });
 
+    const lossReason = useWatch({
+        control: lossForm.control,
+        name: 'lossReason',
+    });
+
     async function onLossSubmit(values: LossFormValues) {
         if (!firestore) return;
         try {
-        const date = parse(values.date, 'dd/MM/yyyy', new Date());
-        await addDoc(collection(firestore, 'lossRecords'), {
-            ...values,
-            date,
-            createdAt: serverTimestamp(),
-        });
-        toast({
-            title: 'Perda Registrada',
-            description: 'O registro de perda foi salvo com sucesso.',
-        });
-        lossForm.reset({
-            ...initialLossValues,
-            date: format(new Date(), 'dd/MM/yyyy'),
-        });
+            const finalValues = {
+                ...values,
+                lossReason: values.lossReason === 'Outro' ? values.otherLossReason : values.lossReason,
+            };
+            // @ts-ignore
+            delete finalValues.otherLossReason;
+
+            const date = parse(values.date, 'dd/MM/yyyy', new Date());
+            await addDoc(collection(firestore, 'lossRecords'), {
+                ...finalValues,
+                date,
+                createdAt: serverTimestamp(),
+            });
+
+            toast({
+                title: 'Perda Registrada',
+                description: 'O registro de perda foi salvo com sucesso.',
+            });
+
+            lossForm.reset({
+                ...initialLossValues,
+                date: format(new Date(), 'dd/MM/yyyy'),
+            });
         } catch (error) {
-        console.error('Error adding loss record: ', error);
-        toast({
-            title: 'Erro',
-            description: 'Não foi possível salvar o registro de perda.',
-            variant: 'destructive',
-        });
+            console.error('Error adding loss record: ', error);
+            toast({
+                title: 'Erro',
+                description: 'Não foi possível salvar o registro de perda.',
+                variant: 'destructive',
+            });
         }
     }
     
@@ -664,22 +688,48 @@ const LossFormContent = () => {
                         </FormItem>
                       )}
                     />
-                    <FormField
+                     <FormField
                       control={lossForm.control}
                       name="lossReason"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Motivo da Perda</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Descreva o motivo da perda"
-                              {...field}
-                            />
-                          </FormControl>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione um motivo" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="SETUP">SETUP</SelectItem>
+                              <SelectItem value="Outro">Outro</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                    {lossReason === 'Outro' && (
+                      <FormField
+                        control={lossForm.control}
+                        name="otherLossReason"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Especifique o Motivo</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Descreva o motivo da perda"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                     <FormField
                       control={lossForm.control}
                       name="deadPartsQuantity"
