@@ -146,11 +146,13 @@ export default function RecordsPage() {
     const reasonMap = filteredLossRecords.reduce((acc, record) => {
       let reason = record.lossReason || 'Não especificado';
       const time = Number(record.timeLost) || 0;
+      const lowerCaseReason = reason.toLowerCase();
   
-      // Group all "REUNIÃO" related reasons into a single "REUNIÃO" category
-      if (reason.toLowerCase().includes('reunião')) {
+      if (lowerCaseReason.includes('limpeza')) {
+        reason = 'Limpeza';
+      } else if (lowerCaseReason.includes('reunião')) {
         reason = 'REUNIÃO';
-      } else if (reason.toLowerCase().includes('setup')) {
+      } else if (lowerCaseReason.includes('setup')) {
         reason = 'SETUP';
       }
   
