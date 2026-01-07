@@ -25,7 +25,7 @@ export function LossReasonChart({ data, loading }: LossReasonChartProps) {
   const chartData = data.map(item => ({
     name: item.name,
     Horas: item.value / 60
-  }))
+  })).sort((a, b) => a.Horas - b.Horas); // Sort ascending for horizontal layout
 
   const chartConfig = {
     Horas: {
@@ -41,7 +41,7 @@ export function LossReasonChart({ data, loading }: LossReasonChartProps) {
       <CardHeader>
         <CardTitle>Tempo Perdido por Motivo</CardTitle>
         <CardDescription>
-          Principais motivos de perda, ordenados do maior para o menor.
+          Principais motivos de perda, ordenados do menor para o maior tempo.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -53,7 +53,7 @@ export function LossReasonChart({ data, loading }: LossReasonChartProps) {
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <ChartContainer config={chartConfig}>
-                <BarChart data={chartData} layout="vertical" barSize={30}>
+                <BarChart data={chartData} layout="vertical" barSize={30} margin={{ left: 10 }}>
                     <CartesianGrid horizontal={false} />
                     <YAxis
                       dataKey="name"
@@ -61,7 +61,8 @@ export function LossReasonChart({ data, loading }: LossReasonChartProps) {
                       tickLine={false}
                       axisLine={false}
                       tickMargin={5}
-                      width={100}
+                      width={120}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                     />
                     <XAxis
                       type='number'
@@ -71,11 +72,12 @@ export function LossReasonChart({ data, loading }: LossReasonChartProps) {
                       axisLine={false}
                       tickMargin={10}
                       unit="h"
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                     />
                     <ChartTooltip
                         cursor={{fill: 'hsl(var(--accent))', radius: 4}}
                         content={<ChartTooltipContent 
-                            formatter={(value) => `${(value as number).toFixed(2)}h`}
+                            formatter={(value, name) => [`${(value as number).toFixed(2)}h`, name]}
                             indicator="dot"
                         />}
                     />
