@@ -47,27 +47,32 @@ export function OperatorDailyTimeChart({
     const dailyData: { [date: string]: { [operator: string]: number } } = {};
     const operatorSet = new Set<string>();
 
-    const processRecord = (record: any, timeField: string) => {
-        if (record.operatorId && record.date && record.date.toDate) {
-            const dateObj = record.date.toDate();
-            const dateStr = format(dateObj, 'yyyy-MM-dd');
-            const operator = record.operatorId;
-            const timeInMinutes = (record[timeField] || 0);
+    const allRecords = [
+        ...productionData.map(r => ({...r, type: 'prod'})),
+        ...lossData.map(r => ({...r, type: 'loss'}))
+    ];
 
-            if (!dailyData[dateStr]) {
-            dailyData[dateStr] = {};
-            }
-            if (!dailyData[dateStr][operator]) {
-            dailyData[dateStr][operator] = 0;
-            }
-            dailyData[dateStr][operator] += timeInMinutes;
-            operatorSet.add(operator);
+    allRecords.forEach(record => {
+      if (record.operatorId && record.date && record.date.toDate) {
+        const dateObj = record.date.toDate();
+        const dateStr = format(dateObj, 'yyyy-MM-dd');
+        const operator = record.operatorId;
+        
+        const timeInMinutes = record.type === 'prod' 
+            ? (record.machiningTime || 0) 
+            : (record.timeLost || 0);
+
+        if (!dailyData[dateStr]) {
+          dailyData[dateStr] = {};
         }
-    }
+        if (!dailyData[dateStr][operator]) {
+          dailyData[dateStr][operator] = 0;
+        }
+        dailyData[dateStr][operator] += timeInMinutes;
+        operatorSet.add(operator);
+      }
+    });
 
-    productionData.forEach(record => processRecord(record, 'machiningTime'));
-    lossData.forEach(record => processRecord(record, 'timeLost'));
-    
     const sortedOperators = Array.from(operatorSet).sort();
 
     const chartDataResult = Object.entries(dailyData)
@@ -133,7 +138,7 @@ export function OperatorDailyTimeChart({
   const CustomLegend = (props: any) => {
     const { payload } = props;
     return (
-      <div className="flex justify-center gap-4 pt-4">
+      <div className="flex justify-center flex-wrap gap-4 pt-4">
         {payload.map((entry: any, index: number) => (
           <div key={`item-${index}`} className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: entry.color }} />
@@ -166,6 +171,7 @@ export function OperatorDailyTimeChart({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
+              domain={[0, 'dataMax + 2']}
             />
             <ChartTooltip
               cursor={false}
