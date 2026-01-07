@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { OperatorDailyTimeChart } from '@/components/charts/operator-daily-time-chart';
 
 export default function RecordsPage() {
   const firestore = useFirestore();
@@ -318,6 +319,24 @@ export default function RecordsPage() {
           <MachiningTimeTrendChart
             data={filteredProductionRecords}
             loading={loadingProduction}
+            isWeekView={selectedWeek !== 'all'}
+          />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+            <div>
+              <CardTitle>Análise diária por Operador</CardTitle>
+              <CardDescription>
+                Tempo total de atividades (produção e perda) por operador a cada dia.
+              </CardDescription>
+            </div>
+        </CardHeader>
+        <CardContent>
+          <OperatorDailyTimeChart
+            productionData={filteredProductionRecords}
+            lossData={filteredLossRecords}
+            loading={isLoading}
             isWeekView={selectedWeek !== 'all'}
           />
         </CardContent>
