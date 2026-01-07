@@ -142,23 +142,25 @@ export default function RecordsPage() {
     if (!filteredLossRecords) {
       return [];
     }
-
+  
     const reasonMap = filteredLossRecords.reduce((acc, record) => {
       let reason = record.lossReason || 'Não especificado';
       const time = Number(record.timeLost) || 0;
-
+  
       // Group all "REUNIÃO" related reasons into a single "REUNIÃO" category
       if (reason.toLowerCase().includes('reunião')) {
         reason = 'REUNIÃO';
+      } else if (reason.toLowerCase().includes('setup')) {
+        reason = 'SETUP';
       }
-
+  
       if (!acc[reason]) {
         acc[reason] = 0;
       }
       acc[reason] += time;
       return acc;
     }, {} as Record<string, number>);
-
+  
     return Object.entries(reasonMap).map(([name, value]) => ({
       name,
       value,
