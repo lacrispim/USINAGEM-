@@ -166,7 +166,7 @@ export default function RecordsPage() {
     return Object.entries(reasonMap).map(([name, value]) => ({
       name,
       value,
-    })).sort((a,b) => b.value - a.value);
+    })).sort((a,b) => b.value - a.value).slice(0, 10);
   }, [filteredLossRecords]);
 
   const totalProductionRecords = filteredProductionRecords
