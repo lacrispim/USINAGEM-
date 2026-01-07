@@ -59,8 +59,8 @@ export function OperatorDailyTimeChart({
         const operator = record.operatorId;
         
         const timeInMinutes = record.type === 'prod' 
-            ? (record.machiningTime || 0) 
-            : (record.timeLost || 0);
+            ? (Number(record.machiningTime) || 0) 
+            : (Number(record.timeLost) || 0);
 
         if (!dailyData[dateStr]) {
           dailyData[dateStr] = {};
