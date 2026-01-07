@@ -15,17 +15,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
 import { useAuth } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 
-export default function LoginPage() {
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const router = useRouter();
   const auth = useAuth();
   const { toast } = useToast();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!auth) {
         toast({
@@ -36,19 +35,30 @@ export default function LoginPage() {
         return;
     }
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard/production-registry');
+      await sendPasswordResetEmail(auth, email);
+      toast({
+        title: 'E-mail de redefinição enviado',
+        description: 'Se este e-mail estiver cadastrado, você receberá um link para redefinir sua senha.',
+      });
+      router.push('/login');
     } catch (error: any) {
-        let errorMessage = 'Ocorreu um erro ao fazer login.';
-        if (error.code === 'auth/invalid-credential') {
-            errorMessage = 'E-mail ou senha inválidos.';
+        let errorMessage = 'Ocorreu um erro ao enviar o e-mail de redefinição.';
+         if (error.code === 'auth/user-not-found') {
+            // We don't want to reveal if a user exists or not
+             errorMessage = 'Se este e-mail estiver cadastrado, você receberá um link para redefinir sua senha.';
+             toast({
+                title: 'E-mail de redefinição enviado',
+                description: errorMessage,
+             });
+             router.push('/login');
+        } else {
+             toast({
+                title: 'Erro',
+                description: errorMessage,
+                variant: 'destructive',
+            });
         }
-        toast({
-            title: 'Erro de Login',
-            description: errorMessage,
-            variant: 'destructive',
-        });
-      console.error('Error signing in: ', error);
+      console.error('Error sending password reset email: ', error);
     }
   };
 
@@ -58,14 +68,14 @@ export default function LoginPage() {
         <CardHeader className="space-y-4">
           <Logo className="justify-center" />
           <div className="text-center">
-            <CardTitle className="text-2xl">Welcome Back</CardTitle>
+            <CardTitle className="text-2xl">Redefinir Senha</CardTitle>
             <CardDescription>
-              Enter your email below to login to your account
+              Digite seu e-mail para receber um link de redefinição.
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleResetPassword}>
             <div className="grid gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
@@ -78,33 +88,15 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="ml-auto inline-block text-sm underline"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
               <Button type="submit" className="w-full">
-                Login
+                Enviar E-mail de Redefinição
               </Button>
             </div>
           </form>
           <div className="mt-4 text-center text-sm">
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="underline">
-              Sign up
+            Lembrou sua senha?{' '}
+            <Link href="/login" className="underline">
+              Fazer Login
             </Link>
           </div>
         </CardContent>
