@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2, Edit, Save, XCircle, FileSpreadsheet, User } from 'lucide-react';
+import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2, Edit, Save, XCircle, FileSpreadsheet, User, X } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -51,10 +51,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp, orderBy, query, limit, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { format, parse } from 'date-fns';
+import { format, parse, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
@@ -763,6 +765,7 @@ export default function ProductionRegistryPage() {
   const [editedLossRecord, setEditedLossRecord] = useState<any | null>(null);
   
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
 
   const productionRecordsQuery = useMemoFirebase(() => 
@@ -777,15 +780,29 @@ export default function ProductionRegistryPage() {
 
   const filteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
-    if (selectedOperator === 'all') return productionRecords;
-    return productionRecords.filter(record => record.operatorId === selectedOperator);
-  }, [productionRecords, selectedOperator]);
+    return productionRecords.filter(record => {
+      const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
+      
+      const dateMatch = !selectedDate || (record.date?.toDate && 
+        record.date.toDate() >= startOfDay(selectedDate) &&
+        record.date.toDate() <= endOfDay(selectedDate));
+
+      return operatorMatch && dateMatch;
+    });
+  }, [productionRecords, selectedOperator, selectedDate]);
 
   const filteredLossRecords = useMemo(() => {
     if (!lossRecords) return [];
-    if (selectedOperator === 'all') return lossRecords;
-    return lossRecords.filter(record => record.operatorId === selectedOperator);
-  }, [lossRecords, selectedOperator]);
+     return lossRecords.filter(record => {
+      const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
+      
+      const dateMatch = !selectedDate || (record.date?.toDate && 
+        record.date.toDate() >= startOfDay(selectedDate) &&
+        record.date.toDate() <= endOfDay(selectedDate));
+
+      return operatorMatch && dateMatch;
+    });
+  }, [lossRecords, selectedOperator, selectedDate]);
 
   const handleDelete = async (collectionName: string, id: string) => {
     if (!firestore) return;
@@ -976,8 +993,39 @@ export default function ProductionRegistryPage() {
             <LossFormContent />
           </div>
           <div className="mt-8 space-y-8">
-            <div className="flex justify-end">
-                <div className="grid w-full max-w-xs gap-1.5">
+             <div className="flex flex-col sm:flex-row justify-end gap-4">
+                <div className="grid w-full sm:max-w-xs gap-1.5">
+                    <Label htmlFor="date-filter">Filtrar por Data</Label>
+                     <Popover>
+                        <PopoverTrigger asChild>
+                        <Button
+                            id="date-filter"
+                            variant={"outline"}
+                            className={cn(
+                            "justify-start text-left font-normal",
+                            !selectedDate && "text-muted-foreground"
+                            )}
+                        >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione uma data</span>}
+                        </Button>
+                        </PopoverTrigger>
+                        {selectedDate && (
+                            <Button variant="ghost" size="icon" className="absolute right-0 top-6" onClick={() => setSelectedDate(undefined)}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        )}
+                        <PopoverContent className="w-auto p-0">
+                        <Calendar
+                            mode="single"
+                            selected={selectedDate}
+                            onSelect={setSelectedDate}
+                            initialFocus
+                        />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <div className="grid w-full sm:max-w-xs gap-1.5">
                     <Label htmlFor="operator-filter">Filtrar por Técnico</Label>
                     <Select value={selectedOperator} onValueChange={setSelectedOperator}>
                         <SelectTrigger id="operator-filter">
