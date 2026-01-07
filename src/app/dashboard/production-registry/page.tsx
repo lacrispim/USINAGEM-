@@ -783,6 +783,7 @@ export default function ProductionRegistryPage() {
     return productionRecords.filter(record => {
       const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
       
+      // The date filter should use the 'date' field (Data), not 'createdAt' (Registrado em)
       const dateMatch = !selectedDate || (record.date?.toDate && 
         record.date.toDate() >= startOfDay(selectedDate) &&
         record.date.toDate() <= endOfDay(selectedDate));
@@ -796,6 +797,7 @@ export default function ProductionRegistryPage() {
      return lossRecords.filter(record => {
       const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
       
+      // The date filter should use the 'date' field (Data), not 'createdAt' (Registrado em)
       const dateMatch = !selectedDate || (record.date?.toDate && 
         record.date.toDate() >= startOfDay(selectedDate) &&
         record.date.toDate() <= endOfDay(selectedDate));
