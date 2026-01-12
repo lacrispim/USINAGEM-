@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import {
   Card,
   CardContent,
@@ -84,7 +84,7 @@ export function MachiningTimeByFactoryChart({
                 <BarChart 
                     data={chartData} 
                     barSize={40} 
-                    margin={{ bottom: 40 }}
+                    margin={{ top: 20, bottom: 40 }}
                     onClick={(e) => onFactorySelect(e?.activeLabel || null)}
                 >
                     <CartesianGrid vertical={false} />
@@ -113,6 +113,13 @@ export function MachiningTimeByFactoryChart({
                         />}
                     />
                     <Bar dataKey="hours" radius={4}>
+                      <LabelList
+                        dataKey="hours"
+                        position="top"
+                        offset={8}
+                        className="fill-foreground text-sm"
+                        formatter={(value: number) => `${value.toFixed(1)}h`}
+                      />
                       {chartData.map((entry, index) => (
                           <Cell 
                               key={`cell-${index}`} 
