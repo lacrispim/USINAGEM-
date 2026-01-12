@@ -52,7 +52,7 @@ export function MachiningTimeByFactoryChart({
     return Object.entries(factoryData).map(([name, timeInMinutes]) => ({
       name,
       hours: timeInMinutes / 60,
-    }));
+    })).sort((a, b) => b.hours - a.hours);
   }, [data]);
 
   const chartConfig = {
