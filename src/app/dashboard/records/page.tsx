@@ -154,6 +154,8 @@ export default function RecordsPage() {
         reason = 'REUNIÃO';
       } else if (lowerCaseReason.includes('setup')) {
         reason = 'SETUP';
+      } else if (lowerCaseReason.includes('cursos enabley')) {
+        reason = 'Cursos enabley';
       }
   
       if (!acc[reason]) {
