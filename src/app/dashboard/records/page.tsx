@@ -326,8 +326,8 @@ export default function RecordsPage() {
         </Card>
       </div>
 
-       <div className="flex flex-wrap justify-end gap-4">
-            <div className="grid w-full sm:w-auto flex-grow sm:flex-grow-0 basis-28 gap-1.5">
+       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid gap-1.5">
                 <Label htmlFor="year-filter">Ano</Label>
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
                     <SelectTrigger id="year-filter">
@@ -343,7 +343,7 @@ export default function RecordsPage() {
                     </SelectContent>
                 </Select>
             </div>
-             <div className="grid w-full sm:w-auto flex-grow sm:flex-grow-0 basis-28 gap-1.5">
+             <div className="grid gap-1.5">
                 <Label htmlFor="month-filter">Mês</Label>
                 <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={selectedYear === 'all' || !!selectedDate}>
                     <SelectTrigger id="month-filter">
@@ -359,7 +359,7 @@ export default function RecordsPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="grid w-full sm:w-auto flex-grow sm:flex-grow-0 basis-36 gap-1.5">
+            <div className="grid gap-1.5">
                 <Label htmlFor="week-filter">Semana</Label>
                 <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all' || selectedMonth !== 'all' || !!selectedDate}>
                     <SelectTrigger id="week-filter">
@@ -375,7 +375,7 @@ export default function RecordsPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="grid w-full sm:w-auto flex-grow sm:flex-grow-0 basis-40 gap-1.5 relative">
+            <div className="grid gap-1.5 relative">
                 <Label htmlFor="date-filter">Dia</Label>
                     <Popover>
                     <PopoverTrigger asChild>
