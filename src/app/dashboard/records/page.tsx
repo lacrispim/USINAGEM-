@@ -156,6 +156,8 @@ export default function RecordsPage() {
         reason = 'SETUP';
       } else if (lowerCaseReason.includes('cursos enabley')) {
         reason = 'Cursos enabley';
+      } else if (lowerCaseReason.includes('treinamento')) {
+        reason = 'TREINAMENTO';
       }
   
       if (!acc[reason]) {
