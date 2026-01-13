@@ -18,7 +18,8 @@ interface FirebaseServices {
 }
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
-  const firebaseServices = useMemo(() => {
+  const firebaseServices = useMemo((): FirebaseServices => {
+    // Initialize Firebase only on the client side.
     if (typeof window !== 'undefined') {
       const app = initializeFirebase();
       if (app) {
