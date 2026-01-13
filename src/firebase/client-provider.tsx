@@ -18,13 +18,14 @@ interface FirebaseServices {
 }
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
-  const firebaseServices = useMemo(():: FirebaseServices => {
-    // Initialize Firebase only on the client side.
-    const app = initializeFirebase();
-    if (app) {
-      return getSdks(app);
+  const firebaseServices = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const app = initializeFirebase();
+      if (app) {
+        return getSdks(app);
+      }
     }
-    // Return nulls for server-side rendering
+    // Return nulls for server-side rendering or if initialization fails
     return { firebaseApp: null, auth: null, firestore: null };
   }, []);
 

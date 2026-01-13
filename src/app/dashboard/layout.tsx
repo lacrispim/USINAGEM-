@@ -68,7 +68,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const auth = useAuth();
-  const { user, loading } = useUser();
+  const { user, isUserLoading: loading } = useUser();
   const [isClient, setIsClient] = React.useState(false);
 
   React.useEffect(() => {
