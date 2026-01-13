@@ -326,87 +326,87 @@ export default function RecordsPage() {
         </Card>
       </div>
 
-       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="grid gap-1.5">
-                <Label htmlFor="year-filter">Ano</Label>
-                <Select value={selectedYear} onValueChange={setSelectedYear}>
-                    <SelectTrigger id="year-filter">
-                    <SelectValue placeholder="Selecione o ano" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {availableYears.map((year) => (
-                        <SelectItem key={year} value={String(year)}>
-                        {year}
-                        </SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-            </div>
-             <div className="grid gap-1.5">
-                <Label htmlFor="month-filter">Mês</Label>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={selectedYear === 'all' || !!selectedDate}>
-                    <SelectTrigger id="month-filter">
-                        <SelectValue placeholder="Selecione o mês" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {months.map((month) => (
-                            <SelectItem key={month.value} value={month.value}>
-                                {month.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="grid gap-1.5">
-                <Label htmlFor="week-filter">Semana</Label>
-                <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all' || selectedMonth !== 'all' || !!selectedDate}>
-                    <SelectTrigger id="week-filter">
-                    <SelectValue placeholder="Selecione a semana" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {availableWeeks.map((week) => (
-                        <SelectItem key={week} value={String(week)}>
-                            {`Semana ${week}`}
-                        </SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="grid gap-1.5 relative">
-                <Label htmlFor="date-filter">Dia</Label>
-                    <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        id="date-filter"
-                        variant={"outline"}
-                        className={cn(
-                        "justify-start text-left font-normal",
-                        !selectedDate && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione um dia</span>}
-                    </Button>
-                    </PopoverTrigger>
-                     {selectedDate && (
-                        <Button variant="ghost" size="icon" className="absolute right-0 top-6 h-8 w-8" onClick={() => setSelectedDate(undefined)}>
-                            <X className="h-4 w-4" />
-                        </Button>
-                    )}
-                    <PopoverContent className="w-auto p-0">
-                    <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={setSelectedDate}
-                        initialFocus
-                    />
-                    </PopoverContent>
-                </Popover>
-            </div>
-        </div>
+      <div className="flex flex-col sm:flex-row justify-end gap-2">
+          <div className="grid w-full sm:max-w-[120px] gap-1.5">
+              <Label htmlFor="year-filter">Ano</Label>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger id="year-filter">
+                  <SelectValue placeholder="Selecione o ano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {availableYears.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                      {year}
+                      </SelectItem>
+                  ))}
+                  </SelectContent>
+              </Select>
+          </div>
+            <div className="grid w-full sm:max-w-[120px] gap-1.5">
+              <Label htmlFor="month-filter">Mês</Label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={selectedYear === 'all' || !!selectedDate}>
+                  <SelectTrigger id="month-filter">
+                      <SelectValue placeholder="Selecione o mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {months.map((month) => (
+                          <SelectItem key={month.value} value={month.value}>
+                              {month.label}
+                          </SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+          </div>
+          <div className="grid w-full sm:max-w-[150px] gap-1.5">
+              <Label htmlFor="week-filter">Semana</Label>
+              <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all' || selectedMonth !== 'all' || !!selectedDate}>
+                  <SelectTrigger id="week-filter">
+                  <SelectValue placeholder="Selecione a semana" />
+                  </SelectTrigger>
+                  <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {availableWeeks.map((week) => (
+                      <SelectItem key={week} value={String(week)}>
+                          {`Semana ${week}`}
+                      </SelectItem>
+                  ))}
+                  </SelectContent>
+              </Select>
+          </div>
+          <div className="grid w-full sm:max-w-[180px] gap-1.5 relative">
+              <Label htmlFor="date-filter">Dia</Label>
+                  <Popover>
+                  <PopoverTrigger asChild>
+                  <Button
+                      id="date-filter"
+                      variant={"outline"}
+                      className={cn(
+                      "justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                      )}
+                  >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione um dia</span>}
+                  </Button>
+                  </PopoverTrigger>
+                    {selectedDate && (
+                      <Button variant="ghost" size="icon" className="absolute right-0 top-6 h-8 w-8" onClick={() => setSelectedDate(undefined)}>
+                          <X className="h-4 w-4" />
+                      </Button>
+                  )}
+                  <PopoverContent className="w-auto p-0">
+                  <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      initialFocus
+                  />
+                  </PopoverContent>
+              </Popover>
+          </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LossReasonChart
