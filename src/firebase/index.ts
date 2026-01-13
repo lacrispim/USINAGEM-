@@ -11,6 +11,15 @@ export function initializeFirebase() {
     return getSdks(getApp());
   }
 
+  // Check if the API key is available before initializing
+  if (!firebaseConfig.apiKey) {
+    // This path should not be reached if environment variables are set correctly.
+    // This is a safety net.
+    console.error("Firebase API Key is missing. Please check your environment variables.");
+    // In a production environment, you might want to handle this more gracefully.
+    // For now, we'll proceed, and Firebase will throw its own error.
+  }
+
   const firebaseApp = initializeApp(firebaseConfig);
   return getSdks(firebaseApp);
 }
