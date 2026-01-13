@@ -16,12 +16,14 @@ import {
   Package,
   TriangleAlert,
   PlusCircle,
+  CalendarIcon,
+  X
 } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
-import { getYear, getMonth, format, getISOWeek } from 'date-fns';
+import { getYear, getMonth, format, getISOWeek, startOfDay, endOfDay } from 'date-fns';
 import {
   Select,
   SelectContent,
@@ -34,6 +36,9 @@ import { OperatorDailyTimeChart } from '@/components/charts/operator-daily-time-
 import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 import { OperatorDailyLossChart } from '@/components/charts/operator-daily-loss-chart';
 import { OperatorPerformanceChart } from '@/components/charts/operator-performance-chart';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 const months = [
     { value: '0', label: 'Janeiro' },
@@ -53,9 +58,10 @@ const months = [
 
 export default function RecordsPage() {
   const firestore = useFirestore();
-  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
 
 
@@ -102,17 +108,22 @@ export default function RecordsPage() {
           if (!record.date?.toDate) return false;
           const recordDate = record.date.toDate();
           
-          const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
-          if (!yearMatch) return false;
-          
-          if (selectedYear !== 'all') {
-              const monthMatch = selectedMonth === 'all' || getMonth(recordDate) === parseInt(selectedMonth, 10);
-              if (!monthMatch) return false;
+          if (selectedDate) {
+              const dayMatch = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
+              if (!dayMatch) return false;
+          } else {
+            const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
+            if (!yearMatch) return false;
+            
+            if (selectedYear !== 'all') {
+                const monthMatch = selectedMonth === 'all' || getMonth(recordDate) === parseInt(selectedMonth, 10);
+                if (!monthMatch) return false;
 
-              if (selectedMonth === 'all') { // Only allow week filter if month is 'all'
-                const weekMatch = selectedWeek === 'all' || getISOWeek(recordDate) === parseInt(selectedWeek, 10);
-                if (!weekMatch) return false;
-              }
+                if (selectedMonth === 'all') { // Only allow week filter if month is 'all'
+                  const weekMatch = selectedWeek === 'all' || getISOWeek(recordDate) === parseInt(selectedWeek, 10);
+                  if (!weekMatch) return false;
+                }
+            }
           }
 
           const factoryMatch = !selectedFactory || record.factory === selectedFactory;
@@ -126,24 +137,42 @@ export default function RecordsPage() {
     const filteredLoss = filterRecords(lossRecords);
 
     return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss };
-  }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedWeek, selectedFactory]);
+  }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory]);
 
 
   useEffect(() => {
     setSelectedWeek('all');
     setSelectedMonth('all');
+    setSelectedDate(undefined);
   }, [selectedYear]);
 
    useEffect(() => {
     if (selectedMonth !== 'all') {
       setSelectedWeek('all');
+      setSelectedDate(undefined);
     }
   }, [selectedMonth]);
-
+  
+  useEffect(() => {
+    if(selectedWeek !== 'all'){
+        setSelectedDate(undefined);
+    }
+  }, [selectedWeek]);
+  
+  useEffect(() => {
+    if (selectedDate) {
+      setSelectedMonth('all');
+      setSelectedWeek('all');
+      const year = getYear(selectedDate);
+      if (String(year) !== selectedYear) {
+        setSelectedYear(String(year));
+      }
+    }
+  }, [selectedDate, selectedYear]);
 
   useEffect(() => {
     setSelectedFactory(null);
-  }, [selectedYear, selectedWeek, selectedMonth]);
+  }, [selectedYear, selectedWeek, selectedMonth, selectedDate]);
 
 
   const totalHoursData = useMemo(() => {
@@ -297,15 +326,15 @@ export default function RecordsPage() {
         </Card>
       </div>
 
-       <div className="flex justify-end gap-4">
-            <div className="grid w-full sm:w-36 gap-1.5">
+       <div className="flex flex-wrap justify-end gap-4">
+            <div className="grid w-full sm:w-auto flex-grow sm:flex-grow-0 basis-28 gap-1.5">
                 <Label htmlFor="year-filter">Ano</Label>
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
                     <SelectTrigger id="year-filter">
                     <SelectValue placeholder="Selecione o ano" />
                     </SelectTrigger>
                     <SelectContent>
-                    <SelectItem value="all">Todos os Anos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     {availableYears.map((year) => (
                         <SelectItem key={year} value={String(year)}>
                         {year}
@@ -314,14 +343,14 @@ export default function RecordsPage() {
                     </SelectContent>
                 </Select>
             </div>
-             <div className="grid w-full sm:w-36 gap-1.5">
+             <div className="grid w-full sm:w-auto flex-grow sm:flex-grow-0 basis-28 gap-1.5">
                 <Label htmlFor="month-filter">Mês</Label>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={selectedYear === 'all'}>
+                <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={selectedYear === 'all' || !!selectedDate}>
                     <SelectTrigger id="month-filter">
                         <SelectValue placeholder="Selecione o mês" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">Todos os Meses</SelectItem>
+                        <SelectItem value="all">Todos</SelectItem>
                         {months.map((month) => (
                             <SelectItem key={month.value} value={month.value}>
                                 {month.label}
@@ -330,14 +359,14 @@ export default function RecordsPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="grid w-full sm:w-48 gap-1.5">
+            <div className="grid w-full sm:w-auto flex-grow sm:flex-grow-0 basis-36 gap-1.5">
                 <Label htmlFor="week-filter">Semana</Label>
-                <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all' || selectedMonth !== 'all'}>
+                <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all' || selectedMonth !== 'all' || !!selectedDate}>
                     <SelectTrigger id="week-filter">
                     <SelectValue placeholder="Selecione a semana" />
                     </SelectTrigger>
                     <SelectContent>
-                    <SelectItem value="all">Todas as Semanas</SelectItem>
+                    <SelectItem value="all">Todas</SelectItem>
                     {availableWeeks.map((week) => (
                         <SelectItem key={week} value={String(week)}>
                             {`Semana ${week}`}
@@ -345,6 +374,37 @@ export default function RecordsPage() {
                     ))}
                     </SelectContent>
                 </Select>
+            </div>
+            <div className="grid w-full sm:w-auto flex-grow sm:flex-grow-0 basis-40 gap-1.5 relative">
+                <Label htmlFor="date-filter">Dia</Label>
+                    <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        id="date-filter"
+                        variant={"outline"}
+                        className={cn(
+                        "justify-start text-left font-normal",
+                        !selectedDate && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione um dia</span>}
+                    </Button>
+                    </PopoverTrigger>
+                     {selectedDate && (
+                        <Button variant="ghost" size="icon" className="absolute right-0 top-6 h-8 w-8" onClick={() => setSelectedDate(undefined)}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    )}
+                    <PopoverContent className="w-auto p-0">
+                    <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        initialFocus
+                    />
+                    </PopoverContent>
+                </Popover>
             </div>
         </div>
 
@@ -379,7 +439,8 @@ export default function RecordsPage() {
           <MachiningTimeTrendChart
             data={filteredProductionRecords}
             loading={loadingProduction}
-            isWeekView={selectedWeek !== 'all'}
+            isWeekView={selectedWeek !== 'all' && !selectedDate}
+            isDayView={!!selectedDate}
           />
         </CardContent>
       </Card>
@@ -396,7 +457,8 @@ export default function RecordsPage() {
           <OperatorDailyTimeChart
             productionData={filteredProductionRecords}
             loading={isLoading}
-            isWeekView={selectedWeek !== 'all'}
+            isWeekView={selectedWeek !== 'all' && !selectedDate}
+            isDayView={!!selectedDate}
           />
         </CardContent>
       </Card>
@@ -413,12 +475,11 @@ export default function RecordsPage() {
           <OperatorDailyLossChart
             lossData={filteredLossRecords}
             loading={isLoading}
-            isWeekView={selectedWeek !== 'all'}
+            isWeekView={selectedWeek !== 'all' && !selectedDate}
+            isDayView={!!selectedDate}
           />
         </CardContent>
       </Card>
     </div>
   );
 }
-
-    

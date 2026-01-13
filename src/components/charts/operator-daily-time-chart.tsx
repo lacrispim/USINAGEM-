@@ -22,6 +22,7 @@ interface OperatorDailyTimeChartProps {
   productionData: any[];
   loading: boolean;
   isWeekView?: boolean;
+  isDayView?: boolean;
 }
 
 const OPERATOR_COLORS: { [key: string]: string } = {
@@ -36,6 +37,7 @@ export function OperatorDailyTimeChart({
   productionData,
   loading,
   isWeekView,
+  isDayView,
 }: OperatorDailyTimeChartProps) {
   const { chartData, operators } = useMemo(() => {
     if (!productionData) {
@@ -94,6 +96,7 @@ export function OperatorDailyTimeChart({
   const xAxisFormatter = (value: string) => {
     const date = new Date(value);
     date.setDate(date.getDate() + 1);
+    if (isDayView) return format(date, 'dd/MM');
     return isWeekView ? format(date, 'EEE', { locale: ptBR }) : format(date, 'dd/MM');
   }
 
@@ -101,7 +104,7 @@ export function OperatorDailyTimeChart({
     if (active && payload && payload.length) {
       const date = new Date(label);
       date.setDate(date.getDate() + 1);
-      const formattedLabel = isWeekView ? format(date, 'EEE', { locale: ptBR }) : format(date, 'dd/MM/yyyy');
+      const formattedLabel = format(date, 'dd/MM/yyyy');
       
       const total = payload.reduce((acc: number, item: any) => acc + item.value, 0);
 

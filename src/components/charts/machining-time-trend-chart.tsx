@@ -28,6 +28,7 @@ interface MachiningTimeTrendChartProps {
   }[];
   loading: boolean;
   isWeekView?: boolean;
+  isDayView?: boolean;
 }
 
 const FACTORY_COLORS: { [key: string]: string } = {
@@ -48,6 +49,7 @@ export function MachiningTimeTrendChart({
   data,
   loading,
   isWeekView,
+  isDayView,
 }: MachiningTimeTrendChartProps) {
   const { chartData, factories } = useMemo(() => {
     if (!data) {
@@ -99,6 +101,7 @@ export function MachiningTimeTrendChart({
     const date = new Date(value);
     // add a day to the date to show correct day of week
     date.setDate(date.getDate() + 1);
+    if (isDayView) return format(date, 'dd/MM');
     return isWeekView ? format(date, 'EEE', { locale: ptBR }) : format(date, 'dd/MM');
   }
 
@@ -106,7 +109,7 @@ export function MachiningTimeTrendChart({
     if (active && payload && payload.length) {
       const date = new Date(label);
       date.setDate(date.getDate() + 1);
-      const formattedLabel = isWeekView ? format(date, 'EEE', { locale: ptBR }) : format(date, 'dd/MM/yyyy');
+      const formattedLabel = format(date, 'dd/MM/yyyy');
       
       const total = payload.reduce((acc: number, item: any) => acc + item.value, 0);
 
