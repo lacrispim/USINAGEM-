@@ -32,6 +32,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { OperatorDailyTimeChart } from '@/components/charts/operator-daily-time-chart';
 import { LossReasonChart } from '@/components/charts/loss-reason-chart';
+import { OperatorDailyLossChart } from '@/components/charts/operator-daily-loss-chart';
 
 const months = [
     { value: '0', label: 'Janeiro' },
@@ -387,6 +388,23 @@ export default function RecordsPage() {
         <CardContent>
           <OperatorDailyTimeChart
             productionData={filteredProductionRecords}
+            lossData={filteredLossRecords}
+            loading={isLoading}
+            isWeekView={selectedWeek !== 'all'}
+          />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+            <div>
+              <CardTitle>Análise de Perda por Operador</CardTitle>
+              <CardDescription>
+                Tempo total de perda por operador a cada dia.
+              </CardDescription>
+            </div>
+        </CardHeader>
+        <CardContent>
+          <OperatorDailyLossChart
             lossData={filteredLossRecords}
             loading={isLoading}
             isWeekView={selectedWeek !== 'all'}
