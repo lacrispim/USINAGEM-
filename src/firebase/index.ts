@@ -7,21 +7,15 @@ import { getFirestore } from 'firebase/firestore'
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
-  if (getApps().length) {
-    return getSdks(getApp());
+  // This check prevents re-initializing the app on the client-side.
+  if (typeof window !== 'undefined') {
+    if (!getApps().length) {
+      return initializeApp(firebaseConfig);
+    }
+    return getApp();
   }
-
-  // Check if the API key is available before initializing
-  if (!firebaseConfig.apiKey) {
-    // This path should not be reached if environment variables are set correctly.
-    // This is a safety net.
-    console.error("Firebase API Key is missing. Please check your environment variables.");
-    // In a production environment, you might want to handle this more gracefully.
-    // For now, we'll proceed, and Firebase will throw its own error.
-  }
-
-  const firebaseApp = initializeApp(firebaseConfig);
-  return getSdks(firebaseApp);
+  // On the server, we return null to prevent initialization.
+  return null;
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
