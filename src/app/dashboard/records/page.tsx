@@ -408,12 +408,6 @@ export default function RecordsPage() {
             </div>
         </div>
 
-      <OperatorPerformanceChart 
-        productionData={filteredProductionRecords}
-        lossData={filteredLossRecords}
-        loading={isLoading}
-      />
-
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LossReasonChart
           data={lossReasonData}
@@ -480,6 +474,11 @@ export default function RecordsPage() {
           />
         </CardContent>
       </Card>
+      <OperatorPerformanceChart 
+        productionData={filteredProductionRecords}
+        lossData={filteredLossRecords}
+        loading={isLoading}
+      />
     </div>
   );
 }
