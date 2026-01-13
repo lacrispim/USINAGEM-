@@ -51,16 +51,20 @@ export function OperatorDailyTimeChart({
         const dateStr = format(dateObj, 'yyyy-MM-dd');
         const operator = record.operatorId;
         
+        // Inclui tempo de usinagem e programação como tempo produtivo.
+        // O campo `machiningTime` é usado para ambos os tipos de atividade.
         const timeInMinutes = Number(record.machiningTime) || 0;
 
-        if (!dailyData[dateStr]) {
-          dailyData[dateStr] = {};
+        if (timeInMinutes > 0) {
+            if (!dailyData[dateStr]) {
+                dailyData[dateStr] = {};
+            }
+            if (!dailyData[dateStr][operator]) {
+                dailyData[dateStr][operator] = 0;
+            }
+            dailyData[dateStr][operator] += timeInMinutes;
+            operatorSet.add(operator);
         }
-        if (!dailyData[dateStr][operator]) {
-          dailyData[dateStr][operator] = 0;
-        }
-        dailyData[dateStr][operator] += timeInMinutes;
-        operatorSet.add(operator);
       }
     });
 
