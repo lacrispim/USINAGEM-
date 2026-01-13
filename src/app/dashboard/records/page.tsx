@@ -23,7 +23,7 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
-import { getYear, getMonth, format, getISOWeek, startOfDay, endOfDay } from 'date-fns';
+import { getYear, getMonth, format, startOfDay, endOfDay } from 'date-fns';
 import {
   Select,
   SelectContent,
@@ -60,7 +60,6 @@ export default function RecordsPage() {
   const firestore = useFirestore();
   const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  const [selectedWeek, setSelectedWeek] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
 
@@ -77,9 +76,9 @@ export default function RecordsPage() {
   const { data: lossRecords, loading: loadingLoss } =
     useCollection(lossRecordsQuery);
     
-  const { availableYears, availableWeeks, filteredProductionRecords, filteredLossRecords } = useMemo(() => {
+  const { availableYears, filteredProductionRecords, filteredLossRecords } = useMemo(() => {
     if (!productionRecords || !lossRecords) {
-        return { availableYears: [], availableWeeks: [], filteredProductionRecords: [], filteredLossRecords: [] };
+        return { availableYears: [], filteredProductionRecords: [], filteredLossRecords: [] };
     }
 
     const recordYears = new Set<number>();
@@ -95,13 +94,6 @@ export default function RecordsPage() {
     });
 
     const sortedYears = Array.from(recordYears).sort((a, b) => b - a);
-    const year = selectedYear === 'all' ? null : parseInt(selectedYear, 10);
-    
-    let weeks: number[] = [];
-    if (year) {
-      weeks = Array.from({ length: 52 }, (_, i) => i + 1);
-    }
-
 
     const filterRecords = (records: any[]) => {
       return records.filter((record) => {
@@ -118,11 +110,6 @@ export default function RecordsPage() {
             if (selectedYear !== 'all') {
                 const monthMatch = selectedMonth === 'all' || getMonth(recordDate) === parseInt(selectedMonth, 10);
                 if (!monthMatch) return false;
-
-                if (selectedMonth === 'all') { // Only allow week filter if month is 'all'
-                  const weekMatch = selectedWeek === 'all' || getISOWeek(recordDate) === parseInt(selectedWeek, 10);
-                  if (!weekMatch) return false;
-                }
             }
           }
 
@@ -136,33 +123,24 @@ export default function RecordsPage() {
     const filteredProd = filterRecords(productionRecords);
     const filteredLoss = filterRecords(lossRecords);
 
-    return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss };
-  }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory]);
+    return { availableYears: sortedYears, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss };
+  }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedDate, selectedFactory]);
 
 
   useEffect(() => {
-    setSelectedWeek('all');
     setSelectedMonth('all');
     setSelectedDate(undefined);
   }, [selectedYear]);
 
    useEffect(() => {
     if (selectedMonth !== 'all') {
-      setSelectedWeek('all');
       setSelectedDate(undefined);
     }
   }, [selectedMonth]);
   
   useEffect(() => {
-    if(selectedWeek !== 'all'){
-        setSelectedDate(undefined);
-    }
-  }, [selectedWeek]);
-  
-  useEffect(() => {
     if (selectedDate) {
       setSelectedMonth('all');
-      setSelectedWeek('all');
       const year = getYear(selectedDate);
       if (String(year) !== selectedYear) {
         setSelectedYear(String(year));
@@ -172,7 +150,7 @@ export default function RecordsPage() {
 
   useEffect(() => {
     setSelectedFactory(null);
-  }, [selectedYear, selectedWeek, selectedMonth, selectedDate]);
+  }, [selectedYear, selectedMonth, selectedDate]);
 
 
   const totalHoursData = useMemo(() => {
@@ -359,22 +337,6 @@ export default function RecordsPage() {
                   </SelectContent>
               </Select>
           </div>
-          <div className="grid w-full sm:max-w-[150px] gap-1.5">
-              <Label htmlFor="week-filter">Semana</Label>
-              <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all' || selectedMonth !== 'all' || !!selectedDate}>
-                  <SelectTrigger id="week-filter">
-                  <SelectValue placeholder="Selecione a semana" />
-                  </SelectTrigger>
-                  <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {availableWeeks.map((week) => (
-                      <SelectItem key={week} value={String(week)}>
-                          {`Semana ${week}`}
-                      </SelectItem>
-                  ))}
-                  </SelectContent>
-              </Select>
-          </div>
           <div className="grid w-full sm:max-w-[180px] gap-1.5 relative">
               <Label htmlFor="date-filter">Dia</Label>
                   <Popover>
@@ -433,7 +395,7 @@ export default function RecordsPage() {
           <MachiningTimeTrendChart
             data={filteredProductionRecords}
             loading={loadingProduction}
-            isWeekView={selectedWeek !== 'all' && !selectedDate}
+            isWeekView={false}
             isDayView={!!selectedDate}
           />
         </CardContent>
@@ -451,7 +413,7 @@ export default function RecordsPage() {
           <OperatorDailyTimeChart
             productionData={filteredProductionRecords}
             loading={isLoading}
-            isWeekView={selectedWeek !== 'all' && !selectedDate}
+            isWeekView={false}
             isDayView={!!selectedDate}
           />
         </CardContent>
@@ -469,7 +431,7 @@ export default function RecordsPage() {
           <OperatorDailyLossChart
             lossData={filteredLossRecords}
             loading={isLoading}
-            isWeekView={selectedWeek !== 'all' && !selectedDate}
+            isWeekView={false}
             isDayView={!!selectedDate}
           />
         </CardContent>
