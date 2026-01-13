@@ -20,7 +20,6 @@ import { ptBR } from 'date-fns/locale';
 
 interface OperatorDailyTimeChartProps {
   productionData: any[];
-  lossData: any[];
   loading: boolean;
   isWeekView?: boolean;
 }
@@ -35,32 +34,24 @@ const OPERATOR_COLORS: { [key: string]: string } = {
 
 export function OperatorDailyTimeChart({
   productionData,
-  lossData,
   loading,
   isWeekView,
 }: OperatorDailyTimeChartProps) {
   const { chartData, operators } = useMemo(() => {
-    if (!productionData || !lossData) {
+    if (!productionData) {
       return { chartData: [], operators: [] };
     }
 
     const dailyData: { [date: string]: { [operator: string]: number } } = {};
     const operatorSet = new Set<string>();
 
-    const allRecords = [
-        ...productionData.map(r => ({...r, type: 'prod'})),
-        ...lossData.map(r => ({...r, type: 'loss'}))
-    ];
-
-    allRecords.forEach(record => {
+    productionData.forEach(record => {
       if (record.operatorId && record.date && record.date.toDate) {
         const dateObj = record.date.toDate();
         const dateStr = format(dateObj, 'yyyy-MM-dd');
         const operator = record.operatorId;
         
-        const timeInMinutes = record.type === 'prod' 
-            ? (Number(record.machiningTime) || 0) 
-            : (Number(record.timeLost) || 0);
+        const timeInMinutes = Number(record.machiningTime) || 0;
 
         if (!dailyData[dateStr]) {
           dailyData[dateStr] = {};
@@ -86,7 +77,7 @@ export function OperatorDailyTimeChart({
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return { chartData: chartDataResult, operators: sortedOperators };
-  }, [productionData, lossData]);
+  }, [productionData]);
 
   const chartConfig = operators.reduce((acc, operator) => {
     acc[operator] = {

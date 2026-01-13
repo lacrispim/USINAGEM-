@@ -379,16 +379,15 @@ export default function RecordsPage() {
       <Card>
         <CardHeader>
             <div>
-              <CardTitle>Análise diária por Operador</CardTitle>
+              <CardTitle>Tempo de Usinagem por Operador</CardTitle>
               <CardDescription>
-                Tempo total de atividades (produção e perda) por operador a cada dia.
+                Tempo total de usinagem por operador a cada dia.
               </CardDescription>
             </div>
         </CardHeader>
         <CardContent>
           <OperatorDailyTimeChart
             productionData={filteredProductionRecords}
-            lossData={filteredLossRecords}
             loading={isLoading}
             isWeekView={selectedWeek !== 'all'}
           />
