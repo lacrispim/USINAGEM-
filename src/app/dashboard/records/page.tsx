@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { OperatorDailyTimeChart } from '@/components/charts/operator-daily-time-chart';
-import { LossReasonPieChart } from '@/components/charts/loss-reason-pie-chart';
+import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 
 export default function RecordsPage() {
   const firestore = useFirestore();
@@ -138,9 +138,9 @@ export default function RecordsPage() {
   }, [filteredProductionRecords, filteredLossRecords, loadingProduction, loadingLoss]);
 
 
-  const { lossReasonData, totalLostMinutes } = useMemo(() => {
+  const lossReasonData = useMemo(() => {
     if (!filteredLossRecords) {
-      return { lossReasonData: [], totalLostMinutes: 0 };
+      return [];
     }
   
     const reasonMap = filteredLossRecords.reduce((acc, record) => {
@@ -166,15 +166,11 @@ export default function RecordsPage() {
       acc[reason] += time;
       return acc;
     }, {} as Record<string, number>);
-
-    const totalMinutes = Object.values(reasonMap).reduce((sum, time) => sum + time, 0);
   
-    const data = Object.entries(reasonMap).map(([name, value]) => ({
+    return Object.entries(reasonMap).map(([name, value]) => ({
       name,
       value,
     })).sort((a,b) => b.value - a.value).slice(0, 10);
-
-    return { lossReasonData: data, totalLostMinutes: totalMinutes };
   }, [filteredLossRecords]);
 
   const totalProductionRecords = filteredProductionRecords
@@ -305,10 +301,9 @@ export default function RecordsPage() {
         </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <LossReasonPieChart
+        <LossReasonChart
           data={lossReasonData}
           loading={loadingLoss}
-          totalMinutes={totalLostMinutes}
         />
         <MachiningTimeByFactoryChart
           data={productionRecords || []}
