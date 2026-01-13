@@ -1,8 +1,9 @@
 export const firebaseConfig = {
-  "projectId": "coffee-spark-sample-app-bc73f",
-  "appId": "1:198751668692:web:3fb688f93402472118ee41",
-  "apiKey": "AIzaSyAI1XkNMBqRNPt59plsuP3-MFskCwgibqQ",
-  "authDomain": "coffee-spark-sample-app-bc73f.firebaseapp.com",
-  "measurementId": "",
-  "messagingSenderId": "198751668692"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
