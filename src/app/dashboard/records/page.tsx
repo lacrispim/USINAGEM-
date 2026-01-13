@@ -304,7 +304,7 @@ export default function RecordsPage() {
         </Card>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-end gap-2">
+      <div className="flex flex-col sm:flex-row justify-start gap-2">
           <div className="grid w-full sm:max-w-[120px] gap-1.5">
               <Label htmlFor="year-filter">Ano</Label>
               <Select value={selectedYear} onValueChange={setSelectedYear}>
