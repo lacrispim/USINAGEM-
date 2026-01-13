@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Label,
   LabelList,
   ReferenceLine,
   ResponsiveContainer,
@@ -71,7 +72,7 @@ export function OperatorPerformanceChart({
         hours: operatorHours[operator],
         fill: OPERATOR_COLORS[operator] || OPERATOR_COLORS['Outro'],
       }))
-      .sort((a, b) => b.hours - a.hours);
+      .sort((a, b) => a.hours - b.hours); // Sort ascending for horizontal layout
   }, [productionData, lossData]);
 
   const chartConfig = {
@@ -88,7 +89,7 @@ export function OperatorPerformanceChart({
   };
   
   const maxHours = Math.max(...chartData.map(d => d.hours), 0);
-  const yAxisDomainMax = Math.max(8, Math.ceil(maxHours) + 1);
+  const xAxisDomainMax = Math.max(8, Math.ceil(maxHours) + 1);
 
 
   return (
@@ -108,20 +109,27 @@ export function OperatorPerformanceChart({
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig} className="h-full w-full">
-                <BarChart data={chartData} margin={{ top: 20, right: 20, left: -20, bottom: 5 }}>
-                  <CartesianGrid vertical={false} />
+                <BarChart 
+                    data={chartData} 
+                    layout="vertical" 
+                    barSize={30}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid horizontal={false} />
+                   <YAxis
+                      dataKey="name"
+                      type="category"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={5}
+                      width={120}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                      interval={0}
+                    />
                   <XAxis
-                    dataKey="name"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={10}
-                    angle={-45}
-                    textAnchor='end'
-                    interval={0}
-                  />
-                  <YAxis
+                    type="number"
                     dataKey="hours"
-                    domain={[0, yAxisDomainMax]}
+                    domain={[0, xAxisDomainMax]}
                     unit="h"
                     tickLine={false}
                     axisLine={false}
@@ -134,44 +142,27 @@ export function OperatorPerformanceChart({
                     />}
                   />
                   <ReferenceLine 
-                    y={7} 
+                    x={7} 
                     stroke="hsl(var(--destructive))" 
                     strokeDasharray="3 3"
                     strokeWidth={2}
                   >
-                     <LabelList 
-                        dataKey="name"
-                        content={({ x, y, width, height, value }) => {
-                            if (value === chartData[0].name) {
-                                return (
-                                <text 
-                                    x={x}
-                                    y={y}
-                                    dx={-10}
-                                    dy={-10}
-                                    fill="hsl(var(--destructive))"
-                                    fontSize={12}
-                                    textAnchor="start"
-                                >
-                                    Meta: 7h
-                                </text>
-                                )
-                            }
-                            return null;
-                        }}
-                     />
+                     <Label 
+                        value="Meta: 7h" 
+                        position="insideTop"
+                        fill="hsl(var(--destructive))"
+                        fontSize={12}
+                        dy={-10}
+                      />
                   </ReferenceLine>
-                  <Bar dataKey="hours">
+                  <Bar dataKey="hours" layout="vertical">
                      <LabelList
                         dataKey="hours"
-                        position="top"
+                        position="right"
                         offset={8}
                         className="fill-foreground text-sm"
                         formatter={(value: number) => `${value.toFixed(1)}h`}
                       />
-                    {chartData.map((entry) => (
-                      <rect key={entry.name} fill={entry.fill} />
-                    ))}
                   </Bar>
                 </BarChart>
               </ChartContainer>
