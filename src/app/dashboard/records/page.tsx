@@ -33,6 +33,7 @@ import { Label } from '@/components/ui/label';
 import { OperatorDailyTimeChart } from '@/components/charts/operator-daily-time-chart';
 import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 import { OperatorDailyLossChart } from '@/components/charts/operator-daily-loss-chart';
+import { OperatorPerformanceChart } from '@/components/charts/operator-performance-chart';
 
 const months = [
     { value: '0', label: 'Janeiro' },
@@ -346,6 +347,12 @@ export default function RecordsPage() {
                 </Select>
             </div>
         </div>
+
+      <OperatorPerformanceChart 
+        productionData={filteredProductionRecords}
+        lossData={filteredLossRecords}
+        loading={isLoading}
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LossReasonChart

@@ -12,6 +12,13 @@ import {
   YAxis,
 } from 'recharts';
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -70,92 +77,114 @@ export function OperatorPerformanceChart({
   const chartConfig = {
     hours: {
       label: 'Horas',
-      color: 'hsl(var(--chart-1))',
     },
+    ...chartData.reduce((acc, { name, fill }) => {
+        acc[name] = {
+            label: name,
+            color: fill,
+        }
+        return acc;
+    }, {} as any)
   };
-
+  
   const maxHours = Math.max(...chartData.map(d => d.hours), 0);
-  const goal = 7;
-  const xAxisDomainMax = Math.max(goal + 1, Math.ceil(maxHours) + 1);
+  const yAxisDomainMax = Math.max(8, Math.ceil(maxHours) + 1);
 
-  return loading ? (
-    <div className="flex h-[350px] w-full items-center justify-center">
-      <Loader className="h-8 w-8 animate-spin" />
-    </div>
-  ) : chartData.length > 0 ? (
-    <div className="h-[350px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <ChartContainer config={chartConfig} className="h-full w-full">
-          <BarChart data={chartData} layout="vertical" barSize={30} margin={{ left: 10, right: 30 }}>
-            <CartesianGrid horizontal={false} />
-            <YAxis
-              dataKey="name"
-              type="category"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={5}
-              width={120}
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-            />
-            <XAxis
-              type="number"
-              domain={[0, xAxisDomainMax]}
-              allowDecimals={false}
-              tickLine={false}
-              axisLine={false}
-              tickMargin={10}
-              unit="h"
-            />
-            <ChartTooltip
-              cursor={{ fill: 'hsl(var(--accent))' }}
-              content={<ChartTooltipContent 
-                 formatter={(value) => [`${(value as number).toFixed(1)}h`, 'Total Horas']}
-              />}
-            />
-             <ReferenceLine 
-              x={goal} 
-              stroke="hsl(var(--destructive))"
-              strokeWidth={2}
-            >
-                <LabelList
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Horas Diárias</CardTitle>
+        <CardDescription>
+          Progresso da jornada de trabalho de cada operador até a meta de 7 horas.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex h-[350px] w-full items-center justify-center">
+            <Loader className="h-8 w-8 animate-spin" />
+          </div>
+        ) : chartData.length > 0 ? (
+          <div className="h-[350px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ChartContainer config={chartConfig} className="h-full w-full">
+                <BarChart data={chartData} margin={{ top: 20, right: 20, left: -20, bottom: 5 }}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
                     dataKey="name"
-                    position="insideTopLeft"
-                    content={(props) => {
-                        const {x, y, width, height} = props;
-                        if (props.index !== 0) return null;
-                        return (
-                            <text 
-                                x={x}
-                                y={y}
-                                dy={-10}
-                                fill="hsl(var(--muted-foreground))"
-                                fontSize={12}
-                                textAnchor="middle"
-                            >
-                                Meta: {goal}h
-                            </text>
-                        )
-                    }}
-                />
-            </ReferenceLine>
-            <Bar dataKey="hours">
-                <LabelList
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                    angle={-45}
+                    textAnchor='end'
+                    interval={0}
+                  />
+                  <YAxis
                     dataKey="hours"
-                    position="right"
-                    offset={8}
-                    className="fill-foreground text-sm"
-                    formatter={(value: number) => `${value.toFixed(1)}h`}
-                />
-            </Bar>
-          </BarChart>
-        </ChartContainer>
-      </ResponsiveContainer>
-    </div>
-  ) : (
-    <div className="flex h-[350px] w-full flex-col items-center justify-center">
-      <p className="text-sm text-muted-foreground">
-        Nenhum dado para exibir o desempenho dos técnicos.
-      </p>
-    </div>
+                    domain={[0, yAxisDomainMax]}
+                    unit="h"
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent 
+                        formatter={(value, name) => [`${(value as number).toFixed(1)}h`, 'Total']}
+                        indicator="dot"
+                    />}
+                  />
+                  <ReferenceLine 
+                    y={7} 
+                    stroke="hsl(var(--destructive))" 
+                    strokeDasharray="3 3"
+                    strokeWidth={2}
+                  >
+                     <LabelList 
+                        dataKey="name"
+                        content={({ x, y, width, height, value }) => {
+                            if (value === chartData[0].name) {
+                                return (
+                                <text 
+                                    x={x}
+                                    y={y}
+                                    dx={-10}
+                                    dy={-10}
+                                    fill="hsl(var(--destructive))"
+                                    fontSize={12}
+                                    textAnchor="start"
+                                >
+                                    Meta: 7h
+                                </text>
+                                )
+                            }
+                            return null;
+                        }}
+                     />
+                  </ReferenceLine>
+                  <Bar dataKey="hours">
+                     <LabelList
+                        dataKey="hours"
+                        position="top"
+                        offset={8}
+                        className="fill-foreground text-sm"
+                        formatter={(value: number) => `${value.toFixed(1)}h`}
+                      />
+                    {chartData.map((entry) => (
+                      <rect key={entry.name} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="flex h-[350px] w-full flex-col items-center justify-center">
+            <p className="text-sm text-muted-foreground">
+              Nenhum dado para exibir o desempenho dos técnicos.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
