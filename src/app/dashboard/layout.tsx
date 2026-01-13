@@ -105,6 +105,11 @@ export default function DashboardLayout({
       label: 'Manutenção IA',
       icon: BrainCircuit,
     },
+    {
+      href: '/dashboard/settings',
+      label: 'Configurações',
+      icon: Settings,
+    },
   ];
   
   const getInitials = (name: string | null | undefined) => {
@@ -130,7 +135,9 @@ export default function DashboardLayout({
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>Settings</DropdownMenuItem>
+        <DropdownMenuItem asChild>
+            <Link href="/dashboard/settings">Settings</Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
          <DropdownMenuItem onClick={handleLogout}>
             Log out
@@ -156,9 +163,11 @@ export default function DashboardLayout({
       <DropdownMenuContent className="w-56 mb-2 ml-2">
         <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
+        <DropdownMenuItem asChild>
+            <Link href="/dashboard/settings">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>
