@@ -21,7 +21,7 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
-import { getYear, format, getISOWeek } from 'date-fns';
+import { getYear, getMonth, format, getISOWeek } from 'date-fns';
 import {
   Select,
   SelectContent,
@@ -33,9 +33,26 @@ import { Label } from '@/components/ui/label';
 import { OperatorDailyTimeChart } from '@/components/charts/operator-daily-time-chart';
 import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 
+const months = [
+    { value: '0', label: 'Janeiro' },
+    { value: '1', label: 'Fevereiro' },
+    { value: '2', label: 'Março' },
+    { value: '3', label: 'Abril' },
+    { value: '4', label: 'Maio' },
+    { value: '5', label: 'Junho' },
+    { value: '6', label: 'Julho' },
+    { value: '7', label: 'Agosto' },
+    { value: '8', label: 'Setembro' },
+    { value: '9', label: 'Outubro' },
+    { value: '10', label: 'Novembro' },
+    { value: '11', label: 'Dezembro' },
+];
+
+
 export default function RecordsPage() {
   const firestore = useFirestore();
   const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
   const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
 
@@ -87,8 +104,13 @@ export default function RecordsPage() {
           if (!yearMatch) return false;
           
           if (selectedYear !== 'all') {
-              const weekMatch = selectedWeek === 'all' || getISOWeek(recordDate) === parseInt(selectedWeek, 10);
-              if (!weekMatch) return false;
+              const monthMatch = selectedMonth === 'all' || getMonth(recordDate) === parseInt(selectedMonth, 10);
+              if (!monthMatch) return false;
+
+              if (selectedMonth === 'all') { // Only allow week filter if month is 'all'
+                const weekMatch = selectedWeek === 'all' || getISOWeek(recordDate) === parseInt(selectedWeek, 10);
+                if (!weekMatch) return false;
+              }
           }
 
           const factoryMatch = !selectedFactory || record.factory === selectedFactory;
@@ -102,16 +124,24 @@ export default function RecordsPage() {
     const filteredLoss = filterRecords(lossRecords);
 
     return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss };
-  }, [productionRecords, lossRecords, selectedYear, selectedWeek, selectedFactory]);
+  }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedWeek, selectedFactory]);
 
 
   useEffect(() => {
     setSelectedWeek('all');
+    setSelectedMonth('all');
   }, [selectedYear]);
+
+   useEffect(() => {
+    if (selectedMonth !== 'all') {
+      setSelectedWeek('all');
+    }
+  }, [selectedMonth]);
+
 
   useEffect(() => {
     setSelectedFactory(null);
-  }, [selectedYear, selectedWeek]);
+  }, [selectedYear, selectedWeek, selectedMonth]);
 
 
   const totalHoursData = useMemo(() => {
@@ -282,9 +312,25 @@ export default function RecordsPage() {
                     </SelectContent>
                 </Select>
             </div>
+             <div className="grid w-full sm:w-36 gap-1.5">
+                <Label htmlFor="month-filter">Mês</Label>
+                <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={selectedYear === 'all'}>
+                    <SelectTrigger id="month-filter">
+                        <SelectValue placeholder="Selecione o mês" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todos os Meses</SelectItem>
+                        {months.map((month) => (
+                            <SelectItem key={month.value} value={month.value}>
+                                {month.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
             <div className="grid w-full sm:w-48 gap-1.5">
                 <Label htmlFor="week-filter">Semana</Label>
-                <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all'}>
+                <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all' || selectedMonth !== 'all'}>
                     <SelectTrigger id="week-filter">
                     <SelectValue placeholder="Selecione a semana" />
                     </SelectTrigger>
