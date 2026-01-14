@@ -93,15 +93,7 @@ export function OperatorPerformanceChart({
 
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Horas Trabalhadas por Técnico</CardTitle>
-        <CardDescription>
-          Progresso da jornada de trabalho de cada operador até a meta de 7 horas.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
+        loading ? (
           <div className="flex h-[350px] w-full items-center justify-center">
             <Loader className="h-8 w-8 animate-spin" />
           </div>
@@ -174,9 +166,9 @@ export function OperatorPerformanceChart({
               Nenhum dado para exibir o desempenho dos técnicos.
             </p>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        )
   );
 }
+    
+
     

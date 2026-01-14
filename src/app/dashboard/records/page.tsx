@@ -261,7 +261,7 @@ export default function RecordsPage() {
             Uma visão geral dos dados de produção.
           </p>
         </div>
-        <Button asChild className="bg-yellow-500 text-black hover:bg-yellow-600">
+        <Button asChild>
           <Link href="/dashboard/production-registry">
             <PlusCircle className="mr-2 h-4 w-4" />
             Add New Record
@@ -414,11 +414,21 @@ export default function RecordsPage() {
               </Popover>
           </div>
       </div>
-       <OperatorPerformanceChart 
-        productionData={filteredProductionRecords}
-        lossData={filteredLossRecords}
-        loading={isLoading}
-      />
+       <Card>
+        <CardHeader>
+          <CardTitle>Horas Trabalhadas por Técnico</CardTitle>
+          <CardDescription>
+            Progresso da jornada de trabalho de cada operador até a meta de 7 horas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <OperatorPerformanceChart 
+            productionData={filteredProductionRecords}
+            lossData={filteredLossRecords}
+            loading={isLoading}
+          />
+        </CardContent>
+      </Card>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LossReasonChart
           data={lossReasonData}
@@ -488,4 +498,6 @@ export default function RecordsPage() {
     </div>
   );
 }
+    
+
     
