@@ -143,14 +143,14 @@ export function OperatorPerformanceChart({
                   />
                   <ReferenceLine 
                     x={7} 
-                    stroke="hsl(var(--destructive))" 
+                    stroke="#ef4444"
                     strokeDasharray="3 3"
                     strokeWidth={2}
                   >
                      <Label 
                         value="Meta: 7h" 
                         position="insideTop"
-                        fill="hsl(var(--destructive))"
+                        fill="#ef4444"
                         fontSize={12}
                         dy={-10}
                       />
