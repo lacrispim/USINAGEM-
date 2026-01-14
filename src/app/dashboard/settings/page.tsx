@@ -15,6 +15,58 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { updateProfile } from 'firebase/auth';
 import { useState, useEffect } from 'react';
+import { Timer } from 'lucide-react';
+
+const formatTime = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+
+    return `${hours.toString().padStart(2, '0')}:${minutes
+      .toString()
+      .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+};
+
+
+const TimeSpentCard = () => {
+    const [timeSpent, setTimeSpent] = useState(0);
+
+    useEffect(() => {
+        const storedTime = localStorage.getItem('timeSpentInApp');
+        if (storedTime) {
+            setTimeSpent(parseInt(storedTime, 10));
+        }
+
+        const interval = setInterval(() => {
+            setTimeSpent(prevTime => {
+                const newTime = prevTime + 1;
+                localStorage.setItem('timeSpentInApp', newTime.toString());
+                return newTime;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                    Tempo Gasto no App
+                </CardTitle>
+                <Timer className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">
+                    {formatTime(timeSpent)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    Tempo total da sessão nesta máquina.
+                </p>
+            </CardContent>
+        </Card>
+    );
+};
 
 export default function SettingsPage() {
   const { user, isUserLoading } = useUser();
@@ -87,6 +139,9 @@ export default function SettingsPage() {
           Gerencie as configurações da sua conta.
         </p>
       </div>
+       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <TimeSpentCard />
+       </div>
       <Card>
         <CardHeader>
           <CardTitle>Perfil</CardTitle>
