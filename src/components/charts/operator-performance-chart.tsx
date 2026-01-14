@@ -95,7 +95,7 @@ export function OperatorPerformanceChart({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Apontamentos</CardTitle>
+        <CardTitle>Horas Trabalhadas por Técnico</CardTitle>
         <CardDescription>
           Progresso da jornada de trabalho de cada operador até a meta de 7 horas.
         </CardDescription>
