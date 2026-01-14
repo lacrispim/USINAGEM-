@@ -407,7 +407,7 @@ export default function RecordsPage() {
               </Popover>
           </div>
       </div>
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LossReasonChart
           data={lossReasonData}
           loading={loadingLoss}

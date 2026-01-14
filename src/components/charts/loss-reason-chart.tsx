@@ -23,7 +23,7 @@ interface LossReasonChartProps {
 export function LossReasonChart({ data, loading }: LossReasonChartProps) {
 
   const chartData = data.map(item => ({
-    name: item.name.charAt(0).toUpperCase() + item.name.slice(1).toLowerCase(),
+    name: item.name,
     Horas: item.value / 60
   })).sort((a, b) => a.Horas - b.Horas); // Sort ascending for horizontal layout
 
