@@ -30,13 +30,11 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 import {
-  BrainCircuit,
   LogOut,
   Settings,
   FileText,
   Eye,
   PanelLeft,
-  Wrench
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -94,11 +92,6 @@ export default function DashboardLayout({
         href: '/dashboard/records',
         label: 'Visão Supervisor',
         icon: Eye,
-    },
-    {
-      href: '/dashboard/ai-recommendations',
-      label: 'Manutenção IA',
-      icon: BrainCircuit,
     },
     {
       href: '/dashboard/settings',
