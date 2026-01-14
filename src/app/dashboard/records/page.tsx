@@ -39,6 +39,7 @@ import { OperatorPerformanceChart } from '@/components/charts/operator-performan
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { Confetti } from '@/components/ui/confetti';
 
 const months = [
     { value: '0', label: 'Janeiro' },
@@ -58,6 +59,7 @@ const months = [
 
 export default function RecordsPage() {
   const firestore = useFirestore();
+  const [showConfetti, setShowConfetti] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
@@ -138,6 +140,10 @@ export default function RecordsPage() {
     return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss };
   }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory]);
 
+  useEffect(() => {
+    // Let's celebrate the successful deployment!
+    setShowConfetti(true);
+  }, []);
 
   useEffect(() => {
     setSelectedMonth('all');
@@ -247,6 +253,7 @@ export default function RecordsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {showConfetti && <Confetti onComplete={() => setShowConfetti(false)} />}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Visão Supervisor</h1>
