@@ -69,11 +69,6 @@ export default function DashboardLayout({
   const router = useRouter();
   const auth = useAuth();
   const { user, isUserLoading: loading } = useUser();
-  const [isClient, setIsClient] = React.useState(false);
-
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   React.useEffect(() => {
     if (!loading && !user) {
@@ -224,7 +219,7 @@ export default function DashboardLayout({
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-          {isClient ? <UserMenuFooter /> : <UserMenuFooterPlaceholder />}
+          {loading ? <UserMenuFooterPlaceholder /> : <UserMenuFooter />}
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
@@ -234,7 +229,7 @@ export default function DashboardLayout({
              {/* Can add page title or search bar here */}
           </div>
           <div className="flex items-center gap-4">
-            {isClient ? <UserMenu /> : <UserMenuPlaceholder />}
+            {loading ? <UserMenuPlaceholder /> : <UserMenu />}
           </div>
         </header>
         <main className="flex-1 p-4 lg:p-6">{children}</main>
