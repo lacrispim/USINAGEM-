@@ -254,7 +254,7 @@ export default function RecordsPage() {
             Uma visão geral dos dados de produção.
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="bg-yellow-500 text-black hover:bg-yellow-600">
           <Link href="/dashboard/production-registry">
             <PlusCircle className="mr-2 h-4 w-4" />
             Add New Record
