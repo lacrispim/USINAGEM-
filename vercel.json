@@ -1,7 +1,4 @@
 {
-  "framework": {
-    "version": "14.2.35"
-  },
   "build": {
     "env": {
       "FORCE_REBUILD": "1722340804"
