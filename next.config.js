@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+// Force new build at 1722341584
 const nextConfig = {
   /* config options here */
   typescript: {
