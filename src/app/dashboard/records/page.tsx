@@ -33,7 +33,6 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { OperatorDailyTimeChart } from '@/components/charts/operator-daily-time-chart';
-import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 import { OperatorDailyLossChart } from '@/components/charts/operator-daily-loss-chart';
 import { OperatorPerformanceChart } from '@/components/charts/operator-performance-chart';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -203,42 +202,6 @@ export default function RecordsPage() {
       isLoading: false,
     };
   }, [filteredProductionRecords, filteredLossRecords, loadingProduction, loadingLoss]);
-
-
-  const lossReasonData = useMemo(() => {
-    if (!filteredLossRecords) {
-      return [];
-    }
-  
-    const reasonMap = filteredLossRecords.reduce((acc, record) => {
-      let reason = record.lossReason || 'Não especificado';
-      const time = Number(record.timeLost) || 0;
-      const lowerCaseReason = reason.toLowerCase();
-  
-      if (lowerCaseReason.includes('limpeza')) {
-        reason = 'Limpeza';
-      } else if (lowerCaseReason.includes('reunião')) {
-        reason = 'REUNIÃO';
-      } else if (lowerCaseReason.includes('setup')) {
-        reason = 'SETUP';
-      } else if (lowerCaseReason.includes('cursos enabley')) {
-        reason = 'Cursos enabley';
-      } else if (lowerCaseReason.includes('treinamento')) {
-        reason = 'TREINAMENTO';
-      }
-  
-      if (!acc[reason]) {
-        acc[reason] = 0;
-      }
-      acc[reason] += time;
-      return acc;
-    }, {} as Record<string, number>);
-  
-    return Object.entries(reasonMap).map(([name, value]) => ({
-      name,
-      value,
-    })).sort((a,b) => b.value - a.value).slice(0, 10);
-  }, [filteredLossRecords]);
 
   const totalProductionRecords = filteredProductionRecords
     ? filteredProductionRecords.length
@@ -429,11 +392,7 @@ export default function RecordsPage() {
           />
         </CardContent>
       </Card>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <LossReasonChart
-          data={lossReasonData}
-          loading={loadingLoss}
-        />
+      <div className="grid grid-cols-1 gap-6">
         <MachiningTimeByFactoryChart
           data={filteredProductionRecords}
           loading={loadingProduction}
