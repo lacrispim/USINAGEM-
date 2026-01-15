@@ -114,7 +114,7 @@ export default function DashboardLayout({
       <DropdownMenuTrigger asChild>
         <Button variant="secondary" size="icon" className="rounded-full">
           <Avatar>
-            <AvatarImage src={user?.photoURL ?? "https://picsum.photos/seed/female-avatar/100/100"} data-ai-hint="female avatar" alt={user?.displayName ?? "User"} />
+            <AvatarImage src={user?.photoURL ?? "https://pravatar.cc/100?img=3"} data-ai-hint="female avatar" alt={user?.displayName ?? "User"} />
             <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
           </Avatar>
           <span className="sr-only">Toggle user menu</span>
@@ -142,7 +142,7 @@ export default function DashboardLayout({
           tooltip="User Settings"
         >
           <Avatar className="h-7 w-7">
-            <AvatarImage src={user?.photoURL ?? "https://picsum.photos/seed/female-avatar/100/100"} data-ai-hint="female avatar" alt={user?.displayName ?? "User"} />
+            <AvatarImage src={user?.photoURL ?? "https://pravatar.cc/100?img=3"} data-ai-hint="female avatar" alt={user?.displayName ?? "User"} />
             <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
           </Avatar>
           <span className="text-sm font-medium">{user?.displayName || 'User'}</span>
