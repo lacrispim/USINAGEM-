@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-// Force new build at 1722341584
+// Force new build at 1722342551
 const nextConfig = {
   /* config options here */
   typescript: {
@@ -33,5 +33,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-
-    
