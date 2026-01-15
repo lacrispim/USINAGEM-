@@ -1,6 +1,6 @@
 'use client';
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Legend } from 'recharts';
 import {
   Card,
   CardContent,
@@ -14,34 +14,94 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Loader } from 'lucide-react';
+import { useMemo } from 'react';
 
 interface LossReasonChartProps {
   data: { name: string; value: number }[];
   loading: boolean;
 }
 
+const OEE_CATEGORIES = {
+  PERDA_DISPONIBILIDADE: 'Perda por Disponibilidade',
+  PERDA_PERFORMANCE: 'Perda por Performance',
+  PERDA_QUALIDADE: 'Perda por Qualidade',
+  OUTRAS_PERDAS: 'Outras Perdas',
+};
+
+const OEE_COLORS = {
+  [OEE_CATEGORIES.PERDA_DISPONIBILIDADE]: 'hsl(var(--chart-1))',
+  [OEE_CATEGORIES.PERDA_PERFORMANCE]: 'hsl(var(--chart-2))',
+  [OEE_CATEGORIES.PERDA_QUALIDADE]: 'hsl(var(--chart-3))',
+  [OEE_CATEGORIES.OUTRAS_PERDAS]: 'hsl(var(--chart-4))',
+};
+
+// Mapeia palavras-chave dos motivos de perda para as categorias OEE
+const mapReasonToOeeCategory = (reason: string): string => {
+  const lowerCaseReason = reason.toLowerCase();
+
+  // Disponibilidade
+  if (['setup', 'manutenção', 'falta de material', 'ferramenta'].some(keyword => lowerCaseReason.includes(keyword))) {
+    return OEE_CATEGORIES.PERDA_DISPONIBILIDADE;
+  }
+  
+  // Performance
+  if (['ajuste', 'velocidade reduzida', 'microparada'].some(keyword => lowerCaseReason.includes(keyword))) {
+    return OEE_CATEGORIES.PERDA_PERFORMANCE;
+  }
+  
+  // Qualidade
+  if (['refugo', 'retrabalho', 'peça morta'].some(keyword => lowerCaseReason.includes(keyword))) {
+    return OEE_CATEGORIES.PERDA_QUALIDADE;
+  }
+
+  // Outras (Reuniões, Treinamentos, etc.)
+  return OEE_CATEGORIES.OUTRAS_PERDAS;
+};
+
+
 export function LossReasonChart({ data, loading }: LossReasonChartProps) {
 
-  const chartData = data.map(item => ({
-    name: item.name,
-    Horas: item.value / 60
-  })).sort((a, b) => a.Horas - b.Horas); // Sort ascending for horizontal layout
+  const { chartData, categories } = useMemo(() => {
+    if (!data) {
+      return { chartData: [], categories: [] };
+    }
 
-  const chartConfig = {
-    Horas: {
-      label: 'Horas',
-      color: 'hsl(var(--chart-2))',
-    },
-  };
+    const categorizedData = data.reduce((acc, item) => {
+      const category = mapReasonToOeeCategory(item.name);
+      if (!acc[category]) {
+        acc[category] = 0;
+      }
+      acc[category] += item.value / 60; // Convert to hours
+      return acc;
+    }, {} as Record<string, number>);
 
-  const maxHours = Math.max(...chartData.map(d => d.Horas), 0);
+    const finalChartData = [{
+      name: 'Perdas por Categoria',
+      ...categorizedData
+    }];
+    
+    const activeCategories = Object.keys(categorizedData);
+
+    return { chartData: finalChartData, categories: activeCategories };
+
+  }, [data]);
+
+  const chartConfig = categories.reduce((acc, category) => {
+    acc[category] = {
+      label: category,
+      color: OEE_COLORS[category],
+    };
+    return acc;
+  }, {} as any);
+  
+  const totalHours = categories.reduce((sum, cat) => sum + (chartData[0][cat] || 0), 0);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tempo Perdido por Motivo</CardTitle>
+        <CardTitle>Análise de Perdas por Categoria (OEE)</CardTitle>
         <CardDescription>
-          Principais motivos de perda, ordenados do menor para o maior tempo.
+          Tempo total perdido agrupado por categorias de eficiência.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -49,39 +109,56 @@ export function LossReasonChart({ data, loading }: LossReasonChartProps) {
           <div className="flex h-[300px] w-full items-center justify-center">
             <Loader className="h-8 w-8 animate-spin" />
           </div>
-        ) : chartData && chartData.length > 0 ? (
+        ) : chartData && chartData[0] && totalHours > 0 ? (
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <ChartContainer config={chartConfig}>
-                <BarChart data={chartData} layout="vertical" barSize={30} margin={{ left: 10 }}>
+                <BarChart data={chartData} layout="vertical" stackOffset="expand" barSize={60}>
                     <CartesianGrid horizontal={false} />
                     <YAxis
                       dataKey="name"
                       type="category"
+                      tick={false}
                       tickLine={false}
                       axisLine={false}
-                      tickMargin={5}
-                      width={120}
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                     />
                     <XAxis
                       type='number'
-                      domain={[0, Math.ceil(maxHours) + 1]}
-                      allowDecimals={false}
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={10}
-                      unit="h"
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                      tickFormatter={(value) => `${value * 100}%`}
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
                     />
                     <ChartTooltip
-                        cursor={{fill: 'hsl(var(--accent))', radius: 4}}
+                        cursor={{fill: 'hsl(var(--accent))'}}
                         content={<ChartTooltipContent 
-                            formatter={(value, name) => [`${(value as number).toFixed(2)}h`, name]}
+                            formatter={(value, name, props) => {
+                                const percentage = (value as number) * 100;
+                                const hours = (value as number) * totalHours;
+                                return [`${hours.toFixed(1)}h (${percentage.toFixed(1)}%)`, name];
+                            }}
                             indicator="dot"
                         />}
                     />
-                    <Bar dataKey="Horas" fill="var(--color-Horas)" radius={4} />
+                    <Legend
+                      content={({ payload }) => (
+                        <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4">
+                          {payload?.map((entry, index) => (
+                            <div key={`item-${index}`} className="flex items-center gap-1.5">
+                              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: entry.color }} />
+                              <span className="text-xs text-muted-foreground">{entry.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    />
+                    {categories.map((category) => (
+                         <Bar 
+                            key={category} 
+                            dataKey={category} 
+                            fill={OEE_COLORS[category]} 
+                            stackId="a" 
+                         />
+                    ))}
                 </BarChart>
                 </ChartContainer>
             </ResponsiveContainer>
