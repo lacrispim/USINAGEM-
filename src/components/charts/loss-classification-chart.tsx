@@ -194,6 +194,7 @@ export function LossClassificationChart({
   
   const renderLabel = (props: any) => {
     const { x, y, width, value } = props;
+    if (!value) return null;
     const total = value[1] - value[0];
     
     // Não renderiza label para a base invisível da barra de perda
@@ -210,6 +211,7 @@ export function LossClassificationChart({
   
     const renderLossLabel = (props: any) => {
     const { x, y, width, value } = props;
+    if (!value) return null;
     const total = value[1] - value[0];
     
     if (total <= 0) return null;
@@ -270,7 +272,7 @@ export function LossClassificationChart({
                      <LabelList 
                         content={(props) => {
                             const { payload } = props;
-                            if (payload.value[0] === 0) { // Render label for blue bars
+                            if (payload && payload.value && payload.value[0] === 0) { // Render label for blue bars
                                 return renderLabel(props);
                             }
                             // Render label for grey loss bars
