@@ -704,8 +704,14 @@ const LossFormContent = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="SETUP">SETUP</SelectItem>
-                              <SelectItem value="Outro">Outro</SelectItem>
+                               <SelectItem value="SETUP">SETUP</SelectItem>
+                                <SelectItem value="Manutenção Corretiva">Manutenção Corretiva</SelectItem>
+                                <SelectItem value="Falta de Ferramenta">Falta de Ferramenta</SelectItem>
+                                <SelectItem value="Falta de Material">Falta de Material</SelectItem>
+                                <SelectItem value="Limpeza">Limpeza</SelectItem>
+                                <SelectItem value="Treinamento">Treinamento</SelectItem>
+                                <SelectItem value="Reunião">Reunião</SelectItem>
+                                <SelectItem value="Outro">Outro</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
