@@ -56,11 +56,9 @@ const categoryColors: Record<string, string> = {
 };
 
 const categoryOrder = [
-  'Tempo Total',
   'Perdas de Processo',
   'Perdas de Disponibilidade',
   'Outras Atividades',
-  'Tempo de Operação',
 ];
 
 export function LossClassificationChart({
@@ -72,23 +70,23 @@ export function LossClassificationChart({
     if (!productionData || !lossData) {
       return [];
     }
-  
+
     const totalProductiveMinutes = productionData.reduce(
       (sum, record) => sum + (Number(record.machiningTime) || 0),
       0
     );
-  
+
     const categorizedLosses: Record<string, { total: number, reasons: Record<string, number> }> = {
       'Perdas de Processo': { total: 0, reasons: {} },
       'Perdas de Disponibilidade': { total: 0, reasons: {} },
       'Outras Atividades': { total: 0, reasons: {} },
     };
-  
+
     lossData.forEach(record => {
       const reason = record.lossReason || 'Desconhecido';
       const category = lossCategories[reason] || 'Outras Atividades';
       const time = Number(record.timeLost) || 0;
-  
+
       if (categorizedLosses[category]) {
         categorizedLosses[category].total += time;
         if (!categorizedLosses[category].reasons[reason]) {
@@ -97,59 +95,61 @@ export function LossClassificationChart({
         categorizedLosses[category].reasons[reason] += time;
       }
     });
-  
+
     const totalLossMinutes = Object.values(categorizedLosses).reduce((sum, cat) => sum + cat.total, 0);
     const totalTime = totalProductiveMinutes + totalLossMinutes;
-  
-    const dataMap: Record<string, any> = {
-      'Tempo Total': { name: 'Tempo Total', total: totalTime, range: [0, totalTime], fill: categoryColors['Tempo Total'], reasons: {} },
-      'Tempo de Operação': { name: 'Tempo de Operação', total: totalProductiveMinutes, range: [0, totalProductiveMinutes], fill: categoryColors['Tempo de Operação'], reasons: {'Tempo Produtivo': totalProductiveMinutes}},
-    };
 
+    const waterfallData: any[] = [];
     let remainingTime = totalTime;
 
-    categoryOrder.forEach(catName => {
-        if(catName === 'Tempo Total' || catName === 'Tempo de Operação') return;
-
-        const loss = categorizedLosses[catName];
-        if (loss) {
-            remainingTime -= loss.total;
-            dataMap[catName] = {
-                name: catName,
-                total: loss.total,
-                range: [remainingTime, totalTime], // Invisible part
-                offset: loss.total, // The visible gray bar
-                fill: 'hsl(var(--muted))',
-                reasons: loss.reasons,
-            };
-
-            const nextCategoryName = categoryOrder[categoryOrder.indexOf(catName) + 1] || 'Tempo de Operação';
-            let nextTime = remainingTime;
-            if (nextCategoryName === 'Tempo de Operação') {
-                nextTime = totalProductiveMinutes
-            }
-
-             dataMap[`Tempo após ${catName}`] = {
-                name: ` `,
-                total: remainingTime,
-                range: [0, remainingTime],
-                fill: categoryColors[nextCategoryName] || categoryColors['Tempo de Operação'],
-                reasons: {},
-             }
-        }
+    // 1. Tempo Total
+    waterfallData.push({
+      name: 'Tempo Total',
+      value: [0, totalTime],
+      total: totalTime,
+      fill: categoryColors['Tempo Total'],
+      reasons: { 'Tempo Calendário': totalTime }
     });
 
-    const finalChartData = [
-        dataMap['Tempo Total'],
-        dataMap['Perdas de Processo'],
-        dataMap[`Tempo após Perdas de Processo`],
-        dataMap['Perdas de Disponibilidade'],
-        dataMap[`Tempo após Perdas de Disponibilidade`],
-        dataMap['Outras Atividades'],
-        dataMap['Tempo de Operação'],
-    ].filter(Boolean);
+    // 2. Categorias de Perda e Tempo Restante
+    categoryOrder.forEach((catName, index) => {
+      const loss = categorizedLosses[catName];
+      if (loss && loss.total > 0) {
+        remainingTime -= loss.total;
 
-    return finalChartData;
+        // Barra de Perda (cinza)
+        waterfallData.push({
+          name: catName,
+          value: [remainingTime, remainingTime + loss.total],
+          total: loss.total,
+          fill: 'hsl(var(--muted-foreground))',
+          reasons: loss.reasons,
+        });
+
+        // Barra de Tempo Restante (azul)
+        waterfallData.push({
+          name: ` `, // Nome vazio para o eixo X
+          value: [0, remainingTime],
+          total: remainingTime,
+          fill: categoryColors[categoryOrder[index+1]] || categoryColors['Tempo de Operação'],
+          reasons: {},
+        });
+      }
+    });
+    
+    // Assegurar que a última barra represente o tempo de operação
+    const lastBar = waterfallData[waterfallData.length -1];
+    if (lastBar) {
+      lastBar.name = 'Tempo de Operação'
+      lastBar.value = [0, totalProductiveMinutes];
+      lastBar.total = totalProductiveMinutes;
+      lastBar.fill = categoryColors['Tempo de Operação'];
+      lastBar.reasons = {'Tempo Produtivo': totalProductiveMinutes};
+    }
+
+
+    return waterfallData;
+
   }, [productionData, lossData]);
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -191,6 +191,38 @@ export function LossClassificationChart({
   
   const yAxisFormatter = (value: number) => `${(value/60).toFixed(0)}h`;
   const maxTime = chartData.length > 0 ? chartData[0].total : 0;
+  
+  const renderLabel = (props: any) => {
+    const { x, y, width, value } = props;
+    const total = value[1] - value[0];
+    
+    // Não renderiza label para a base invisível da barra de perda
+    if (value[0] !== 0 && total > 0) return null; 
+    
+    const formattedValue = (total / 60).toFixed(1) + 'h';
+    
+    return (
+      <text x={x + width / 2} y={y - 5} fill="hsl(var(--foreground))" textAnchor="middle" dominantBaseline="bottom" className="text-sm font-medium">
+        {formattedValue}
+      </text>
+    );
+  };
+  
+    const renderLossLabel = (props: any) => {
+    const { x, y, width, value } = props;
+    const total = value[1] - value[0];
+    
+    if (total <= 0) return null;
+
+    const formattedValue = (total / 60).toFixed(1) + 'h';
+
+    return (
+      <text x={x + width / 2} y={y - 5} fill="hsl(var(--muted-foreground))" textAnchor="middle" dominantBaseline="bottom" className="text-sm">
+        {formattedValue}
+      </text>
+    );
+  };
+
 
   return (
     <Card>
@@ -211,7 +243,7 @@ export function LossClassificationChart({
               <ChartContainer config={{}} className="h-full w-full">
                 <BarChart 
                     data={chartData}
-                    margin={{ top: 30, right: 20, left: 20, bottom: 20 }}
+                    margin={{ top: 30, right: 20, left: 0, bottom: 20 }}
                 >
                   <CartesianGrid vertical={false} />
                   <XAxis
@@ -220,6 +252,7 @@ export function LossClassificationChart({
                     axisLine={false}
                     tickLine={false}
                     tickMargin={10}
+                    interval={0}
                   />
                   <YAxis
                     type="number"
@@ -233,23 +266,18 @@ export function LossClassificationChart({
                     cursor={{fill: 'hsl(var(--accent))', fillOpacity: 0.2}}
                     content={<CustomTooltip />}
                   />
-                  <Bar dataKey="range" stackId="a" strokeWidth={0}>
+                  <Bar dataKey="value" stackId="a" strokeWidth={0}>
                      <LabelList 
-                        dataKey="total"
-                        position="top"
-                        formatter={(value: number) => (value / 60).toFixed(1) + 'h'}
-                        className="fill-foreground text-sm font-medium"
+                        content={(props) => {
+                            const { payload } = props;
+                            if (payload.value[0] === 0) { // Render label for blue bars
+                                return renderLabel(props);
+                            }
+                            // Render label for grey loss bars
+                            return renderLossLabel(props);
+                        }}
                      />
                   </Bar>
-                   <Bar dataKey="offset" stackId="a" fill="hsl(var(--background))" strokeWidth={0}>
-                        <LabelList 
-                            dataKey="offset"
-                            position="top"
-                            formatter={(value: number) => (value > 0 ? (value / 60).toFixed(1) + 'h' : '')}
-                            className="fill-muted-foreground text-sm"
-                            dy={-10}
-                        />
-                   </Bar>
                 </BarChart>
               </ChartContainer>
             </ResponsiveContainer>
