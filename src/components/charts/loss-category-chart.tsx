@@ -22,7 +22,7 @@ interface LossCategoryChartProps {
 }
 
 const lossCategories = {
-  'Perdas de Processo': ['SETUP'],
+  'Perdas de Processo': ['SETUP', 'DDSHE'],
   'Perdas de Disponibilidade': ['Manutenção Corretiva', 'Falta de Ferramenta', 'Falta de Material'],
   'Outras Atividades': ['Limpeza', 'Treinamento', 'Reunião'],
 };

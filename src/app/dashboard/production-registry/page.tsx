@@ -711,6 +711,7 @@ const LossFormContent = () => {
                                 <SelectItem value="Limpeza">Limpeza</SelectItem>
                                 <SelectItem value="Treinamento">Treinamento</SelectItem>
                                 <SelectItem value="Reunião">Reunião</SelectItem>
+                                <SelectItem value="DDSHE">DDSHE</SelectItem>
                                 <SelectItem value="Outro">Outro</SelectItem>
                             </SelectContent>
                           </Select>
