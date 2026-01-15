@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  LabelList,
 } from 'recharts';
 import {
   Card,
@@ -166,7 +167,7 @@ export function LossAnalysisByCategoryChart({
                     data={chartData} 
                     layout="vertical" 
                     barSize={40}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    margin={{ top: 5, right: 50, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid horizontal={false} />
                    <YAxis
@@ -191,7 +192,15 @@ export function LossAnalysisByCategoryChart({
                     cursor={{fill: 'hsl(var(--accent))', radius: 4}}
                     content={<CustomTooltip />}
                   />
-                  <Bar dataKey="hours" layout="vertical" radius={4} />
+                  <Bar dataKey="hours" layout="vertical" radius={4}>
+                    <LabelList
+                      dataKey="hours"
+                      position="right"
+                      offset={8}
+                      className="fill-foreground text-sm"
+                      formatter={(value: number) => `${value.toFixed(1)}h`}
+                    />
+                  </Bar>
                 </BarChart>
               </ChartContainer>
             </ResponsiveContainer>
