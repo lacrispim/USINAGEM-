@@ -39,7 +39,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Confetti } from '@/components/ui/confetti';
-import { LossCategoryChart } from '@/components/charts/loss-category-chart';
 
 
 const months = [
@@ -394,8 +393,7 @@ export default function RecordsPage() {
           />
         </CardContent>
       </Card>
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <LossCategoryChart lossData={filteredLossRecords} loading={loadingLoss} />
+       <div className="grid grid-cols-1 gap-6">
         <MachiningTimeByFactoryChart
           data={filteredProductionRecords}
           loading={loadingProduction}
@@ -463,5 +461,6 @@ export default function RecordsPage() {
     
 
     
+
 
 
