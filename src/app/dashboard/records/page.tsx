@@ -35,7 +35,6 @@ import { Label } from '@/components/ui/label';
 import { OperatorDailyTimeChart } from '@/components/charts/operator-daily-time-chart';
 import { OperatorDailyLossChart } from '@/components/charts/operator-daily-loss-chart';
 import { OperatorPerformanceChart } from '@/components/charts/operator-performance-chart';
-import { LossClassificationChart } from '@/components/charts/loss-classification-chart';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -394,11 +393,6 @@ export default function RecordsPage() {
         </CardContent>
       </Card>
       <div className="grid grid-cols-1 gap-6">
-        <LossClassificationChart
-            productionData={filteredProductionRecords}
-            lossData={filteredLossRecords}
-            loading={isLoading}
-        />
         <MachiningTimeByFactoryChart
           data={filteredProductionRecords}
           loading={loadingProduction}
@@ -466,3 +460,4 @@ export default function RecordsPage() {
     
 
     
+
