@@ -22,40 +22,47 @@ interface LossReasonChartProps {
 }
 
 const OEE_CATEGORIES = {
-  PERDA_DISPONIBILIDADE: 'Perda por Disponibilidade',
-  PERDA_PERFORMANCE: 'Perda por Performance',
-  PERDA_QUALIDADE: 'Perda por Qualidade',
-  OUTRAS_PERDAS: 'Outras Perdas',
+  PERDA_PROCESSO: 'Perdas de Processo (Programadas)',
+  PERDA_DISPONIBILIDADE: 'Perdas de Disponibilidade (Não Programadas)',
+  PERDA_PERFORMANCE: 'Perdas de Performance',
+  PERDA_QUALIDADE: 'Perdas de Qualidade',
+  OUTRAS_ATIVIDADES: 'Outras Atividades',
 };
 
 const OEE_COLORS = {
-  [OEE_CATEGORIES.PERDA_DISPONIBILIDADE]: 'hsl(var(--chart-1))',
-  [OEE_CATEGORIES.PERDA_PERFORMANCE]: 'hsl(var(--chart-2))',
-  [OEE_CATEGORIES.PERDA_QUALIDADE]: 'hsl(var(--chart-3))',
-  [OEE_CATEGORIES.OUTRAS_PERDAS]: 'hsl(var(--chart-4))',
+  [OEE_CATEGORIES.PERDA_PROCESSO]: 'hsl(var(--chart-1))',
+  [OEE_CATEGORIES.PERDA_DISPONIBILIDADE]: 'hsl(var(--chart-2))',
+  [OEE_CATEGORIES.PERDA_PERFORMANCE]: 'hsl(var(--chart-3))',
+  [OEE_CATEGORIES.PERDA_QUALIDADE]: 'hsl(var(--chart-4))',
+  [OEE_CATEGORIES.OUTRAS_ATIVIDADES]: 'hsl(var(--chart-5))',
 };
 
 // Mapeia palavras-chave dos motivos de perda para as categorias OEE
 const mapReasonToOeeCategory = (reason: string): string => {
   const lowerCaseReason = reason.toLowerCase();
 
-  // Disponibilidade
-  if (['setup', 'manutenção', 'falta de material', 'ferramenta'].some(keyword => lowerCaseReason.includes(keyword))) {
+  // 1. Perdas de Processo (Programadas)
+  if (['setup'].some(keyword => lowerCaseReason.includes(keyword))) {
+    return OEE_CATEGORIES.PERDA_PROCESSO;
+  }
+
+  // 2. Perdas de Disponibilidade (Não Programadas)
+  if (['manutenção', 'falta de material', 'ferramenta', 'quebra'].some(keyword => lowerCaseReason.includes(keyword))) {
     return OEE_CATEGORIES.PERDA_DISPONIBILIDADE;
   }
   
-  // Performance
+  // 3. Perdas de Performance
   if (['ajuste', 'velocidade reduzida', 'microparada'].some(keyword => lowerCaseReason.includes(keyword))) {
     return OEE_CATEGORIES.PERDA_PERFORMANCE;
   }
   
-  // Qualidade
+  // 4. Perdas de Qualidade
   if (['refugo', 'retrabalho', 'peça morta'].some(keyword => lowerCaseReason.includes(keyword))) {
     return OEE_CATEGORIES.PERDA_QUALIDADE;
   }
 
-  // Outras (Reuniões, Treinamentos, etc.)
-  return OEE_CATEGORIES.OUTRAS_PERDAS;
+  // 5. Outras Atividades (Reuniões, Treinamentos, Limpeza, etc.)
+  return OEE_CATEGORIES.OUTRAS_ATIVIDADES;
 };
 
 
@@ -80,7 +87,7 @@ export function LossReasonChart({ data, loading }: LossReasonChartProps) {
       ...categorizedData
     }];
     
-    const activeCategories = Object.keys(categorizedData);
+    const activeCategories = Object.keys(categorizedData).sort((a,b) => categorizedData[b] - categorizedData[a]);
 
     return { chartData: finalChartData, categories: activeCategories };
 
@@ -124,7 +131,7 @@ export function LossReasonChart({ data, loading }: LossReasonChartProps) {
                     />
                     <XAxis
                       type='number'
-                      tickFormatter={(value) => `${value * 100}%`}
+                      tickFormatter={(value) => `${Math.round(value * 100)}%`}
                       stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
                     />
