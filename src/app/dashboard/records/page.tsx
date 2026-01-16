@@ -22,6 +22,7 @@ import {
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
+import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
 import { getYear, getMonth, format, startOfDay, endOfDay, getISOWeek } from 'date-fns';
 import {
@@ -65,6 +66,7 @@ export default function RecordsPage() {
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
 
 
   const productionRecordsQuery = useMemoFirebase(() => firestore
@@ -135,10 +137,14 @@ export default function RecordsPage() {
     }
 
     const filteredProd = filterRecords(productionRecords);
-    const filteredLoss = filterRecords(lossRecords);
+    const filteredLoss = filterRecords(lossRecords).filter(record => {
+        const reasonMatch = !selectedReason || record.lossReason === selectedReason;
+        return reasonMatch;
+    });
+
 
     return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss };
-  }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory]);
+  }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason]);
 
   useEffect(() => {
     // Let's celebrate the successful deployment!
@@ -178,6 +184,7 @@ export default function RecordsPage() {
 
   useEffect(() => {
     setSelectedFactory(null);
+    setSelectedReason(null);
   }, [selectedYear, selectedMonth, selectedWeek, selectedDate]);
 
 
@@ -213,6 +220,10 @@ export default function RecordsPage() {
   
   const handleFactorySelect = (factoryName: string | null) => {
     setSelectedFactory(current => current === factoryName ? null : factoryName);
+  };
+  
+  const handleReasonSelect = (reasonName: string | null) => {
+    setSelectedReason(current => current === reasonName ? null : reasonName);
   };
 
   return (
@@ -393,12 +404,18 @@ export default function RecordsPage() {
           />
         </CardContent>
       </Card>
-       <div className="grid grid-cols-1 gap-6">
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MachiningTimeByFactoryChart
           data={filteredProductionRecords}
           loading={loadingProduction}
           selectedFactory={selectedFactory}
           onFactorySelect={handleFactorySelect}
+        />
+         <LossReasonChart
+            data={filteredLossRecords}
+            loading={loadingLoss}
+            selectedReason={selectedReason}
+            onReasonSelect={handleReasonSelect}
         />
       </div>
       <Card>
@@ -461,6 +478,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 
