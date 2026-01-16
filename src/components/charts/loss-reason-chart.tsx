@@ -37,7 +37,10 @@ export function LossReasonChart({
     const reasonData = data.reduce(
       (acc, record) => {
         if (record.lossReason) {
-          const reason = record.lossReason;
+          let reason = record.lossReason;
+          if (reason.toUpperCase().includes('SETUP')) {
+            reason = 'SETUP';
+          }
           const timeInMinutes = Number(record.timeLost) || 0;
           if (!acc[reason]) {
             acc[reason] = 0;
