@@ -17,7 +17,8 @@ import {
   TriangleAlert,
   PlusCircle,
   CalendarIcon,
-  X
+  X,
+  User,
 } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
@@ -67,6 +68,7 @@ export default function RecordsPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
 
 
   const productionRecordsQuery = useMemoFirebase(() => firestore
@@ -110,6 +112,9 @@ export default function RecordsPage() {
       return records.filter((record) => {
           if (!record.date?.toDate) return false;
           const recordDate = record.date.toDate();
+
+          const operatorMatch = !selectedOperator || record.operatorId === selectedOperator;
+          if (!operatorMatch) return false;
           
           if (selectedDate) {
               const dayMatch = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
@@ -144,7 +149,7 @@ export default function RecordsPage() {
 
 
     return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss };
-  }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason]);
+  }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason, selectedOperator]);
 
   useEffect(() => {
     // Let's celebrate the successful deployment!
@@ -185,6 +190,7 @@ export default function RecordsPage() {
   useEffect(() => {
     setSelectedFactory(null);
     setSelectedReason(null);
+    setSelectedOperator(null);
   }, [selectedYear, selectedMonth, selectedWeek, selectedDate]);
 
 
@@ -224,6 +230,10 @@ export default function RecordsPage() {
   
   const handleReasonSelect = (reasonName: string | null) => {
     setSelectedReason(current => current === reasonName ? null : reasonName);
+  };
+
+  const handleOperatorSelect = (operatorName: string | null) => {
+    setSelectedOperator(current => current === operatorName ? null : operatorName);
   };
 
   return (
@@ -393,7 +403,7 @@ export default function RecordsPage() {
         <CardHeader>
           <CardTitle>Horas Trabalhadas por Técnico</CardTitle>
           <CardDescription>
-            Progresso da jornada de trabalho de cada operador até a meta de 7 horas.
+            Progresso da jornada de trabalho de cada operador até a meta de 7 horas. Clique em um técnico para filtrar.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -401,6 +411,8 @@ export default function RecordsPage() {
             productionData={filteredProductionRecords}
             lossData={filteredLossRecords}
             loading={isLoading}
+            selectedOperator={selectedOperator}
+            onOperatorSelect={handleOperatorSelect}
           />
         </CardContent>
       </Card>
@@ -478,6 +490,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 

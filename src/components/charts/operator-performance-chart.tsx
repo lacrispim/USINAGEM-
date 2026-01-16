@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Label,
   LabelList,
   ReferenceLine,
@@ -30,6 +31,8 @@ interface OperatorPerformanceChartProps {
   productionData: any[];
   lossData: any[];
   loading: boolean;
+  selectedOperator: string | null;
+  onOperatorSelect: (operator: string | null) => void;
 }
 
 const OPERATOR_COLORS: { [key: string]: string } = {
@@ -44,6 +47,8 @@ export function OperatorPerformanceChart({
   productionData,
   lossData,
   loading,
+  selectedOperator,
+  onOperatorSelect,
 }: OperatorPerformanceChartProps) {
   const chartData = useMemo(() => {
     const operatorHours: { [key: string]: number } = {};
@@ -106,6 +111,7 @@ export function OperatorPerformanceChart({
                     layout="vertical" 
                     barSize={30}
                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    onClick={(e) => onOperatorSelect(e?.activeLabel || null)}
                 >
                   <CartesianGrid horizontal={false} />
                    <YAxis
@@ -155,6 +161,20 @@ export function OperatorPerformanceChart({
                         className="fill-foreground text-sm"
                         formatter={(value: number) => `${value.toFixed(1)}h`}
                       />
+                       {chartData.map((entry, index) => (
+                        <Cell
+                            key={`cell-${index}`}
+                            cursor="pointer"
+                            fill={entry.fill}
+                            opacity={
+                                selectedOperator
+                                ? selectedOperator === entry.name
+                                    ? 1
+                                    : 0.3
+                                : 1
+                            }
+                        />
+                        ))}
                   </Bar>
                 </BarChart>
               </ChartContainer>
