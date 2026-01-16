@@ -449,22 +449,12 @@ export default function RecordsPage() {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader>
-            <div>
-              <CardTitle>Tempo de Usinagem por Operador</CardTitle>
-              <CardDescription>
-                Tempo total de usinagem por operador a cada dia.
-              </CardDescription>
-            </div>
-        </CardHeader>
-        <CardContent>
-          <OperatorDailyTimeChart
-            productionData={filteredProductionRecords}
-            loading={isLoading}
-            isWeekView={selectedWeek !== 'all'}
-            isDayView={!!selectedDate}
-          />
-        </CardContent>
+        <OperatorDailyTimeChart
+          productionData={filteredProductionRecords}
+          loading={isLoading}
+          isWeekView={selectedWeek !== 'all'}
+          isDayView={!!selectedDate}
+        />
       </Card>
       <Card>
         <CardHeader>
@@ -490,6 +480,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 

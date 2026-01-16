@@ -17,6 +17,7 @@ import {
 import { Loader } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 interface OperatorDailyTimeChartProps {
   productionData: any[];
@@ -53,8 +54,7 @@ export function OperatorDailyTimeChart({
         const dateStr = format(dateObj, 'yyyy-MM-dd');
         const operator = record.operatorId;
         
-        // Inclui tempo de usinagem e programação como tempo produtivo.
-        // O campo `machiningTime` é usado para ambos os tipos de atividade.
+        // O tempo de atividades como usinagem, programação e primeira peça é considerado tempo produtivo.
         const timeInMinutes = Number(record.machiningTime) || 0;
 
         if (timeInMinutes > 0) {
@@ -148,52 +148,64 @@ export function OperatorDailyTimeChart({
   };
 
   return (
-    loading ? (
-      <div className="flex h-[350px] w-full items-center justify-center">
-        <Loader className="h-8 w-8 animate-spin" />
-      </div>
-    ) : chartData && chartData.length > 0 ? (
-      <div className="h-[350px] w-full">
-        <ChartContainer config={chartConfig} className="h-full w-full">
-          <BarChart data={chartData} barGap={4}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={xAxisFormatter}
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-            />
-            <YAxis
-              tickFormatter={(value) => `${value.toFixed(0)}h`}
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              domain={[0, 'dataMax + 2']}
-            />
-            <ChartTooltip
-              cursor={false}
-              content={<CustomTooltip />}
-            />
-            <Legend content={<CustomLegend />} />
-            {operators.map((operator) => (
-              <Bar
-                key={operator}
-                dataKey={operator}
-                fill={OPERATOR_COLORS[operator] || OPERATOR_COLORS['Outro']}
-                stackId="a"
-                radius={[4, 4, 0, 0]}
-              />
-            ))}
-          </BarChart>
-        </ChartContainer>
-      </div>
-    ) : (
-      <div className="flex h-[350px] w-full flex-col items-center justify-center">
-        <p className="text-sm text-muted-foreground">
-          Nenhum dado de atividade para exibir.
-        </p>
-      </div>
-    )
+    <>
+      <CardHeader>
+        <div>
+          <CardTitle>Tempo Produtivo por Operador</CardTitle>
+          <CardDescription>
+            Tempo total de atividades produtivas (usinagem, programação, etc.) por operador a cada dia.
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex h-[350px] w-full items-center justify-center">
+            <Loader className="h-8 w-8 animate-spin" />
+          </div>
+        ) : chartData && chartData.length > 0 ? (
+          <div className="h-[350px] w-full">
+            <ChartContainer config={chartConfig} className="h-full w-full">
+              <BarChart data={chartData} barGap={4}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={xAxisFormatter}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                />
+                <YAxis
+                  tickFormatter={(value) => `${value.toFixed(0)}h`}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  domain={[0, 'dataMax + 2']}
+                />
+                <ChartTooltip
+                  cursor={false}
+                  content={<CustomTooltip />}
+                />
+                <Legend content={<CustomLegend />} />
+                {operators.map((operator) => (
+                  <Bar
+                    key={operator}
+                    dataKey={operator}
+                    fill={OPERATOR_COLORS[operator] || OPERATOR_COLORS['Outro']}
+                    stackId="a"
+                    radius={[4, 4, 0, 0]}
+                  />
+                ))}
+              </BarChart>
+            </ChartContainer>
+          </div>
+        ) : (
+          <div className="flex h-[350px] w-full flex-col items-center justify-center">
+            <p className="text-sm text-muted-foreground">
+              Nenhum dado de atividade para exibir.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </>
   );
 }
