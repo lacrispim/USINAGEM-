@@ -38,8 +38,11 @@ export function LossReasonChart({
       (acc, record) => {
         if (record.lossReason) {
           let reason = record.lossReason;
-          if (reason.toUpperCase().includes('SETUP')) {
+          const upperCaseReason = reason.toUpperCase();
+          if (upperCaseReason.includes('SETUP')) {
             reason = 'SETUP';
+          } else if (upperCaseReason === 'DDS' || upperCaseReason === 'DDSHE') {
+            reason = 'DDS/DDSHE';
           }
           const timeInMinutes = Number(record.timeLost) || 0;
           if (!acc[reason]) {
