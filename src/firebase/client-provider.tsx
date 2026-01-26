@@ -6,6 +6,7 @@ import { initializeFirebase, getSdks } from '@/firebase';
 import type { FirebaseApp } from 'firebase/app';
 import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
+import type { Database } from 'firebase/database';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -15,6 +16,7 @@ interface FirebaseServices {
   firebaseApp: FirebaseApp | null;
   auth: Auth | null;
   firestore: Firestore | null;
+  database: Database | null;
 }
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
@@ -27,7 +29,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
       }
     }
     // Return nulls for server-side rendering or if initialization fails
-    return { firebaseApp: null, auth: null, firestore: null };
+    return { firebaseApp: null, auth: null, firestore: null, database: null };
   }, []);
 
   return (
@@ -35,6 +37,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
       firebaseApp={firebaseServices.firebaseApp}
       auth={firebaseServices.auth}
       firestore={firebaseServices.firestore}
+      database={firebaseServices.database}
     >
       {children}
     </FirebaseProvider>
