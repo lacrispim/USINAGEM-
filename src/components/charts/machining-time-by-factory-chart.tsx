@@ -138,35 +138,38 @@ export function MachiningTimeByFactoryChart({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="flex h-[300px] w-full items-center justify-center">
+          <div className="flex h-[450px] w-full items-center justify-center">
             <Loader className="h-8 w-8 animate-spin" />
           </div>
         ) : chartData && chartData.length > 0 ? (
-          <div className="h-[300px] w-full">
+          <div className="h-[450px] w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <ChartContainer config={chartConfig}>
                 <BarChart 
                     data={chartData} 
-                    barSize={40} 
-                    margin={{ top: 20, bottom: 40 }}
+                    layout="vertical"
+                    barSize={35} 
+                    margin={{ top: 20, right: 50, left: 20, bottom: 40 }}
                 >
-                    <CartesianGrid vertical={false} />
-                    <XAxis
+                    <CartesianGrid horizontal={false} />
+                     <YAxis
                       dataKey="name"
+                      type="category"
                       tickLine={false}
                       axisLine={false}
                       tickMargin={5}
-                      angle={-45}
-                      textAnchor="end"
+                      width={120}
                       interval={0}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                     />
-                    <YAxis
-                        domain={[0, Math.ceil(maxHours / 10) * 10 + 10]}
-                        allowDecimals={false}
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={10}
-                        unit="h"
+                    <XAxis
+                      type="number"
+                      domain={[0, Math.ceil(maxHours / 10) * 10 + 10]}
+                      allowDecimals={false}
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={10}
+                      unit="h"
                     />
                     <ChartTooltip
                         cursor={{fill: 'hsl(var(--accent))', radius: 4}}
@@ -179,12 +182,12 @@ export function MachiningTimeByFactoryChart({
                             dataKey={op} 
                             stackId="a" 
                             fill={chartConfig[op].color}
-                            radius={index === operators.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                            radius={index === 0 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
                         />
                     ))}
                     <LabelList
                         dataKey="total"
-                        position="top"
+                        position="right"
                         offset={8}
                         className="fill-foreground text-sm"
                         formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
@@ -194,7 +197,7 @@ export function MachiningTimeByFactoryChart({
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="flex h-[300px] w-full flex-col items-center justify-center">
+          <div className="flex h-[450px] w-full flex-col items-center justify-center">
             <p className="text-sm text-muted-foreground">
               Nenhum dado de produção para exibir.
             </p>

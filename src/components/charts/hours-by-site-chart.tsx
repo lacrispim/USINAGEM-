@@ -86,7 +86,7 @@ export function HoursBySiteChart({
         });
         siteRecord.total = totalHours; // Add total for sorting
         return siteRecord;
-    }).sort((a, b) => a.total - b.total); // Sort sites by total hours ascending for horizontal chart
+    }).sort((a, b) => b.total - a.total); // Sort sites by total hours descending for horizontal chart
 
     return { chartData: result, technicians: sortedTechnicians };
   }, [data]);
