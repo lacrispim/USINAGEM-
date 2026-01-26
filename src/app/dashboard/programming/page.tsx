@@ -18,66 +18,55 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 
-// This is a type based on the new backend.json entity
-interface MachineSchedule {
+interface PlanoSemanal {
   id: string;
-  machineName: string;
-  monday: string[];
-  tuesday: string[];
-  wednesday: string[];
-  thursday: string[];
-  friday: string[];
-  saturday: string[];
-  sunday: string[];
+  dataExecucao: any; // Firestore timestamp
+  site: string;
+  requisicao: string;
+  nomeDaPeca: string;
+  quantidade: number;
+  tecnico: string;
+  observacao: string;
+  equipamento: string;
 }
-
-const daysOfWeek = [
-  { key: 'monday', label: 'Segunda-feira' },
-  { key: 'tuesday', label: 'Terça-feira' },
-  { key: 'wednesday', label: 'Quarta-feira' },
-  { key: 'thursday', label: 'Quinta-feira' },
-  { key: 'friday', label: 'Sexta-feira' },
-  { key: 'saturday', label: 'Sábado' },
-  { key: 'sunday', label: 'Domingo' },
-] as const;
 
 
 export default function ProgrammingPage() {
   const firestore = useFirestore();
 
-  const schedulesQuery = useMemoFirebase(
+  const planosQuery = useMemoFirebase(
     () =>
       firestore
-        ? query(collection(firestore, 'machineSchedules'), orderBy('machineName'))
+        ? query(collection(firestore, 'planoSemanal'), orderBy('dataExecucao', 'asc'))
         : null,
     [firestore]
   );
 
-  const { data: schedules, isLoading } = useCollection<MachineSchedule>(schedulesQuery);
+  const { data: planos, isLoading } = useCollection<PlanoSemanal>(planosQuery);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-            <h1 className="text-3xl font-bold tracking-tight">Programação de Máquinas</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Plano Semanal</h1>
             <p className="text-muted-foreground">
-            Visualize a programação semanal das máquinas.
+            Visualize e gerencie o planejamento de produção.
             </p>
         </div>
         <Button disabled>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Adicionar Programação (Em breve)
+            Adicionar Item (Em breve)
         </Button>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Programação Semanal</CardTitle>
+          <CardTitle>Planejamento de Produção</CardTitle>
           <CardDescription>
-            Requisições de peças agendadas para cada máquina durante a semana.
+            Lista de todas as tarefas de produção agendadas.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -85,43 +74,45 @@ export default function ProgrammingPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[200px]">Máquina</TableHead>
-                  {daysOfWeek.map(day => (
-                    <TableHead key={day.key} className="min-w-[150px]">{day.label}</TableHead>
-                  ))}
+                  <TableHead>Data Execução</TableHead>
+                  <TableHead>Site</TableHead>
+                  <TableHead># Requisição</TableHead>
+                  <TableHead>Nome da Peça</TableHead>
+                  <TableHead>Quantidade</TableHead>
+                  <TableHead>Técnicos</TableHead>
+                  <TableHead>Observação</TableHead>
+                  <TableHead>Equipamento</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={daysOfWeek.length + 1} className="h-24 text-center">
+                    <TableCell colSpan={8} className="h-24 text-center">
                       <div className="flex justify-center items-center">
                         <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                        Carregando programação...
+                        Carregando planejamento...
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : !schedules || schedules.length === 0 ? (
+                ) : !planos || planos.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={daysOfWeek.length + 1} className="h-24 text-center">
-                      Nenhuma programação encontrada. Clique em "Adicionar Programação" para começar.
+                    <TableCell colSpan={8} className="h-24 text-center">
+                      Nenhum item de planejamento encontrado.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  schedules.map((schedule) => (
-                    <TableRow key={schedule.id}>
-                      <TableCell className="font-medium">{schedule.machineName}</TableCell>
-                      {daysOfWeek.map(day => (
-                        <TableCell key={day.key}>
-                            <div className="flex flex-wrap gap-1">
-                                {(schedule[day.key] || []).map((reqNumber) => (
-                                <Badge key={reqNumber} variant="secondary">
-                                    {reqNumber}
-                                </Badge>
-                                ))}
-                            </div>
-                        </TableCell>
-                      ))}
+                  planos.map((plano) => (
+                    <TableRow key={plano.id}>
+                      <TableCell>
+                        {plano.dataExecucao?.toDate ? format(plano.dataExecucao.toDate(), 'dd/MM/yyyy') : ''}
+                      </TableCell>
+                      <TableCell>{plano.site}</TableCell>
+                      <TableCell>{plano.requisicao}</TableCell>
+                      <TableCell className="font-medium">{plano.nomeDaPeca}</TableCell>
+                      <TableCell>{plano.quantidade}</TableCell>
+                      <TableCell>{plano.tecnico}</TableCell>
+                      <TableCell>{plano.observacao}</TableCell>
+                      <TableCell>{plano.equipamento}</TableCell>
                     </TableRow>
                   ))
                 )}

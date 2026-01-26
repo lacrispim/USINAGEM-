@@ -153,5 +153,9 @@ service cloud.firestore {
     match /machineSchedules/{scheduleId} {
       allow read, write: if isSignedIn();
     }
+
+    match /planoSemanal/{planoId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }

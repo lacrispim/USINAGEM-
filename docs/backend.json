@@ -139,6 +139,48 @@
         "id",
         "machineName"
       ]
+    },
+    "PlanoSemanal": {
+      "title": "PlanoSemanal",
+      "type": "object",
+      "description": "Represents a single entry in the weekly production plan.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "dataExecucao": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "site": {
+          "type": "string"
+        },
+        "requisicao": {
+          "type": "string"
+        },
+        "nomeDaPeca": {
+          "type": "string"
+        },
+        "quantidade": {
+          "type": "number"
+        },
+        "tecnico": {
+          "type": "string"
+        },
+        "observacao": {
+          "type": "string"
+        },
+        "equipamento": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "dataExecucao",
+        "site",
+        "requisicao",
+        "nomeDaPeca"
+      ]
     }
   },
   "auth": {
@@ -197,6 +239,22 @@
             {
               "name": "scheduleId",
               "description": "The unique identifier for the schedule document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/planoSemanal/{planoId}",
+        "definition": {
+          "entityName": "PlanoSemanal",
+          "schema": {
+            "$ref": "#/backend/entities/PlanoSemanal"
+          },
+          "description": "Stores the weekly production plan entries.",
+          "params": [
+            {
+              "name": "planoId",
+              "description": "The unique identifier for the plan entry."
             }
           ]
         }
