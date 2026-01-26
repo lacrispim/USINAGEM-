@@ -3,32 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useDatabase } from '@/firebase';
 import { ref, onValue } from 'firebase/database';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
-// Based on the PlanoSemanal entity
-interface PlanoSemanalItem {
-  id: string; // The key from Realtime Database
-  dataExecucao?: string;
-  site?: string;
-  requisicao?: string;
-  nomeDaPeca?: string;
-  quantidade?: number;
-  tecnico?: string;
-  observacao?: string;
-  equipamento?: string;
-}
+import { Loader } from 'lucide-react';
 
 export default function ProgrammingPage() {
   const database = useDatabase();
-  const [data, setData] = useState<PlanoSemanalItem[]>([]);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,24 +19,19 @@ export default function ProgrammingPage() {
       return;
     }
 
-    const planningRef = ref(database, 'Planejamento S');
+    const dbRef = ref(database, '/'); // Reference to the root of the database
     setLoading(true);
 
-    const unsubscribe = onValue(planningRef, (snapshot) => {
+    const unsubscribe = onValue(dbRef, (snapshot) => {
       if (snapshot.exists()) {
-        const rawData = snapshot.val();
-        const formattedData: PlanoSemanalItem[] = Object.keys(rawData).map(key => ({
-          id: key,
-          ...rawData[key],
-        }));
-        setData(formattedData);
+        setData(snapshot.val());
       } else {
-        setData([]);
+        setData(null);
       }
       setLoading(false);
       setError(null);
-    }, (error) => {
-      console.error(error);
+    }, (dbError) => {
+      console.error(dbError);
       setError("Falha ao buscar os dados do Realtime Database.");
       setLoading(false);
     });
@@ -70,57 +45,33 @@ export default function ProgrammingPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Programação</h1>
         <p className="text-muted-foreground">
-          Visualizando o planejamento de produção diretamente do Realtime Database.
+          Visualizando todos os nós do seu Realtime Database.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Planejamento de Produção</CardTitle>
+          <CardTitle>Visualizador de Nós do Realtime Database</CardTitle>
           <CardDescription>
-            Dados carregados do nó &quot;Planejamento S&quot;.
+            Abaixo estão todos os dados encontrados na raiz do seu projeto.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {loading && <p>Carregando dados...</p>}
+          {loading && (
+            <div className="flex items-center gap-2">
+              <Loader className="animate-spin h-5 w-5" />
+              <span>Carregando dados...</span>
+            </div>
+          )}
           {error && <p className="text-destructive">{error}</p>}
           {!loading && !error && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Requisição</TableHead>
-                  <TableHead>Nome da Peça</TableHead>
-                  <TableHead>Data de Execução</TableHead>
-                  <TableHead>Site</TableHead>
-                  <TableHead>Técnico</TableHead>
-                  <TableHead>Equipamento</TableHead>
-                  <TableHead>Quantidade</TableHead>
-                  <TableHead>Observação</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.length > 0 ? (
-                  data.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.requisicao || '-'}</TableCell>
-                      <TableCell>{item.nomeDaPeca || '-'}</TableCell>
-                      <TableCell>{item.dataExecucao ? new Date(item.dataExecucao).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : '-'}</TableCell>
-                      <TableCell>{item.site || '-'}</TableCell>
-                      <TableCell>{item.tecnico || '-'}</TableCell>
-                      <TableCell>{item.equipamento || '-'}</TableCell>
-                      <TableCell>{item.quantidade || '-'}</TableCell>
-                      <TableCell>{item.observacao || '-'}</TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center">
-                      Nenhum dado encontrado no nó &quot;Planejamento S&quot;.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+            data ? (
+              <pre className="p-4 bg-muted rounded-md overflow-x-auto text-sm">
+                {JSON.stringify(data, null, 2)}
+              </pre>
+            ) : (
+               <p>Nenhum dado encontrado na raiz do banco de dados.</p>
+            )
           )}
         </CardContent>
       </Card>
