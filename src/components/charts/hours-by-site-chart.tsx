@@ -12,7 +12,6 @@ import {
 import {
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Loader } from 'lucide-react';
 
@@ -199,16 +198,20 @@ export function HoursBySiteChart({
                             dataKey={tech} 
                             stackId="a" 
                             fill={chartConfig[tech].color}
-                            radius={index === 0 ? [0, 4, 4, 0] : [0, 0, 0, 0]} 
-                        />
+                            radius={index === technicians.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]} 
+                        >
+                        {/* Only add LabelList to the last bar in the stack */}
+                        {index === technicians.length - 1 && (
+                            <LabelList
+                                dataKey="total"
+                                position="right"
+                                offset={8}
+                                className="fill-foreground text-sm"
+                                formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
+                            />
+                        )}
+                        </Bar>
                     ))}
-                    <LabelList
-                        dataKey="total"
-                        position="right"
-                        offset={8}
-                        className="fill-foreground text-sm"
-                        formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
-                      />
                 </BarChart>
                 </ChartContainer>
             </ResponsiveContainer>
