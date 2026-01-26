@@ -324,6 +324,9 @@ export default function ProgrammingPage() {
         { requisicao: '517', nomeDaPeca: 'Suporte do Motor', site: 'POUSO ALEGRE', dataExecucao: new Date(), quantidade: 8, tecnico: 'Gustavo Gozzi', equipamento: 'CENTRO DE USINAGEM D600', observacao: 'Verificar tolerâncias' },
         { requisicao: '334 3D', nomeDaPeca: 'Peça Impressa 3D', site: 'INDAIATUBA', dataExecucao: new Date(), quantidade: 1, tecnico: 'William Martinucci', equipamento: 'TORNO CNC CENTUR 30', observacao: 'Protótipo' },
         { requisicao: '497_2', nomeDaPeca: 'Eixo Secundário', site: 'VINHEDO', dataExecucao: new Date(), quantidade: 12, tecnico: 'Daniel Solivo', equipamento: 'TORNO CNC CENTUR 30', observacao: 'Segunda versão' },
+        { requisicao: '497_3', nomeDaPeca: 'Eixo Terciário', site: 'VINHEDO', dataExecucao: new Date(), quantidade: 8, tecnico: 'Daniel Solivo', equipamento: 'TORNO CNC CENTUR 30', observacao: 'Terceira versão' },
+        { requisicao: '507_2', nomeDaPeca: 'Flange de Conexão V2', site: 'VALINHOS DOVE', dataExecucao: new Date(), quantidade: 7, tecnico: 'Rodrigo Cantano', equipamento: 'CENTRO DE USINAGEM D600', observacao: '' },
+        { requisicao: '507_3', nomeDaPeca: 'Flange de Conexão V3', site: 'VALINHOS DOVE', dataExecucao: new Date(), quantidade: 9, tecnico: 'Rodrigo Cantano', equipamento: 'CENTRO DE USINAGEM D600', observacao: 'Urgente' },
       ];
 
       const addInitialData = async () => {
