@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import {
@@ -315,6 +315,35 @@ export default function ProgrammingPage() {
   );
 
   const { data: planos, isLoading } = useCollection<PlanoSemanal>(planosQuery);
+
+  useEffect(() => {
+    if (firestore && !isLoading && planos && planos.length === 0) {
+      const seedData = [
+        { requisicao: '497', nomeDaPeca: 'Eixo Principal', site: 'VINHEDO', dataExecucao: new Date(), quantidade: 10, tecnico: 'Daniel Solivo', equipamento: 'TORNO CNC CENTUR 30', observacao: 'Usinagem de precisão' },
+        { requisicao: '507', nomeDaPeca: 'Flange de Conexão', site: 'VALINHOS DOVE', dataExecucao: new Date(), quantidade: 5, tecnico: 'Rodrigo Cantano', equipamento: 'CENTRO DE USINAGEM D600', observacao: '' },
+        { requisicao: '517', nomeDaPeca: 'Suporte do Motor', site: 'POUSO ALEGRE', dataExecucao: new Date(), quantidade: 8, tecnico: 'Gustavo Gozzi', equipamento: 'CENTRO DE USINAGEM D600', observacao: 'Verificar tolerâncias' },
+        { requisicao: '334 3D', nomeDaPeca: 'Peça Impressa 3D', site: 'INDAIATUBA', dataExecucao: new Date(), quantidade: 1, tecnico: 'William Martinucci', equipamento: 'TORNO CNC CENTUR 30', observacao: 'Protótipo' },
+        { requisicao: '497_2', nomeDaPeca: 'Eixo Secundário', site: 'VINHEDO', dataExecucao: new Date(), quantidade: 12, tecnico: 'Daniel Solivo', equipamento: 'TORNO CNC CENTUR 30', observacao: 'Segunda versão' },
+      ];
+
+      const addInitialData = async () => {
+        const collectionRef = collection(firestore, 'planoSemanal');
+        for (const item of seedData) {
+          await addDoc(collectionRef, {
+            ...item,
+            createdAt: serverTimestamp(),
+          });
+        }
+        toast({
+          title: 'Dados Iniciais Carregados',
+          description: 'O planejamento foi populado com os dados de exemplo.',
+        });
+      };
+
+      addInitialData();
+    }
+  }, [firestore, planos, isLoading, toast]);
+
 
   const handleDelete = async (id: string) => {
     if (!firestore) return;
