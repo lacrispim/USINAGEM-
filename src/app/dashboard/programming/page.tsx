@@ -327,6 +327,7 @@ export default function ProgrammingPage() {
         { requisicao: '497_3', nomeDaPeca: 'Eixo Terciário', site: 'VINHEDO', dataExecucao: new Date(), quantidade: 8, tecnico: 'Daniel Solivo', equipamento: 'TORNO CNC CENTUR 30', observacao: 'Terceira versão' },
         { requisicao: '507_2', nomeDaPeca: 'Flange de Conexão V2', site: 'VALINHOS DOVE', dataExecucao: new Date(), quantidade: 7, tecnico: 'Rodrigo Cantano', equipamento: 'CENTRO DE USINAGEM D600', observacao: '' },
         { requisicao: '507_3', nomeDaPeca: 'Flange de Conexão V3', site: 'VALINHOS DOVE', dataExecucao: new Date(), quantidade: 9, tecnico: 'Rodrigo Cantano', equipamento: 'CENTRO DE USINAGEM D600', observacao: 'Urgente' },
+        { requisicao: '587', nomeDaPeca: 'Item 587', site: 'VINHEDO', dataExecucao: new Date(), quantidade: 1, tecnico: 'Daniel Solivo', equipamento: 'TORNO CNC CENTUR 30', observacao: 'Item de base' },
         { requisicao: '587_2', nomeDaPeca: 'Item 587 V2', site: 'VINHEDO', dataExecucao: new Date(), quantidade: 2, tecnico: 'Daniel Solivo', equipamento: 'TORNO CNC CENTUR 30', observacao: 'Item adicional' },
         { requisicao: '587_3', nomeDaPeca: 'Item 587 V3', site: 'VALINHOS DOVE', dataExecucao: new Date(), quantidade: 3, tecnico: 'Rodrigo Cantano', equipamento: 'CENTRO DE USINAGEM D600', observacao: 'Item adicional' },
         { requisicao: '517_2', nomeDaPeca: 'Suporte do Motor V2', site: 'POUSO ALEGRE', dataExecucao: new Date(), quantidade: 4, tecnico: 'Gustavo Gozzi', equipamento: 'CENTRO DE USINAGEM D600', observacao: 'Item adicional' },
