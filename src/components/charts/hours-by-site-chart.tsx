@@ -133,7 +133,7 @@ export function HoursBySiteChart({
   const CustomLegend = (props: any) => {
     const { payload } = props;
     return (
-      <div className="flex justify-center flex-wrap gap-4 pt-4">
+      <div className="flex justify-center flex-wrap gap-x-4 gap-y-2 pt-4">
         {payload.map((entry: any, index: number) => (
           <div key={`item-${index}`} className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: entry.color }} />
@@ -162,7 +162,7 @@ export function HoursBySiteChart({
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <ChartContainer config={chartConfig}>
-                <BarChart data={chartData} barSize={40} margin={{ top: 20, right: 20, bottom: 40 }}>
+                <BarChart data={chartData} barSize={40} margin={{ top: 20, right: 20, bottom: 60 }}>
                     <CartesianGrid vertical={false} />
                     <XAxis
                       dataKey="name"
