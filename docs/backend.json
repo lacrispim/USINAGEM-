@@ -71,6 +71,74 @@
         "id",
         "email"
       ]
+    },
+    "MachineSchedule": {
+      "title": "MachineSchedule",
+      "type": "object",
+      "description": "Represents the weekly schedule for a single machine, listing requisition numbers for each day.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the machine schedule record."
+        },
+        "machineName": {
+          "type": "string",
+          "description": "The name of the machine."
+        },
+        "monday": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of requisition numbers for Monday."
+        },
+        "tuesday": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of requisition numbers for Tuesday."
+        },
+        "wednesday": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of requisition numbers for Wednesday."
+        },
+        "thursday": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of requisition numbers for Thursday."
+        },
+        "friday": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of requisition numbers for Friday."
+        },
+        "saturday": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of requisition numbers for Saturday."
+        },
+        "sunday": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of requisition numbers for Sunday."
+        }
+      },
+      "required": [
+        "id",
+        "machineName"
+      ]
     }
   },
   "auth": {
@@ -113,6 +181,22 @@
             {
               "name": "recordId",
               "description": "The unique identifier for the machining record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/machineSchedules/{scheduleId}",
+        "definition": {
+          "entityName": "MachineSchedule",
+          "schema": {
+            "$ref": "#/backend/entities/MachineSchedule"
+          },
+          "description": "Stores the weekly schedule for each machine.",
+          "params": [
+            {
+              "name": "scheduleId",
+              "description": "The unique identifier for the schedule document."
             }
           ]
         }

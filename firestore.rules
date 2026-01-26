@@ -149,5 +149,9 @@ service cloud.firestore {
     match /lossRecords/{recordId} {
       allow read, write: if isSignedIn();
     }
+
+    match /machineSchedules/{scheduleId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }
