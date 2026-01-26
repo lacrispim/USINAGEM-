@@ -424,7 +424,7 @@ export default function ProgrammingPage() {
   const planosQuery = useMemoFirebase(
     () =>
       firestore
-        ? query(collection(firestore, 'planoSemanal'), orderBy('dataExecucao', 'asc'))
+        ? query(collection(firestore, 'planoSemanal'), orderBy('createdAt', 'asc'))
         : null,
     [firestore]
   );
