@@ -19,18 +19,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-// Define a type for a single planning item
 interface PlanejamentoItem {
   id: string;
-  EQUIPAMENTO: string;
-  'NOME DA PEÇA': string;
-  OBSERVAÇÃO: string;
-  REQUISIÇÃO: string;
-  STATUS: string;
-  TÉCNICO: string;
+  'DATA EXECUÇÃO'?: string;
+  SITE?: string;
+  REQUISIÇÃO?: string;
+  'NOME DA PEÇA'?: string;
+  QUANTIDADE?: number;
+  'HORAS MÁQUINA'?: number;
+  TÉCNICO?: string;
+  OBSERVAÇÃO?: string;
+  EQUIPAMENTO?: string;
 }
 
 export default function ProgrammingPage() {
@@ -46,7 +48,7 @@ export default function ProgrammingPage() {
       return;
     }
 
-    const dbRef = ref(database, '/Planejamento S'); // Reference to the "Planejamento S" node
+    const dbRef = ref(database, '/Planejamento S');
     setLoading(true);
 
     const unsubscribe = onValue(
@@ -54,7 +56,6 @@ export default function ProgrammingPage() {
       (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.val();
-          // Transform the object of objects into an array of objects
           const dataArray: PlanejamentoItem[] = Object.keys(data).map(
             (key) => ({
               id: key,
@@ -78,19 +79,25 @@ export default function ProgrammingPage() {
     // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [database]);
-
-  const statusColorMap: { [key: string]: string } = {
-    AGUARDANDO: 'bg-yellow-500 hover:bg-yellow-500/80',
-    'EM ANDAMENTO': 'bg-blue-500 hover:bg-blue-500/80',
-    CONCLUÍDO: 'bg-green-500 hover:bg-green-500/80',
+  
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      // Assuming the date is a simple string like "DD/MM/YYYY" or can be parsed directly
+      // If it's a timestamp or another format, this might need adjustment
+      return format(new Date(dateString), "dd/MM/yyyy", { locale: ptBR });
+    } catch {
+      return dateString; // Return original string if formatting fails
+    }
   };
+
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Programação</h1>
         <p className="text-muted-foreground">
-          Visualizando os dados do nó "Planejamento S" do seu Realtime Database.
+          Visualizando os dados do seu Realtime Database.
         </p>
       </div>
 
@@ -118,34 +125,29 @@ export default function ProgrammingPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Data Execução</TableHead>
+                    <TableHead>Site</TableHead>
                     <TableHead>Requisição</TableHead>
                     <TableHead>Nome da Peça</TableHead>
-                    <TableHead>Equipamento</TableHead>
-                    <TableHead>Técnico</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Quantidade</TableHead>
+                    <TableHead>Horas Máquina</TableHead>
+                    <TableHead>Técnicos</TableHead>
                     <TableHead>Observação</TableHead>
+                    <TableHead>Equipamento</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {planejamentoData.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell className="font-medium">
-                        {item['REQUISIÇÃO']}
-                      </TableCell>
-                      <TableCell>{item['NOME DA PEÇA']}</TableCell>
-                      <TableCell>{item.EQUIPAMENTO}</TableCell>
-                      <TableCell>{item['TÉCNICO']}</TableCell>
-                      <TableCell>
-                        <Badge
-                          className={cn(
-                            'text-white',
-                            statusColorMap[item.STATUS] || 'bg-gray-500'
-                          )}
-                        >
-                          {item.STATUS}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{item['OBSERVAÇÃO']}</TableCell>
+                      <TableCell>{formatDate(item['DATA EXECUÇÃO'])}</TableCell>
+                      <TableCell>{item.SITE ?? 'N/A'}</TableCell>
+                      <TableCell>{item.REQUISIÇÃO ?? 'N/A'}</TableCell>
+                      <TableCell>{item['NOME DA PEÇA'] ?? 'N/A'}</TableCell>
+                      <TableCell>{item.QUANTIDADE ?? 'N/A'}</TableCell>
+                      <TableCell>{item['HORAS MÁQUINA'] ?? 'N/A'}</TableCell>
+                      <TableCell>{item.TÉCNICO ?? 'N/A'}</TableCell>
+                      <TableCell>{item.OBSERVAÇÃO ?? 'N/A'}</TableCell>
+                      <TableCell>{item.EQUIPAMENTO ?? 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
