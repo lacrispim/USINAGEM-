@@ -35,6 +35,7 @@ import {
   FileText,
   Eye,
   PanelLeft,
+  FileCode,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -87,6 +88,11 @@ export default function DashboardLayout({
       href: '/dashboard/production-registry',
       label: 'Registro de Produção',
       icon: FileText,
+    },
+    {
+      href: '/dashboard/programming',
+      label: 'Programação',
+      icon: FileCode,
     },
     {
         href: '/dashboard/records',
