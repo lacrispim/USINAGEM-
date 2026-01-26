@@ -195,7 +195,7 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="none">
+      <Sidebar collapsible="icon">
         <SidebarHeader>
           <Logo />
         </SidebarHeader>
