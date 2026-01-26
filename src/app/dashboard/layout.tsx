@@ -44,12 +44,12 @@ import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 
 const CustomSidebarTrigger = () => {
-  const { toggleSidebar, isMobile } = useSidebar();
+  const { toggleSidebar } = useSidebar();
   return (
     <Button
       variant="ghost"
       size="icon"
-      className={cn('h-10 w-10', isMobile ? 'flex' : 'hidden md:flex')}
+      className="h-10 w-10 md:hidden"
       onClick={() => toggleSidebar()}
     >
       <PanelLeft />
@@ -195,7 +195,7 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="icon">
+      <Sidebar collapsible="none">
         <SidebarHeader>
           <Logo />
         </SidebarHeader>
