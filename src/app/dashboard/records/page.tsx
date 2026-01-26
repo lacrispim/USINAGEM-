@@ -457,22 +457,23 @@ export default function RecordsPage() {
         </CardContent>
       </Card>
        
-      <HoursBySiteChart data={planejamentoData} loading={loadingPlanejamento} />
-       
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <HoursBySiteChart data={planejamentoData} loading={loadingPlanejamento} />
         <MachiningTimeByFactoryChart
           data={filteredProductionRecords}
           loading={loadingProduction}
           selectedFactory={selectedFactory}
           onFactorySelect={handleFactorySelect}
         />
-         <LossReasonChart
-            data={filteredLossRecords}
-            loading={loadingLoss}
-            selectedReason={selectedReason}
-            onReasonSelect={handleReasonSelect}
-        />
       </div>
+       
+      <LossReasonChart
+        data={filteredLossRecords}
+        loading={loadingLoss}
+        selectedReason={selectedReason}
+        onReasonSelect={handleReasonSelect}
+      />
+      
       <Card>
         <CardHeader>
             <div>
@@ -523,6 +524,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 
