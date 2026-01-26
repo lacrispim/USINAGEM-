@@ -182,16 +182,19 @@ export function MachiningTimeByFactoryChart({
                             dataKey={op} 
                             stackId="a" 
                             fill={chartConfig[op].color}
-                            radius={index === 0 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
-                        />
+                            radius={index === operators.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                        >
+                           {index === operators.length - 1 && (
+                            <LabelList
+                                dataKey="total"
+                                position="right"
+                                offset={8}
+                                className="fill-foreground text-sm"
+                                formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
+                            />
+                        )}
+                        </Bar>
                     ))}
-                    <LabelList
-                        dataKey="total"
-                        position="right"
-                        offset={8}
-                        className="fill-foreground text-sm"
-                        formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
-                      />
                 </BarChart>
                 </ChartContainer>
             </ResponsiveContainer>
