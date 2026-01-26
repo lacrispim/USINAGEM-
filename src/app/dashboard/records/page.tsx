@@ -462,8 +462,6 @@ export default function RecordsPage() {
         <MachiningTimeByFactoryChart
           data={filteredProductionRecords}
           loading={loadingProduction}
-          selectedFactory={selectedFactory}
-          onFactorySelect={handleFactorySelect}
         />
       </div>
        
@@ -524,6 +522,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 
