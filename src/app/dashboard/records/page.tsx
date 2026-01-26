@@ -20,7 +20,8 @@ import {
   X,
   User,
 } from 'lucide-react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useDatabase } from '@/firebase';
+import { ref, onValue } from 'firebase/database';
 import { collection, query } from 'firebase/firestore';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { LossReasonChart } from '@/components/charts/loss-reason-chart';
@@ -41,6 +42,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Confetti } from '@/components/ui/confetti';
+import { HoursBySiteChart } from '@/components/charts/hours-by-site-chart';
 
 
 const months = [
@@ -61,6 +63,7 @@ const months = [
 
 export default function RecordsPage() {
   const firestore = useFirestore();
+  const database = useDatabase();
   const [showConfetti, setShowConfetti] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
@@ -69,6 +72,43 @@ export default function RecordsPage() {
   const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
+
+  const [planejamentoData, setPlanejamentoData] = useState<any[]>([]);
+  const [loadingPlanejamento, setLoadingPlanejamento] = useState(true);
+
+  useEffect(() => {
+    if (!database) {
+      setLoadingPlanejamento(false);
+      return;
+    }
+
+    const dbRef = ref(database, '/Planejamento S');
+    const unsubscribe = onValue(
+      dbRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const dataArray = Object.keys(data).map(
+            (key) => ({
+              id: key,
+              ...data[key],
+            })
+          );
+          setPlanejamentoData(dataArray);
+        } else {
+          setPlanejamentoData([]);
+        }
+        setLoadingPlanejamento(false);
+      },
+      (dbError) => {
+        console.error('Error fetching Realtime DB data:', dbError);
+        setLoadingPlanejamento(false);
+      }
+    );
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, [database]);
 
 
   const productionRecordsQuery = useMemoFirebase(() => firestore
@@ -416,6 +456,9 @@ export default function RecordsPage() {
           />
         </CardContent>
       </Card>
+       
+      <HoursBySiteChart data={planejamentoData} loading={loadingPlanejamento} />
+       
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MachiningTimeByFactoryChart
           data={filteredProductionRecords}
@@ -480,6 +523,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 
