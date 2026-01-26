@@ -19,25 +19,27 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface PlanejamentoItem {
   id: string;
-  'DATA EXECUÇÃO'?: string;
-  SITE?: string;
-  REQUISIÇÃO?: string;
-  'NOME DA PEÇA'?: string;
-  QUANTIDADE?: number;
-  'HORAS MÁQUINA'?: number;
-  TÉCNICO?: string;
-  OBSERVAÇÃO?: string;
+  'Data Execução'?: string;
+  Site?: string;
+  Requisição?: string;
+  'Nome da Peça'?: string;
+  Quantidade?: number;
+  'Horas Máquina'?: number;
+  Técnicos?: string;
+  Observação?: string;
   EQUIPAMENTO?: string;
 }
 
 export default function ProgrammingPage() {
   const database = useDatabase();
-  const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
+  const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,18 +81,28 @@ export default function ProgrammingPage() {
     // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [database]);
-  
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     try {
-      // Assuming the date is a simple string like "DD/MM/YYYY" or can be parsed directly
-      // If it's a timestamp or another format, this might need adjustment
-      return format(new Date(dateString), "dd/MM/yyyy", { locale: ptBR });
+      // First, try to parse the date assuming a 'dd/MM/yyyy' format.
+      const parsedDate = parse(dateString, 'dd/MM/yyyy', new Date());
+      if (!isNaN(parsedDate.getTime())) {
+        return format(parsedDate, 'dd/MM/yyyy', { locale: ptBR });
+      }
+
+      // As a fallback, try letting new Date() parse it, which handles ISO 8601 and other formats.
+      const fallbackDate = new Date(dateString);
+      if (!isNaN(fallbackDate.getTime())) {
+        return format(fallbackDate, 'dd/MM/yyyy', { locale: ptBR });
+      }
+
+      // If all parsing fails, return the original string.
+      return dateString;
     } catch {
-      return dateString; // Return original string if formatting fails
+      return dateString; // Return original string if any error occurs during formatting
     }
   };
-
 
   return (
     <div className="space-y-6">
@@ -120,7 +132,8 @@ export default function ProgrammingPage() {
               {error}
             </p>
           )}
-          {!loading && !error &&
+          {!loading &&
+            !error &&
             (planejamentoData.length > 0 ? (
               <Table>
                 <TableHeader>
@@ -139,15 +152,15 @@ export default function ProgrammingPage() {
                 <TableBody>
                   {planejamentoData.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{formatDate(item['DATA EXECUÇÃO'])}</TableCell>
-                      <TableCell>{item.SITE ?? 'N/A'}</TableCell>
-                      <TableCell>{item.REQUISIÇÃO ?? 'N/A'}</TableCell>
-                      <TableCell>{item['NOME DA PEÇA'] ?? 'N/A'}</TableCell>
-                      <TableCell>{item.QUANTIDADE ?? 'N/A'}</TableCell>
-                      <TableCell>{item['HORAS MÁQUINA'] ?? 'N/A'}</TableCell>
-                      <TableCell>{item.TÉCNICO ?? 'N/A'}</TableCell>
-                      <TableCell>{item.OBSERVAÇÃO ?? 'N/A'}</TableCell>
-                      <TableCell>{item.EQUIPAMENTO ?? 'N/A'}</TableCell>
+                      <TableCell>{formatDate(item['Data Execução'])}</TableCell>
+                      <TableCell>{item['Site'] ?? 'N/A'}</TableCell>
+                      <TableCell>{item['Requisição'] ?? 'N/A'}</TableCell>
+                      <TableCell>{item['Nome da Peça'] ?? 'N/A'}</TableCell>
+                      <TableCell>{item['Quantidade'] ?? 'N/A'}</TableCell>
+                      <TableCell>{item['Horas Máquina'] ?? 'N/A'}</TableCell>
+                      <TableCell>{item['Técnicos'] ?? 'N/A'}</TableCell>
+                      <TableCell>{item['Observação'] ?? 'N/A'}</TableCell>
+                      <TableCell>{item['EQUIPAMENTO'] ?? 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
