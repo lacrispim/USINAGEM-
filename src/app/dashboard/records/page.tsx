@@ -26,7 +26,7 @@ import { collection, query } from 'firebase/firestore';
 import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
-import { getYear, getMonth, format, startOfDay, endOfDay, getISOWeek } from 'date-fns';
+import { getYear, getMonth, format, startOfDay, endOfDay, getISOWeek, parse } from 'date-fns';
 import {
   Select,
   SelectContent,
@@ -123,9 +123,9 @@ export default function RecordsPage() {
   const { data: lossRecords, loading: loadingLoss } =
     useCollection(lossRecordsQuery);
     
-  const { availableYears, availableWeeks, filteredProductionRecords, filteredLossRecords } = useMemo(() => {
-    if (!productionRecords || !lossRecords) {
-        return { availableYears: [], availableWeeks: [], filteredProductionRecords: [], filteredLossRecords: [] };
+  const { availableYears, availableWeeks, filteredProductionRecords, filteredLossRecords, filteredPlanejamentoData } = useMemo(() => {
+    if (!productionRecords || !lossRecords || !planejamentoData) {
+        return { availableYears: [], availableWeeks: [], filteredProductionRecords: [], filteredLossRecords: [], filteredPlanejamentoData: [] };
     }
 
     const recordYears = new Set<number>();
@@ -187,9 +187,50 @@ export default function RecordsPage() {
         return reasonMatch;
     });
 
+    const filteredPlanData = planejamentoData.filter((record) => {
+      if (!record['Data Execução']) return false;
 
-    return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss };
-  }, [productionRecords, lossRecords, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason, selectedOperator]);
+      let recordDate;
+      try {
+        recordDate = parse(record['Data Execução'], 'dd/MM/yyyy', new Date());
+        if (isNaN(recordDate.getTime())) {
+          recordDate = new Date(record['Data Execução']);
+          if (isNaN(recordDate.getTime())) return false;
+        }
+      } catch (e) {
+        return false;
+      }
+
+      const operatorMatch = !selectedOperator || (record['Técnicos'] && String(record['Técnicos']).includes(selectedOperator));
+      if (!operatorMatch) return false;
+
+      if (selectedDate) {
+        const dayMatch = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
+        if (!dayMatch) return false;
+      } else {
+        const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
+        if (!yearMatch) return false;
+
+        if (selectedYear !== 'all') {
+          if (selectedWeek !== 'all') {
+            const weekMatch = getISOWeek(recordDate) === parseInt(selectedWeek, 10);
+            if (!weekMatch) return false;
+          } else {
+            const monthMatch = selectedMonth === 'all' || getMonth(recordDate) === parseInt(selectedMonth, 10);
+            if (!monthMatch) return false;
+          }
+        }
+      }
+
+      const factoryMatch = !selectedFactory || record['Site'] === selectedFactory;
+      if (!factoryMatch) return false;
+
+      return true;
+    });
+
+
+    return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss, filteredPlanejamentoData: filteredPlanData };
+  }, [productionRecords, lossRecords, planejamentoData, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason, selectedOperator]);
 
   useEffect(() => {
     // Let's celebrate the successful deployment!
@@ -458,7 +499,7 @@ export default function RecordsPage() {
       </Card>
        
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <HoursBySiteChart data={planejamentoData} loading={loadingPlanejamento} />
+        <HoursBySiteChart data={filteredPlanejamentoData} loading={loadingPlanejamento} />
         <MachiningTimeByFactoryChart
           data={filteredProductionRecords}
           loading={loadingProduction}
@@ -522,6 +563,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 
