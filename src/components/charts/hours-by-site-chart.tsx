@@ -63,9 +63,9 @@ export function HoursBySiteChart({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Horas de Máquina por Site</CardTitle>
+        <CardTitle>Horas Planejadas de Máquina por Fábrica</CardTitle>
         <CardDescription>
-          Total de horas de máquina planejadas para cada site.
+          Total de horas de máquina planejadas para cada fábrica.
         </CardDescription>
       </CardHeader>
       <CardContent>
