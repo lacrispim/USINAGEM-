@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import {
@@ -19,7 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Loader2, Edit, Trash2, Save, XCircle, CalendarIcon } from 'lucide-react';
+import { PlusCircle, Loader2, Edit, Trash2, Save, XCircle, CalendarIcon, FileSpreadsheet } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import {
   Dialog,
@@ -67,6 +67,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ptBR } from 'date-fns/locale';
+import { useDropzone } from 'react-dropzone';
+import * as XLSX from 'xlsx';
 
 
 interface PlanoSemanal {
@@ -298,11 +300,124 @@ const AddPlanoForm = ({ onFinished }: { onFinished: () => void }) => {
     )
 }
 
+const ImportFromExcelDialog = ({ onFinished }: { onFinished: () => void }) => {
+    const { toast } = useToast();
+    const firestore = useFirestore();
+
+    const handleFileUpload = useCallback(async (file: File) => {
+        if (!firestore) {
+            toast({
+                title: 'Erro de Conexão',
+                description: 'Não foi possível conectar ao banco de dados.',
+                variant: 'destructive'
+            });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+                if (json.length === 0) {
+                    toast({
+                        title: 'Arquivo Vazio',
+                        description: 'A planilha selecionada não contém dados.',
+                        variant: 'destructive'
+                    });
+                    return;
+                }
+
+                const planoCollection = collection(firestore, 'planoSemanal');
+                for (const row of json) {
+                    const planoItem = {
+                        dataExecucao: row['Data Execução'] || row['dataExecucao'] || new Date(),
+                        site: row['Site'] || row['site'] || '',
+                        requisicao: String(row['# Requisição'] || row['requisicao'] || ''),
+                        nomeDaPeca: row['Nome da Peça'] || row['nomeDaPeca'] || '',
+                        quantidade: Number(row['Quantidade'] || row['quantidade'] || 0),
+                        tecnico: row['Técnicos'] || row['tecnico'] || '',
+                        observacao: row['Observação'] || row['observacao'] || '',
+                        equipamento: row['Equipamento'] || row['equipamento'] || '',
+                        createdAt: serverTimestamp(),
+                    };
+                    
+                    if (!planoItem.requisicao && !planoItem.nomeDaPeca) {
+                        continue;
+                    }
+
+                    await addDoc(planoCollection, planoItem);
+                }
+
+                toast({
+                    title: 'Importação Concluída',
+                    description: `${json.length} registros foram importados com sucesso.`,
+                });
+                onFinished();
+
+            } catch (error) {
+                console.error("Error processing Excel file: ", error);
+                toast({
+                    title: 'Erro ao Processar Arquivo',
+                    description: 'Houve um problema ao ler a planilha. Verifique o formato do arquivo e das colunas.',
+                    variant: 'destructive',
+                });
+            }
+        };
+        reader.readAsBinaryString(file);
+    }, [firestore, toast, onFinished]);
+
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop: acceptedFiles => handleFileUpload(acceptedFiles[0]),
+        accept: {
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+            'application/vnd.ms-excel': ['.xls'],
+        },
+        maxFiles: 1,
+    });
+    
+    return (
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Importar Planejamento</DialogTitle>
+                <DialogDescription>
+                    Arraste ou selecione um arquivo Excel (.xlsx) para importar os dados para o plano de produção.
+                </DialogDescription>
+            </DialogHeader>
+            <div
+                {...getRootProps()}
+                className={cn(
+                    "flex flex-col items-center justify-center p-10 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary",
+                    isDragActive && "border-primary bg-primary/10"
+                )}
+            >
+                <input {...getInputProps()} />
+                <FileSpreadsheet className="h-12 w-12 text-muted-foreground" />
+                {isDragActive ? (
+                    <p className="mt-2 text-sm">Solte o arquivo aqui...</p>
+                ) : (
+                    <p className="mt-2 text-sm text-center">Arraste a planilha aqui ou clique para selecionar</p>
+                )}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">
+                <p className="font-semibold">Colunas esperadas:</p>
+                <p>Data Execução, Site, # Requisição, Nome da Peça, Quantidade, Técnicos, Observação, Equipamento</p>
+            </div>
+        </DialogContent>
+    )
+}
+
 
 export default function ProgrammingPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingPlanoId, setEditingPlanoId] = useState<string | null>(null);
   const [editedPlano, setEditedPlano] = useState<any | null>(null);
 
@@ -427,23 +542,34 @@ export default function ProgrammingPage() {
             Visualize e gerencie o planejamento de produção.
             </p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Adicionar Item
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                    <DialogTitle>Adicionar Item ao Plano</DialogTitle>
-                    <DialogDescription>
-                        Preencha os detalhes da nova tarefa de produção.
-                    </DialogDescription>
-                </DialogHeader>
-                <AddPlanoForm onFinished={() => setIsAddDialogOpen(false)} />
-            </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+            <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button variant="outline">
+                        <FileSpreadsheet className="mr-2 h-4 w-4" />
+                        Importar de Excel
+                    </Button>
+                </DialogTrigger>
+                <ImportFromExcelDialog onFinished={() => setIsImportDialogOpen(false)} />
+            </Dialog>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Adicionar Item
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Adicionar Item ao Plano</DialogTitle>
+                        <DialogDescription>
+                            Preencha os detalhes da nova tarefa de produção.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <AddPlanoForm onFinished={() => setIsAddDialogOpen(false)} />
+                </DialogContent>
+            </Dialog>
+        </div>
 
       </div>
       <Card>
