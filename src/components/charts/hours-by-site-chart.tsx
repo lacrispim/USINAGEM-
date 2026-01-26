@@ -55,7 +55,7 @@ export function HoursBySiteChart({
 
       if (site && hours > 0 && techsString) {
         // Split by comma and trim whitespace
-        const techList = techsString.split(',').map((t: string) => t.trim()).filter(Boolean);
+        const techList = String(techsString).split(',').map((t: string) => t.trim()).filter(Boolean);
         
         if (techList.length > 0) {
             // Divide hours equally among technicians for a given record
