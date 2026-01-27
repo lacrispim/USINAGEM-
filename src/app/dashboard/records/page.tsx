@@ -123,15 +123,21 @@ export default function RecordsPage() {
   const { data: lossRecords, loading: loadingLoss } =
     useCollection(lossRecordsQuery);
     
-  const { availableYears, availableWeeks, filteredProductionRecords, filteredLossRecords, filteredPlanejamentoData } = useMemo(() => {
+  const { availableYears, availableWeeks, filteredProductionRecords, filteredLossRecords, filteredPlanejamentoData, performanceProductionRecords, performanceLossRecords } = useMemo(() => {
     if (!productionRecords || !lossRecords || !planejamentoData) {
-        return { availableYears: [], availableWeeks: [], filteredProductionRecords: [], filteredLossRecords: [], filteredPlanejamentoData: [] };
+        return { 
+          availableYears: [], 
+          availableWeeks: [], 
+          filteredProductionRecords: [], 
+          filteredLossRecords: [], 
+          filteredPlanejamentoData: [],
+          performanceProductionRecords: [],
+          performanceLossRecords: []
+        };
     }
 
     const recordYears = new Set<number>();
-    const allRecords = [...productionRecords, ...lossRecords];
-
-    allRecords.forEach((record) => {
+    [...productionRecords, ...lossRecords].forEach((record) => {
         if (record.date?.toDate) {
             const year = getYear(record.date.toDate());
             if (year > 2000 && year < 3000) {
@@ -141,95 +147,89 @@ export default function RecordsPage() {
     });
 
     const sortedYears = Array.from(recordYears).sort((a, b) => b - a);
-    const year = selectedYear === 'all' ? null : parseInt(selectedYear, 10);
-    
     let weeks: number[] = [];
-    if (year) {
-      weeks = Array.from({ length: 53 }, (_, i) => i + 1); // Up to 53 weeks
+    if (selectedYear !== 'all') {
+      weeks = Array.from({ length: 53 }, (_, i) => i + 1);
     }
 
-    const filterRecords = (records: any[]) => {
-      return records.filter((record) => {
-          if (!record.date?.toDate) return false;
-          const recordDate = record.date.toDate();
-
-          const operatorMatch = !selectedOperator || record.operatorId === selectedOperator;
-          if (!operatorMatch) return false;
-          
-          if (selectedDate) {
-              const dayMatch = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
-              if (!dayMatch) return false;
-          } else {
-            const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
-            if (!yearMatch) return false;
-            
-            if (selectedYear !== 'all') {
-                if (selectedWeek !== 'all') {
-                    const weekMatch = getISOWeek(recordDate) === parseInt(selectedWeek, 10);
-                    if (!weekMatch) return false;
-                } else {
-                    const monthMatch = selectedMonth === 'all' || getMonth(recordDate) === parseInt(selectedMonth, 10);
-                    if (!monthMatch) return false;
-                }
-            }
+    // A generic filter function for any record with a date
+    const dateFilter = (recordDate: Date) => {
+      if (selectedDate) {
+        return recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
+      }
+      
+      const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
+      if (!yearMatch) return false;
+      
+      if (selectedYear !== 'all') {
+          if (selectedWeek !== 'all') {
+              return getISOWeek(recordDate) === parseInt(selectedWeek, 10);
           }
-
-          const factoryMatch = !selectedFactory || record.factory === selectedFactory;
-          if (!factoryMatch) return false;
-
-          return true;
-      });
+          if (selectedMonth !== 'all') {
+              return getMonth(recordDate) === parseInt(selectedMonth, 10);
+          }
+      }
+      return true;
     }
 
-    const filteredProd = filterRecords(productionRecords);
-    const filteredLoss = filterRecords(lossRecords).filter(record => {
-        const reasonMatch = !selectedReason || record.lossReason === selectedReason;
-        return reasonMatch;
+    // Filter Firestore records (production/loss)
+    const baseFilterFirestore = (record: any) => {
+        if (!record.date?.toDate) return false;
+        const recordDate = record.date.toDate();
+        if (!dateFilter(recordDate)) return false;
+
+        const factoryMatch = !selectedFactory || record.factory === selectedFactory;
+        if (!factoryMatch) return false;
+
+        return true;
+    };
+    
+    // Unfiltered by operator for performance chart
+    const perfProdRecords = productionRecords.filter(baseFilterFirestore);
+    const perfLossRecords = lossRecords.filter(baseFilterFirestore);
+
+    // Filtered by operator for other charts
+    const operatorFilterFirestore = (record: any) => !selectedOperator || record.operatorId === selectedOperator;
+    const filteredProd = perfProdRecords.filter(operatorFilterFirestore);
+    const filteredLoss = perfLossRecords.filter(operatorFilterFirestore).filter(record => {
+      const reasonMatch = !selectedReason || record.lossReason === selectedReason;
+      return reasonMatch;
     });
 
-    const filteredPlanData = planejamentoData.filter((record) => {
+    // Filter Realtime DB records (planning)
+    const planningFilter = (record: any) => {
       if (!record['Data Execução']) return false;
-
       let recordDate;
       try {
         recordDate = parse(record['Data Execução'], 'dd/MM/yyyy', new Date());
         if (isNaN(recordDate.getTime())) {
           recordDate = new Date(record['Data Execução']);
-          if (isNaN(recordDate.getTime())) return false;
         }
-      } catch (e) {
-        return false;
-      }
-
-      const operatorMatch = !selectedOperator || (record['Técnicos'] && String(record['Técnicos']).includes(selectedOperator));
-      if (!operatorMatch) return false;
-
-      if (selectedDate) {
-        const dayMatch = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
-        if (!dayMatch) return false;
-      } else {
-        const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
-        if (!yearMatch) return false;
-
-        if (selectedYear !== 'all') {
-          if (selectedWeek !== 'all') {
-            const weekMatch = getISOWeek(recordDate) === parseInt(selectedWeek, 10);
-            if (!weekMatch) return false;
-          } else {
-            const monthMatch = selectedMonth === 'all' || getMonth(recordDate) === parseInt(selectedMonth, 10);
-            if (!monthMatch) return false;
-          }
-        }
-      }
+        if (isNaN(recordDate.getTime())) return false;
+      } catch { return false; }
+      
+      if (!dateFilter(recordDate)) return false;
 
       const factoryMatch = !selectedFactory || record['Site'] === selectedFactory;
       if (!factoryMatch) return false;
+      
+      const operatorMatch = !selectedOperator || (record['Técnicos'] && String(record['Técnicos']).includes(selectedOperator));
+      if (!operatorMatch) return false;
 
       return true;
-    });
+    };
 
+    const filteredPlanData = planejamentoData.filter(planningFilter);
 
-    return { availableYears: sortedYears, availableWeeks: weeks, filteredProductionRecords: filteredProd, filteredLossRecords: filteredLoss, filteredPlanejamentoData: filteredPlanData };
+    return { 
+        availableYears: sortedYears, 
+        availableWeeks: weeks, 
+        filteredProductionRecords: filteredProd, 
+        filteredLossRecords: filteredLoss, 
+        filteredPlanejamentoData: filteredPlanData,
+        performanceProductionRecords: perfProdRecords,
+        performanceLossRecords: perfLossRecords,
+    };
   }, [productionRecords, lossRecords, planejamentoData, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason, selectedOperator]);
 
   useEffect(() => {
@@ -489,8 +489,8 @@ export default function RecordsPage() {
         </CardHeader>
         <CardContent>
           <OperatorPerformanceChart 
-            productionData={filteredProductionRecords}
-            lossData={filteredLossRecords}
+            productionData={performanceProductionRecords}
+            lossData={performanceLossRecords}
             loading={isLoading}
             selectedOperator={selectedOperator}
             onOperatorSelect={handleOperatorSelect}
@@ -563,6 +563,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 
