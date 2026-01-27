@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useDatabase } from '@/firebase';
 import { ref, onValue } from 'firebase/database';
 import {
@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Loader } from 'lucide-react';
+import { CalendarIcon, Loader, X } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -19,8 +19,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { format, parse } from 'date-fns';
+import { format, parse, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 interface PlanejamentoItem {
   id: string;
@@ -42,6 +47,7 @@ export default function ProgrammingPage() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     if (!database) {
@@ -81,6 +87,35 @@ export default function ProgrammingPage() {
     // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [database]);
+  
+  const filteredData = useMemo(() => {
+    if (!planejamentoData) return [];
+    if (!selectedDate) {
+      return planejamentoData;
+    }
+    
+    return planejamentoData.filter(item => {
+      const dateString = item['Data Execução'];
+      if (!dateString) return false;
+
+      let recordDate;
+      try {
+        recordDate = parse(dateString, 'dd/MM/yyyy', new Date());
+        if (isNaN(recordDate.getTime())) {
+          recordDate = new Date(dateString);
+        }
+      } catch (e) {
+        return false;
+      }
+
+      if (isNaN(recordDate.getTime())) {
+        return false;
+      }
+
+      return recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
+    });
+  }, [planejamentoData, selectedDate]);
+
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
@@ -113,6 +148,40 @@ export default function ProgrammingPage() {
         </p>
       </div>
 
+       <div className="flex flex-col sm:flex-row justify-start gap-4">
+        <div className="grid w-full sm:max-w-xs gap-1.5 relative">
+          <Label htmlFor="date-filter">Filtrar por Data</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="date-filter"
+                variant={"outline"}
+                className={cn(
+                  "justify-start text-left font-normal",
+                  !selectedDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione uma data</span>}
+              </Button>
+            </PopoverTrigger>
+            {selectedDate && (
+              <Button variant="ghost" size="icon" className="absolute right-0 top-6 h-8 w-8" onClick={() => setSelectedDate(undefined)}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Planejamento de Produção</CardTitle>
@@ -134,7 +203,7 @@ export default function ProgrammingPage() {
           )}
           {!loading &&
             !error &&
-            (planejamentoData.length > 0 ? (
+            (filteredData.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -150,7 +219,7 @@ export default function ProgrammingPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {planejamentoData.map((item) => (
+                  {filteredData.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{formatDate(item['Data Execução'])}</TableCell>
                       <TableCell>{item['Site'] ?? 'N/A'}</TableCell>
@@ -166,8 +235,8 @@ export default function ProgrammingPage() {
                 </TableBody>
               </Table>
             ) : (
-              <p className="flex h-64 items-center justify-center text-center text-muted-foreground">
-                Nenhum dado encontrado no nó "Planejamento S".
+               <p className="flex h-64 items-center justify-center text-center text-muted-foreground">
+                {selectedDate ? "Nenhum dado encontrado para a data selecionada." : 'Nenhum dado encontrado no nó "Planejamento S".'}
               </p>
             ))}
         </CardContent>
