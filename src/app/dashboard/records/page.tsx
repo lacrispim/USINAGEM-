@@ -213,8 +213,11 @@ export default function RecordsPage() {
       const factoryMatch = !selectedFactory || record['Site'] === selectedFactory;
       if (!factoryMatch) return false;
       
-      const operatorMatch = !selectedOperator || (record['Técnicos'] && String(record['Técnicos']).includes(selectedOperator));
-      if (!operatorMatch) return false;
+      if (selectedOperator) {
+        const techsInRecord = record['Técnicos'] ? String(record['Técnicos']).split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+        const match = techsInRecord.some((tech: string) => selectedOperator.includes(tech));
+        if (!match) return false;
+      }
 
       return true;
     };
@@ -563,6 +566,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 
