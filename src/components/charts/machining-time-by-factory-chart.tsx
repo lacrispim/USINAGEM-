@@ -18,6 +18,7 @@ import { Loader } from 'lucide-react';
 interface MachiningTimeByFactoryChartProps {
   productionData: any[];
   setupData: any[];
+  ddsData: any[];
   loading: boolean;
 }
 
@@ -29,12 +30,13 @@ const OPERATOR_COLORS: { [key: string]: string } = {
   'Outro': 'hsl(var(--chart-5))',
 };
 
-const SETUP_COLOR = 'hsl(36 94% 57%)'; // Orange
+const PROGRAMMED_LOSS_COLOR = 'hsl(36 94% 57%)'; // Orange
 
 
 export function MachiningTimeByFactoryChart({
   productionData,
   setupData,
+  ddsData,
   loading,
 }: MachiningTimeByFactoryChartProps) {
   const { chartData, series } = useMemo(() => {
@@ -74,10 +76,30 @@ export function MachiningTimeByFactoryChart({
         seriesSet.add(seriesName);
       }
     });
+
+    (ddsData || []).forEach(record => {
+        const factory = record.factory;
+        const hours = (Number(record.timeLost) || 0) / 60;
+        const seriesName = 'DDS/DDSHE';
+  
+        if (factory && hours > 0) {
+          if (!factoryData[factory]) {
+            factoryData[factory] = {};
+          }
+          if (!factoryData[factory][seriesName]) {
+            factoryData[factory][seriesName] = 0;
+          }
+          factoryData[factory][seriesName] += hours;
+          seriesSet.add(seriesName);
+        }
+      });
     
     const sortedSeries = Array.from(seriesSet).sort((a, b) => {
-        if (a === 'SETUP') return 1;
-        if (b === 'SETUP') return -1;
+        const isAProgrammed = a === 'SETUP' || a === 'DDS/DDSHE';
+        const isBProgrammed = b === 'SETUP' || b === 'DDS/DDSHE';
+        if (isAProgrammed && !isBProgrammed) return 1;
+        if (!isAProgrammed && isBProgrammed) return -1;
+        if (isAProgrammed && isBProgrammed) return a.localeCompare(b);
         return a.localeCompare(b);
     });
 
@@ -94,11 +116,13 @@ export function MachiningTimeByFactoryChart({
     }).sort((a, b) => b.total - a.total);
 
     return { chartData: result, series: sortedSeries };
-  }, [productionData, setupData]);
+  }, [productionData, setupData, ddsData]);
 
   const chartConfig = series.reduce((acc, s) => {
     if (s === 'SETUP') {
-        acc[s] = { label: 'SETUP', color: SETUP_COLOR };
+        acc[s] = { label: 'SETUP', color: PROGRAMMED_LOSS_COLOR };
+    } else if (s === 'DDS/DDSHE') {
+        acc[s] = { label: 'DDS/DDSHE', color: PROGRAMMED_LOSS_COLOR };
     } else {
         acc[s] = {
             label: s,

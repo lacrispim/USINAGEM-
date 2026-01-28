@@ -123,7 +123,17 @@ export default function RecordsPage() {
   const { data: lossRecords, loading: loadingLoss } =
     useCollection(lossRecordsQuery);
     
-  const { availableYears, availableWeeks, filteredProductionRecords, filteredLossRecords, filteredPlanejamentoData, performanceProductionRecords, performanceLossRecords } = useMemo(() => {
+  const {
+    availableYears,
+    availableWeeks,
+    filteredProductionRecords,
+    filteredLossRecords,
+    filteredPlanejamentoData,
+    performanceProductionRecords,
+    performanceLossRecords,
+    setupDataForChart,
+    ddsDataForChart,
+  } = useMemo(() => {
     if (!productionRecords || !lossRecords || !planejamentoData) {
         return { 
           availableYears: [], 
@@ -132,7 +142,9 @@ export default function RecordsPage() {
           filteredLossRecords: [], 
           filteredPlanejamentoData: [],
           performanceProductionRecords: [],
-          performanceLossRecords: []
+          performanceLossRecords: [],
+          setupDataForChart: [],
+          ddsDataForChart: [],
         };
     }
 
@@ -189,12 +201,31 @@ export default function RecordsPage() {
     const perfLossRecords = lossRecords.filter(baseFilterFirestore);
 
     // Filtered by operator for other charts
-    const operatorFilterFirestore = (record: any) => !selectedOperator || record.operatorId === selectedOperator;
+    const operatorFilterFirestore = (record: any) => {
+        if (!selectedOperator) return true;
+        const recordOp = record.operatorId || record['Técnicos'];
+        if (!recordOp) return false;
+
+        // Handles both direct match and partial match (e.g., "William" in "William Martinucci")
+        return String(recordOp).includes(selectedOperator) || selectedOperator.includes(String(recordOp));
+    };
+
     const filteredProd = perfProdRecords.filter(operatorFilterFirestore);
+    
     const filteredLoss = perfLossRecords.filter(operatorFilterFirestore).filter(record => {
       const reasonMatch = !selectedReason || record.lossReason === selectedReason;
       return reasonMatch;
     });
+    
+    // Data for MachiningTimeByFactoryChart
+    const setupData = perfLossRecords
+      .filter(operatorFilterFirestore)
+      .filter(record => record.lossReason?.toUpperCase().includes('SETUP'));
+      
+    const ddsData = perfLossRecords
+      .filter(operatorFilterFirestore)
+      .filter(record => record.lossReason?.toUpperCase() === 'DDS' || record.lossReason?.toUpperCase() === 'DDSHE');
+
 
     // Filter Realtime DB records (planning)
     const planningFilter = (record: any) => {
@@ -213,13 +244,7 @@ export default function RecordsPage() {
       const factoryMatch = !selectedFactory || record['Site'] === selectedFactory;
       if (!factoryMatch) return false;
       
-      if (selectedOperator) {
-        const techsInRecord = record['Técnicos'] ? String(record['Técnicos']).split(',').map((t: string) => t.trim()).filter(Boolean) : [];
-        const match = techsInRecord.some((tech: string) => selectedOperator.includes(tech));
-        if (!match) return false;
-      }
-
-      return true;
+      return operatorFilterFirestore(record);
     };
 
     const filteredPlanData = planejamentoData.filter(planningFilter);
@@ -232,15 +257,10 @@ export default function RecordsPage() {
         filteredPlanejamentoData: filteredPlanData,
         performanceProductionRecords: perfProdRecords,
         performanceLossRecords: perfLossRecords,
+        setupDataForChart: setupData,
+        ddsDataForChart: ddsData,
     };
   }, [productionRecords, lossRecords, planejamentoData, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason, selectedOperator]);
-
-  const setupLossRecords = useMemo(() => {
-    if (!filteredLossRecords) return [];
-    return filteredLossRecords.filter(
-        (record) => record.lossReason?.toUpperCase().includes('SETUP')
-    );
-  }, [filteredLossRecords]);
 
   useEffect(() => {
     // Let's celebrate the successful deployment!
@@ -512,7 +532,8 @@ export default function RecordsPage() {
         <HoursBySiteChart data={filteredPlanejamentoData} loading={loadingPlanejamento} />
         <MachiningTimeByFactoryChart
           productionData={filteredProductionRecords}
-          setupData={setupLossRecords}
+          setupData={setupDataForChart}
+          ddsData={ddsDataForChart}
           loading={loadingProduction || loadingLoss}
         />
       </div>
@@ -574,6 +595,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 
