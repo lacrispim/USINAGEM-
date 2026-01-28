@@ -612,8 +612,8 @@ export default function RecordsPage() {
       <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
       
       <OeeLossWaterfallChart 
-        productionData={performanceProductionRecords}
-        lossData={performanceLossRecords}
+        productionData={filteredProductionRecords}
+        lossData={filteredLossRecords}
         loading={isLoading}
       />
        
@@ -678,3 +678,4 @@ export default function RecordsPage() {
     
 
     
+
