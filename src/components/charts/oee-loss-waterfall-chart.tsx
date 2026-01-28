@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
   LabelList,
+  Cell,
 } from 'recharts';
 import {
   Card,
@@ -31,7 +32,7 @@ interface OeeLossWaterfallChartProps {
 
 const chartConfig = {
   value: {
-    label: 'Horas Perdidas',
+    label: 'Horas',
   },
 };
 
@@ -41,20 +42,20 @@ export function OeeLossWaterfallChart({
   loading,
 }: OeeLossWaterfallChartProps) {
 
-  const { chartData, totalMachiningHours, totalLostHours } = useMemo(() => {
+  const { chartData, totalMachiningHours, totalLostHours, totalWorkedHours } = useMemo(() => {
     if (!productionData || !lossData) {
-      return { chartData: [], totalMachiningHours: 0, totalLostHours: 0 };
+      return { chartData: [], totalMachiningHours: 0, totalLostHours: 0, totalWorkedHours: 0 };
     }
 
-    const totalMachiningTime = productionData.reduce( // in minutes
+    const totalMachiningTime = productionData.reduce(
       (sum, record) => sum + (Number(record.machiningTime) || 0),
       0
     );
 
-    const lossByReason = lossData.reduce((acc, record) => { // in minutes
+    const lossByReason = lossData.reduce((acc, record) => {
       if (record.lossReason && record.timeLost) {
-        let reason = record.lossReason;
-        if (reason.toUpperCase().includes('SETUP')) {
+        let reason = record.lossReason.toUpperCase();
+        if (reason.includes('SETUP')) {
           reason = 'SETUP';
         }
         if (!acc[reason]) {
@@ -65,11 +66,6 @@ export function OeeLossWaterfallChart({
       return acc;
     }, {} as Record<string, number>);
 
-    const totalLostTime = Object.values(lossByReason).reduce( // in minutes
-      (sum, time) => sum + time,
-      0
-    );
-    
     const sortedLosses = Object.entries(lossByReason)
       .map(([name, time]) => ({
         name,
@@ -77,21 +73,41 @@ export function OeeLossWaterfallChart({
       }))
       .sort((a, b) => b.lossHours - a.lossHours);
 
-    let cumulative = 0;
-    const waterfallData = sortedLosses.map(loss => {
-      const item = {
+    const totalMachiningHours = totalMachiningTime / 60;
+    const totalLostHours = sortedLosses.reduce((sum, loss) => sum + loss.lossHours, 0);
+
+    const waterfallData: {name: string, start: number, value: number, fill: string}[] = [];
+    
+    // Productive time bar
+    waterfallData.push({
+      name: 'Usinagem Efetiva',
+      start: 0,
+      value: totalMachiningHours,
+      fill: 'hsl(142 71% 45%)' // green
+    });
+
+    let cumulative = totalMachiningHours;
+
+    // Loss bars
+    sortedLosses.forEach(loss => {
+      waterfallData.push({
         name: loss.name,
         start: cumulative,
         value: loss.lossHours,
-      };
+        fill: 'hsl(48 96% 51%)' // yellow
+      });
       cumulative += loss.lossHours;
-      return item;
     });
-    
-    const currentTotalMachiningHours = totalMachiningTime / 60;
-    const currentTotalLostHours = totalLostTime / 60;
 
-    return { chartData: waterfallData, totalMachiningHours: currentTotalMachiningHours, totalLostHours: currentTotalLostHours };
+    // Total worked hours bar
+    waterfallData.push({
+      name: 'Horas Trabalhadas',
+      start: 0,
+      value: cumulative,
+      fill: 'hsl(217 32.6% 77.5%)'
+    });
+
+    return { chartData: waterfallData, totalMachiningHours, totalLostHours, totalWorkedHours: cumulative };
 
   }, [productionData, lossData]);
 
@@ -116,7 +132,7 @@ export function OeeLossWaterfallChart({
     return null;
   };
 
-  const maxHours = totalLostHours > 0 ? Math.ceil(totalLostHours / 5) * 5 + 5 : 10;
+  const maxHours = totalWorkedHours > 0 ? Math.ceil(totalWorkedHours / 5) * 5 + 5 : 10;
 
   return (
     <Card>
@@ -171,13 +187,16 @@ export function OeeLossWaterfallChart({
                   />
                   
                   <Bar dataKey="start" stackId="a" fill="transparent" />
-                  <Bar dataKey="value" stackId="a" fill="hsl(48 96% 51%)">
+                  <Bar dataKey="value" stackId="a">
                     <LabelList 
                         dataKey="value" 
                         position="top"
                         formatter={(value: number) => value > 0.1 ? `${value.toFixed(1)}h` : ''}
                         className="text-xs fill-muted-foreground"
                     />
+                     {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
                   </Bar>
                 </BarChart>
               </ChartContainer>
