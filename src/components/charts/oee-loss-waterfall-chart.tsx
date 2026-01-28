@@ -9,7 +9,6 @@ import {
   XAxis,
   YAxis,
   LabelList,
-  Cell,
 } from 'recharts';
 import {
   Card,
@@ -34,9 +33,6 @@ const chartConfig = {
   value: {
     label: 'Horas Perdidas',
   },
-  total: {
-    label: 'Total de Horas Perdidas',
-  }
 };
 
 export function OeeLossWaterfallChart({
@@ -88,16 +84,9 @@ export function OeeLossWaterfallChart({
       cumulative += loss.lossHours;
       return item;
     });
-
-    const currentTotalLostHours = totalLostTime / 60;
-
-    waterfallData.push({
-      name: 'Total de Perdas Apontadas',
-      start: 0,
-      value: currentTotalLostHours,
-    });
     
     const currentTotalMachiningHours = totalMachiningTime / 60;
+    const currentTotalLostHours = totalLostTime / 60;
 
     return { chartData: waterfallData, totalMachiningHours: currentTotalMachiningHours, totalLostHours: currentTotalLostHours };
 
@@ -131,7 +120,7 @@ export function OeeLossWaterfallChart({
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
-                <CardTitle>Análise de Eficiência e Perdas (OEE)</CardTitle>
+                <CardTitle>Análise de Perdas (OEE)</CardTitle>
                 <CardDescription>Análise em cascata do tempo produtivo versus os diversos motivos de perda.</CardDescription>
             </div>
             <div className="text-right">
@@ -147,7 +136,7 @@ export function OeeLossWaterfallChart({
           <div className="flex h-[350px] w-full items-center justify-center">
             <Loader className="h-8 w-8 animate-spin" />
           </div>
-        ) : chartData.length > 1 ? ( // more than just Total
+        ) : chartData.length > 0 ? (
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig}>
@@ -179,16 +168,13 @@ export function OeeLossWaterfallChart({
                   />
                   
                   <Bar dataKey="start" stackId="a" fill="transparent" />
-                  <Bar dataKey="value" stackId="a" >
+                  <Bar dataKey="value" stackId="a" fill="hsl(48 96% 51%)">
                     <LabelList 
                         dataKey="value" 
                         position="top"
                         formatter={(value: number) => value > 0.1 ? `${value.toFixed(1)}h` : ''}
                         className="text-xs fill-muted-foreground"
                     />
-                     {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.name === 'Total de Perdas Apontadas' ? 'hsl(var(--destructive))' : 'hsl(48 96% 51%)'} />
-                    ))}
                   </Bar>
                 </BarChart>
               </ChartContainer>
