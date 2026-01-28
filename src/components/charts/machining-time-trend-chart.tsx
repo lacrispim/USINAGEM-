@@ -26,6 +26,8 @@ interface MachiningTimeTrendChartProps {
     machiningTime?: number;
     date?: { toDate: () => Date };
   }[];
+  setupData: any[];
+  ddsData: any[];
   loading: boolean;
   isWeekView?: boolean;
   isDayView?: boolean;
@@ -47,16 +49,18 @@ const FACTORY_COLORS: { [key: string]: string } = {
 
 export function MachiningTimeTrendChart({
   data,
+  setupData,
+  ddsData,
   loading,
   isWeekView,
   isDayView,
 }: MachiningTimeTrendChartProps) {
-  const { chartData, factories } = useMemo(() => {
-    if (!data) {
-      return { chartData: [], factories: [] };
+  const { chartData, factories, allKeys } = useMemo(() => {
+    if (!data || !setupData || !ddsData) {
+      return { chartData: [], factories: [], allKeys: [] };
     }
 
-    const dailyData: { [date: string]: { [factory: string]: number } } = {};
+    const dailyData: { [date: string]: { [key: string]: number } } = {};
     const factorySet = new Set<string>();
 
     data.forEach((record) => {
@@ -64,35 +68,65 @@ export function MachiningTimeTrendChart({
         const dateObj = record.date.toDate();
         const dateStr = format(dateObj, 'yyyy-MM-dd');
         const factory = record.factory;
-        const timeInHours = (record.machiningTime || 0) / 60; // Convert to hours
+        const timeInHours = (record.machiningTime || 0) / 60;
 
-        if (!dailyData[dateStr]) {
-          dailyData[dateStr] = {};
-        }
-        if (!dailyData[dateStr][factory]) {
-          dailyData[dateStr][factory] = 0;
-        }
-        dailyData[dateStr][factory] += timeInHours;
+        const key = factory;
+        if (!dailyData[dateStr]) dailyData[dateStr] = {};
+        if (!dailyData[dateStr][key]) dailyData[dateStr][key] = 0;
+        dailyData[dateStr][key] += timeInHours;
         factorySet.add(factory);
       }
     });
 
-    const sortedFactories = Array.from(factorySet).sort();
+    const processLossData = (lossData: any[], lossType: 'Setup' | 'DDS') => {
+        lossData.forEach((record) => {
+            if (record.factory && record.date && record.date.toDate) {
+                const dateObj = record.date.toDate();
+                const dateStr = format(dateObj, 'yyyy-MM-dd');
+                const factory = record.factory;
+                const timeInHours = (record.timeLost || 0) / 60;
 
-    const chartData = Object.entries(dailyData)
+                const key = `${factory} ${lossType}`;
+                 if (!dailyData[dateStr]) dailyData[dateStr] = {};
+                if (!dailyData[dateStr][key]) dailyData[dateStr][key] = 0;
+                dailyData[dateStr][key] += timeInHours;
+            }
+        });
+    }
+
+    processLossData(setupData, 'Setup');
+    processLossData(ddsData, 'DDS');
+
+    const sortedFactories = Array.from(factorySet).sort();
+    
+    const allPossibleKeys = [
+        ...sortedFactories,
+        ...sortedFactories.map(f => `${f} Setup`),
+        ...sortedFactories.map(f => `${f} DDS`)
+    ];
+
+    const chartDataResult = Object.entries(dailyData)
       .map(([date, factoryTimes]) => ({
         date,
         ...factoryTimes,
       }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    return { chartData, factories: sortedFactories };
-  }, [data]);
+    return { chartData: chartDataResult, factories: sortedFactories, allKeys: allPossibleKeys };
+  }, [data, setupData, ddsData]);
   
-  const chartConfig = factories.reduce((acc, factory) => {
-    acc[factory] = {
-      label: factory,
-      color: FACTORY_COLORS[factory] || 'hsl(var(--chart-1))',
+  const chartConfig = allKeys.reduce((acc, key) => {
+    const isSetup = key.includes('Setup');
+    const isDDS = key.includes('DDS');
+    let color;
+    if (isSetup || isDDS) {
+        color = 'hsl(36 94% 57%)'; // orange
+    } else {
+        color = FACTORY_COLORS[key] || 'hsl(var(--chart-1))';
+    }
+    acc[key] = {
+      label: key,
+      color: color,
     };
     return acc;
   }, {} as any);
@@ -140,9 +174,10 @@ export function MachiningTimeTrendChart({
 
   const CustomLegend = (props: any) => {
     const { payload } = props;
+    const filteredPayload = payload.filter((p: any) => factories.includes(p.value));
     return (
-      <div className="flex justify-center gap-4 pt-4">
-        {payload.map((entry: any, index: number) => (
+      <div className="flex justify-center flex-wrap gap-4 pt-4">
+        {filteredPayload.map((entry: any, index: number) => (
           <div key={`item-${index}`} className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: entry.color }} />
             <span className="text-xs text-muted-foreground">{entry.value}</span>
@@ -188,8 +223,24 @@ export function MachiningTimeTrendChart({
                     dataKey={factory}
                     fill={FACTORY_COLORS[factory]}
                     stackId="a"
-                    radius={[4, 4, 0, 0]}
                   />
+                ))}
+                 {factories.map((factory) => (
+                    <Bar
+                        key={`${factory} Setup`}
+                        dataKey={`${factory} Setup`}
+                        fill={'hsl(36 94% 57%)'}
+                        stackId="a"
+                    />
+                ))}
+                 {factories.map((factory) => (
+                    <Bar
+                        key={`${factory} DDS`}
+                        dataKey={`${factory} DDS`}
+                        fill={'hsl(36 94% 57%)'}
+                        stackId="a"
+                        radius={[4, 4, 0, 0]}
+                    />
                 ))}
               </BarChart>
             </ChartContainer>

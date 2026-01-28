@@ -16,7 +16,14 @@ import {
 import { Loader } from 'lucide-react';
 
 interface PlannedVsMachinedChartProps {
-  data: { name: string; planejado: number; usinado: number }[];
+  data: { 
+    name: string; 
+    planejado: number; 
+    usinado: number;
+    usinagem: number;
+    setup: number;
+    dds: number;
+  }[];
   loading: boolean;
 }
 
@@ -29,6 +36,18 @@ const chartConfig = {
     label: 'Usinado',
     color: 'hsl(var(--chart-1))',
   },
+  usinagem: {
+    label: 'Usinagem',
+    color: 'hsl(var(--chart-1))',
+  },
+  setup: {
+    label: 'Setup',
+    color: 'hsl(36 94% 57%)',
+  },
+  dds: {
+    label: 'DDS/DDSHE',
+    color: 'hsl(36 94% 57%)',
+  },
 };
 
 export function PlannedVsMachinedChart({
@@ -38,9 +57,13 @@ export function PlannedVsMachinedChart({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const planned = payload.find((p: any) => p.dataKey === 'planejado')?.value || 0;
-      const machined = payload.find((p: any) => p.dataKey === 'usinado')?.value || 0;
-      const difference = machined - planned;
-      const performance = planned > 0 ? (machined / planned) * 100 : 0;
+      const usinagem = payload.find((p: any) => p.dataKey === 'usinagem')?.value || 0;
+      const setup = payload.find((p: any) => p.dataKey === 'setup')?.value || 0;
+      const dds = payload.find((p: any) => p.dataKey === 'dds')?.value || 0;
+
+      const machinedTotal = usinagem + setup + dds;
+      const difference = machinedTotal - planned;
+      const performance = planned > 0 ? (machinedTotal / planned) * 100 : 0;
 
       return (
         <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[15rem]">
@@ -58,13 +81,39 @@ export function PlannedVsMachinedChart({
                 <span className="font-bold">{planned.toFixed(1)}h</span>
               </div>
             </div>
+
             <div className="flex items-center gap-2">
-              <div className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: chartConfig.usinado.color }} />
-              <div className="flex justify-between flex-1">
-                <span className="text-muted-foreground">Usinado</span>
-                <span className="font-bold">{machined.toFixed(1)}h</span>
-              </div>
+                <div className="h-2.5 w-2.5 rounded-[2px] bg-transparent" />
+                <div className="flex justify-between flex-1">
+                    <span className="text-muted-foreground">Usinado (Total)</span>
+                    <span className="font-bold">{machinedTotal.toFixed(1)}h</span>
+                </div>
             </div>
+
+            <div className="pl-5 flex flex-col gap-1">
+                 {usinagem > 0 && <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: chartConfig.usinagem.color }} />
+                    <div className="flex justify-between flex-1">
+                        <span className="text-muted-foreground text-xs">Usinagem</span>
+                        <span className="font-bold text-xs">{usinagem.toFixed(1)}h</span>
+                    </div>
+                </div>}
+                {setup > 0 && <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: chartConfig.setup.color }} />
+                    <div className="flex justify-between flex-1">
+                        <span className="text-muted-foreground text-xs">Setup</span>
+                        <span className="font-bold text-xs">{setup.toFixed(1)}h</span>
+                    </div>
+                </div>}
+                {dds > 0 && <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: chartConfig.dds.color }} />
+                    <div className="flex justify-between flex-1">
+                        <span className="text-muted-foreground text-xs">DDS/DDSHE</span>
+                        <span className="font-bold text-xs">{dds.toFixed(1)}h</span>
+                    </div>
+                </div>}
+            </div>
+            
             <div className="h-px w-full my-1 bg-border" />
             <div className="flex items-center gap-2">
               <div className="h-2.5 w-2.5 rounded-[2px]" />
@@ -130,7 +179,9 @@ export function PlannedVsMachinedChart({
                         formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
                       />
                   </Bar>
-                  <Bar dataKey="usinado" fill={chartConfig.usinado.color} radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="usinagem" stackId="usinado" fill={chartConfig.usinagem.color} />
+                  <Bar dataKey="setup" stackId="usinado" fill={chartConfig.setup.color} />
+                  <Bar dataKey="dds" stackId="usinado" fill={chartConfig.dds.color} radius={[4, 4, 0, 0]}>
                     <LabelList
                         dataKey="usinado"
                         position="top"

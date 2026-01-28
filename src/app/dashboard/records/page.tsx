@@ -204,9 +204,12 @@ export default function RecordsPage() {
         if (!selectedOperator) return true;
         const recordOp = record.operatorId || record['Técnicos'];
         if (!recordOp) return false;
+        
+        const operatorName = String(selectedOperator);
+        const recordOperatorName = String(recordOp);
 
         // Handles both direct match and partial match (e.g., "William" in "William Martinucci")
-        return String(recordOp).includes(selectedOperator) || selectedOperator.includes(String(recordOp));
+        return recordOperatorName.includes(operatorName) || operatorName.includes(recordOperatorName);
     };
 
     const filteredProd = perfProdRecords.filter(operatorFilterFirestore);
@@ -262,42 +265,70 @@ export default function RecordsPage() {
   }, [productionRecords, lossRecords, planejamentoData, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason, selectedOperator]);
 
     const plannedVsMachinedData = useMemo(() => {
-        const dataMap: { [factory: string]: { planejado: number; usinado: number } } = {};
+        const dataMap: { [factory: string]: { planejado: number; usinagem: number; setup: number; dds: number } } = {};
 
         // 1. Aggregate planned hours from filtered Realtime DB data
         filteredPlanejamentoData.forEach(record => {
-        const factory = record['Site'];
-        const hours = Number(record['Horas Máquina']) || 0;
-        if (factory) {
-            if (!dataMap[factory]) {
-            dataMap[factory] = { planejado: 0, usinado: 0 };
-            }
-            dataMap[factory].planejado += hours;
-        }
+          const factory = record['Site'];
+          const hours = Number(record['Horas Máquina']) || 0;
+          if (factory) {
+              if (!dataMap[factory]) {
+                dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0 };
+              }
+              dataMap[factory].planejado += hours;
+          }
         });
-
-        // 2. Combine all "machined" time sources.
-        const allMachinedRecords = [
-            ...filteredProductionRecords.map(r => ({ factory: r.factory, hours: (Number(r.machiningTime) || 0) / 60 })),
-            ...setupDataForChart.map(r => ({ factory: r.factory, hours: (Number(r.timeLost) || 0) / 60 })),
-            ...ddsDataForChart.map(r => ({ factory: r.factory, hours: (Number(r.timeLost) || 0) / 60 })),
-        ];
         
-        allMachinedRecords.forEach(record => {
-            const { factory, hours } = record;
+        // 2. Aggregate production time
+        filteredProductionRecords.forEach(record => {
+            const factory = record.factory;
+            const hours = (Number(record.machiningTime) || 0) / 60;
             if (factory && hours > 0) {
                 if (!dataMap[factory]) {
-                    dataMap[factory] = { planejado: 0, usinado: 0 };
+                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0 };
                 }
-                dataMap[factory].usinado += hours;
+                dataMap[factory].usinagem += hours;
             }
         });
 
-        return Object.keys(dataMap).map(factory => ({
-        name: factory,
-        planejado: dataMap[factory].planejado,
-        usinado: dataMap[factory].usinado,
-        })).sort((a, b) => (b.planejado + b.usinado) - (a.planejado + a.usinado));
+        // 3. Aggregate setup time
+        setupDataForChart.forEach(record => {
+            const factory = record.factory;
+            const hours = (Number(record.timeLost) || 0) / 60;
+            if (factory && hours > 0) {
+                if (!dataMap[factory]) {
+                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0 };
+                }
+                dataMap[factory].setup += hours;
+            }
+        });
+
+        // 4. Aggregate DDS time
+        ddsDataForChart.forEach(record => {
+            const factory = record.factory;
+            const hours = (Number(record.timeLost) || 0) / 60;
+            if (factory && hours > 0) {
+                if (!dataMap[factory]) {
+                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0 };
+                }
+                dataMap[factory].dds += hours;
+            }
+        });
+
+        // 5. Format for chart
+        return Object.keys(dataMap).map(factory => {
+          const usinagem = dataMap[factory].usinagem;
+          const setup = dataMap[factory].setup;
+          const dds = dataMap[factory].dds;
+          return {
+              name: factory,
+              planejado: dataMap[factory].planejado,
+              usinado: usinagem + setup + dds, // Total for the label
+              usinagem: usinagem,
+              setup: setup,
+              dds: dds,
+          }
+      }).sort((a, b) => (b.planejado + b.usinado) - (a.planejado + a.usinado));
 
   }, [filteredPlanejamentoData, filteredProductionRecords, setupDataForChart, ddsDataForChart]);
 
@@ -589,6 +620,8 @@ export default function RecordsPage() {
         <CardContent>
           <MachiningTimeTrendChart
             data={filteredProductionRecords}
+            setupData={setupDataForChart}
+            ddsData={ddsDataForChart}
             loading={loadingProduction}
             isWeekView={selectedWeek !== 'all'}
             isDayView={!!selectedDate}
@@ -627,20 +660,3 @@ export default function RecordsPage() {
     
 
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
