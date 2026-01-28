@@ -267,9 +267,18 @@ export default function RecordsPage() {
     const plannedVsMachinedData = useMemo(() => {
         const dataMap: { [factory: string]: { planejado: number; usinagem: number; setup: number; dds: number } } = {};
 
+        const normalizeFactoryName = (name: string | undefined): string | undefined => {
+            if (!name) return undefined;
+            const upperName = name.toUpperCase().trim();
+            if (upperName === 'AGUAI' || upperName === 'AGUAÍ') {
+                return 'AGUAÍ';
+            }
+            return name;
+        };
+
         // 1. Aggregate planned hours from filtered Realtime DB data
         filteredPlanejamentoData.forEach(record => {
-          const factory = record['Site'];
+          const factory = normalizeFactoryName(record['Site']);
           const hours = Number(record['Horas Máquina']) || 0;
           if (factory) {
               if (!dataMap[factory]) {
@@ -281,7 +290,7 @@ export default function RecordsPage() {
         
         // 2. Aggregate production time
         filteredProductionRecords.forEach(record => {
-            const factory = record.factory;
+            const factory = normalizeFactoryName(record.factory);
             const hours = (Number(record.machiningTime) || 0) / 60;
             if (factory && hours > 0) {
                 if (!dataMap[factory]) {
@@ -293,7 +302,7 @@ export default function RecordsPage() {
 
         // 3. Aggregate setup time
         setupDataForChart.forEach(record => {
-            const factory = record.factory;
+            const factory = normalizeFactoryName(record.factory);
             const hours = (Number(record.timeLost) || 0) / 60;
             if (factory && hours > 0) {
                 if (!dataMap[factory]) {
@@ -305,7 +314,7 @@ export default function RecordsPage() {
 
         // 4. Aggregate DDS time
         ddsDataForChart.forEach(record => {
-            const factory = record.factory;
+            const factory = normalizeFactoryName(record.factory);
             const hours = (Number(record.timeLost) || 0) / 60;
             if (factory && hours > 0) {
                 if (!dataMap[factory]) {
@@ -657,6 +666,8 @@ export default function RecordsPage() {
     </div>
   );
 }
+    
+
     
 
     
