@@ -46,7 +46,7 @@ const chartConfig = {
   },
   dds: {
     label: 'DDS/DDSHE',
-    color: 'hsl(36 94% 57%)',
+    color: 'hsl(48 96% 51%)',
   },
 };
 
