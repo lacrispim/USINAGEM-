@@ -63,16 +63,12 @@ export function PlannedVsMachinedChart({
 
       const machinedTotal = usinagem + setup + dds;
       const difference = machinedTotal - planned;
-      const performance = planned > 0 ? (machinedTotal / planned) * 100 : 0;
 
       return (
         <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[15rem]">
           <div className="grid gap-1.5">
             <div className="flex justify-between items-center mb-2">
               <p className="font-semibold text-lg">{label}</p>
-              <p className={`font-semibold text-lg ${performance >= 100 ? 'text-green-500' : 'text-red-500'}`}>
-                {performance.toFixed(0)}%
-              </p>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: chartConfig.planejado.color }} />
@@ -119,8 +115,8 @@ export function PlannedVsMachinedChart({
               <div className="h-2.5 w-2.5 rounded-[2px]" />
               <div className="flex justify-between flex-1">
                 <span className="text-muted-foreground">Diferença</span>
-                <span className={`font-bold ${difference >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {difference.toFixed(1)}h
+                <span className="font-bold text-sky-400">
+                  {difference > 0 ? '+' : ''}{difference.toFixed(1)}h
                 </span>
               </div>
             </div>
