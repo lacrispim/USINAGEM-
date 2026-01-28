@@ -99,7 +99,7 @@ export function OeeLossWaterfallChart({
     });
 
     waterfallData.push({
-      name: 'Total',
+      name: 'Perda Total',
       start: 0,
       value: totalLossPercentage,
     });
@@ -141,9 +141,9 @@ export function OeeLossWaterfallChart({
             </div>
             <div className="text-right">
                 <p className="text-sm font-bold text-green-500">{oee.toFixed(1)}%</p>
-                <p className="text-xs text-muted-foreground">OEE YTD %</p>
+                <p className="text-xs text-muted-foreground">Usinagem Efetiva</p>
                 <p className="text-sm font-bold text-red-500 mt-1">{totalLoss.toFixed(1)}%</p>
-                <p className="text-xs text-muted-foreground">OEE Loss YTD %</p>
+                <p className="text-xs text-muted-foreground">Perda Total</p>
             </div>
         </div>
       </CardHeader>
@@ -192,7 +192,7 @@ export function OeeLossWaterfallChart({
                         className="text-xs fill-muted-foreground"
                     />
                      {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.name === 'Total' ? 'hsl(var(--destructive))' : 'hsl(48 96% 51%)'} />
+                      <Cell key={`cell-${index}`} fill={entry.name === 'Perda Total' ? 'hsl(var(--destructive))' : 'hsl(48 96% 51%)'} />
                     ))}
                   </Bar>
                 </BarChart>
