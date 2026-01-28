@@ -53,7 +53,10 @@ export function OeeLossWaterfallChart({
 
     const lossByReason = lossData.reduce((acc, record) => { // in minutes
       if (record.lossReason && record.timeLost) {
-        const reason = record.lossReason;
+        let reason = record.lossReason;
+        if (reason.toUpperCase().includes('SETUP')) {
+          reason = 'SETUP';
+        }
         if (!acc[reason]) {
           acc[reason] = 0;
         }
@@ -120,7 +123,7 @@ export function OeeLossWaterfallChart({
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
-                <CardTitle>Análise de Perdas (OEE)</CardTitle>
+                <CardTitle>Análise de Eficiência e Perdas (OEE)</CardTitle>
                 <CardDescription>Análise em cascata do tempo produtivo versus os diversos motivos de perda.</CardDescription>
             </div>
             <div className="text-right">
