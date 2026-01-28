@@ -16,7 +16,8 @@ import {
 import { Loader } from 'lucide-react';
 
 interface MachiningTimeByFactoryChartProps {
-  data: any[];
+  productionData: any[];
+  setupData: any[];
   loading: boolean;
 }
 
@@ -28,20 +29,19 @@ const OPERATOR_COLORS: { [key: string]: string } = {
   'Outro': 'hsl(var(--chart-5))',
 };
 
+const SETUP_COLOR = 'hsl(36 94% 57%)'; // Orange
+
 
 export function MachiningTimeByFactoryChart({
-  data,
+  productionData,
+  setupData,
   loading,
 }: MachiningTimeByFactoryChartProps) {
-  const { chartData, operators } = useMemo(() => {
-    if (!data) {
-      return { chartData: [], operators: [] };
-    }
+  const { chartData, series } = useMemo(() => {
+    const factoryData: { [factory: string]: { [series: string]: number } } = {};
+    const seriesSet = new Set<string>();
 
-    const factoryData: { [factory: string]: { [operator: string]: number } } = {};
-    const operatorSet = new Set<string>();
-
-    data.forEach(record => {
+    (productionData || []).forEach(record => {
       const factory = record.factory;
       const hours = (Number(record.machiningTime) || 0) / 60;
       const operator = record.operatorId;
@@ -54,32 +54,57 @@ export function MachiningTimeByFactoryChart({
             factoryData[factory][operator] = 0;
         }
         factoryData[factory][operator] += hours;
-        operatorSet.add(operator);
+        seriesSet.add(operator);
+      }
+    });
+
+    (setupData || []).forEach(record => {
+      const factory = record.factory;
+      const hours = (Number(record.timeLost) || 0) / 60;
+      const seriesName = 'SETUP';
+
+      if (factory && hours > 0) {
+        if (!factoryData[factory]) {
+          factoryData[factory] = {};
+        }
+        if (!factoryData[factory][seriesName]) {
+          factoryData[factory][seriesName] = 0;
+        }
+        factoryData[factory][seriesName] += hours;
+        seriesSet.add(seriesName);
       }
     });
     
-    const sortedOperators = Array.from(operatorSet).sort();
+    const sortedSeries = Array.from(seriesSet).sort((a, b) => {
+        if (a === 'SETUP') return 1;
+        if (b === 'SETUP') return -1;
+        return a.localeCompare(b);
+    });
 
     const result = Object.keys(factoryData).map(factoryName => {
         const factoryRecord: { [key: string]: any } = { name: factoryName };
         let totalHours = 0;
-        sortedOperators.forEach(op => {
-            const opHours = factoryData[factoryName][op] || 0;
-            factoryRecord[op] = opHours;
-            totalHours += opHours;
+        sortedSeries.forEach(s => {
+            const s_hours = factoryData[factoryName][s] || 0;
+            factoryRecord[s] = s_hours;
+            totalHours += s_hours;
         });
         factoryRecord.total = totalHours;
         return factoryRecord;
     }).sort((a, b) => b.total - a.total);
 
-    return { chartData: result, operators: sortedOperators };
-  }, [data]);
+    return { chartData: result, series: sortedSeries };
+  }, [productionData, setupData]);
 
-  const chartConfig = operators.reduce((acc, operator) => {
-    acc[operator] = {
-      label: operator,
-      color: OPERATOR_COLORS[operator] || OPERATOR_COLORS['Outro'],
-    };
+  const chartConfig = series.reduce((acc, s) => {
+    if (s === 'SETUP') {
+        acc[s] = { label: 'SETUP', color: SETUP_COLOR };
+    } else {
+        acc[s] = {
+            label: s,
+            color: OPERATOR_COLORS[s] || OPERATOR_COLORS['Outro'],
+        };
+    }
     return acc;
   }, {} as any);
   
@@ -133,7 +158,7 @@ export function MachiningTimeByFactoryChart({
       <CardHeader>
         <CardTitle>Horas de Usinagem por Fábrica</CardTitle>
         <CardDescription>
-          Total de horas de usinagem para cada fábrica, com divisão por operador.
+          Total de horas de processo (usinagem e setup) para cada fábrica, com divisão por operador/tipo.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -176,15 +201,15 @@ export function MachiningTimeByFactoryChart({
                         content={<CustomTooltip />}
                     />
                     <Legend content={<CustomLegend />} />
-                    {operators.map((op, index) => (
+                    {series.map((item, index) => (
                         <Bar 
-                            key={op} 
-                            dataKey={op} 
+                            key={item} 
+                            dataKey={item} 
                             stackId="a" 
-                            fill={chartConfig[op].color}
-                            radius={index === operators.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                            fill={chartConfig[item].color}
+                            radius={index === series.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
                         >
-                           {index === operators.length - 1 && (
+                           {index === series.length - 1 && (
                             <LabelList
                                 dataKey="total"
                                 position="right"
@@ -202,7 +227,7 @@ export function MachiningTimeByFactoryChart({
         ) : (
           <div className="flex h-[450px] w-full flex-col items-center justify-center">
             <p className="text-sm text-muted-foreground">
-              Nenhum dado de produção para exibir.
+              Nenhum dado de produção ou setup para exibir.
             </p>
           </div>
         )}

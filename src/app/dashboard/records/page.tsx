@@ -235,6 +235,13 @@ export default function RecordsPage() {
     };
   }, [productionRecords, lossRecords, planejamentoData, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason, selectedOperator]);
 
+  const setupLossRecords = useMemo(() => {
+    if (!filteredLossRecords) return [];
+    return filteredLossRecords.filter(
+        (record) => record.lossReason?.toUpperCase().includes('SETUP')
+    );
+  }, [filteredLossRecords]);
+
   useEffect(() => {
     // Let's celebrate the successful deployment!
     setShowConfetti(true);
@@ -504,8 +511,9 @@ export default function RecordsPage() {
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <HoursBySiteChart data={filteredPlanejamentoData} loading={loadingPlanejamento} />
         <MachiningTimeByFactoryChart
-          data={filteredProductionRecords}
-          loading={loadingProduction}
+          productionData={filteredProductionRecords}
+          setupData={setupLossRecords}
+          loading={loadingProduction || loadingLoss}
         />
       </div>
        
@@ -566,6 +574,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 
