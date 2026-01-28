@@ -12,12 +12,11 @@ import {
 import {
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Loader } from 'lucide-react';
 
 interface LossReasonChartProps {
-  data: { lossReason?: string; timeLost?: number }[];
+  data: { lossReason?: string; timeLost?: number; factory?: string }[];
   loading: boolean;
   selectedReason: string | null;
   onReasonSelect: (reason: string | null) => void;
@@ -46,18 +45,26 @@ export function LossReasonChart({
           }
           const timeInMinutes = Number(record.timeLost) || 0;
           if (!acc[reason]) {
-            acc[reason] = 0;
+            acc[reason] = { totalTime: 0, factories: {} };
           }
-          acc[reason] += timeInMinutes;
+          acc[reason].totalTime += timeInMinutes;
+
+          if (reason === 'SETUP' && record.factory && timeInMinutes > 0) {
+            if (!acc[reason].factories[record.factory]) {
+              acc[reason].factories[record.factory] = 0;
+            }
+            acc[reason].factories[record.factory] += timeInMinutes;
+          }
         }
         return acc;
       },
-      {} as Record<string, number>
+      {} as Record<string, { totalTime: number; factories: Record<string, number> }>
     );
 
-    return Object.entries(reasonData).map(([name, timeInMinutes]) => ({
+    return Object.entries(reasonData).map(([name, { totalTime, factories }]) => ({
       name,
-      hours: timeInMinutes / 60,
+      hours: totalTime / 60,
+      factories,
     })).sort((a, b) => b.hours - a.hours);
   }, [data]);
 
@@ -69,6 +76,55 @@ export function LossReasonChart({
   };
   
   const maxHours = Math.max(...chartData.map(d => d.hours), 0);
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      const totalHours = payload[0].value as number;
+
+      return (
+        <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[12rem]">
+          <div className="grid gap-1.5">
+            <div className="flex justify-between items-center">
+              <p className="font-semibold">{label}</p>
+              <p className="font-semibold text-muted-foreground">
+                {`${totalHours.toFixed(2)}h`}
+              </p>
+            </div>
+            
+            {label === 'SETUP' && data.factories && Object.keys(data.factories).length > 0 ? (
+              <>
+                <div className="h-px w-full my-1 bg-border" />
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-medium text-foreground">Horas por Fábrica:</p>
+                  {Object.entries(data.factories)
+                    .sort(([, a], [, b]) => (b as number) - (a as number))
+                    .map(([factory, time]) => (
+                      <div key={factory} className="flex justify-between items-center gap-4">
+                        <span className="text-xs text-muted-foreground">{factory}</span>
+                        <span className="text-xs font-bold">{((time as number) / 60).toFixed(1)}h</span>
+                      </div>
+                    ))}
+                </div>
+              </>
+            ) : (
+               <div className="flex items-center gap-2 mt-1">
+                  <div className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: 'var(--color-hours)' }} />
+                  <div className="flex justify-between flex-1">
+                      <span className="text-muted-foreground text-xs">Horas Perdidas</span>
+                      <span className="font-bold text-xs">
+                          {totalHours.toFixed(2)}h
+                      </span>
+                  </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
 
   return (
     <Card>
@@ -113,10 +169,7 @@ export function LossReasonChart({
                     />
                     <ChartTooltip
                         cursor={{fill: 'hsl(var(--accent))', radius: 4}}
-                        content={<ChartTooltipContent 
-                            formatter={(value) => `${(value as number).toFixed(2)}h`}
-                            indicator="dot"
-                        />}
+                        content={<CustomTooltip />}
                     />
                     <Bar dataKey="hours" radius={4}>
                       <LabelList
