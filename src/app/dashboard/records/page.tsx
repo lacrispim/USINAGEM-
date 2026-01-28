@@ -23,7 +23,6 @@ import {
 import { useFirestore, useCollection, useMemoFirebase, useDatabase } from '@/firebase';
 import { ref, onValue } from 'firebase/database';
 import { collection, query } from 'firebase/firestore';
-import { MachiningTimeByFactoryChart } from '@/components/charts/machining-time-by-factory-chart';
 import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
 import { getYear, getMonth, format, startOfDay, endOfDay, getISOWeek, parse } from 'date-fns';
@@ -42,7 +41,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Confetti } from '@/components/ui/confetti';
-import { HoursBySiteChart } from '@/components/charts/hours-by-site-chart';
+import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
 
 
 const months = [
@@ -261,6 +260,47 @@ export default function RecordsPage() {
         ddsDataForChart: ddsData,
     };
   }, [productionRecords, lossRecords, planejamentoData, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason, selectedOperator]);
+
+    const plannedVsMachinedData = useMemo(() => {
+        const dataMap: { [factory: string]: { planejado: number; usinado: number } } = {};
+
+        // 1. Aggregate planned hours from filtered Realtime DB data
+        filteredPlanejamentoData.forEach(record => {
+        const factory = record['Site'];
+        const hours = Number(record['Horas Máquina']) || 0;
+        if (factory) {
+            if (!dataMap[factory]) {
+            dataMap[factory] = { planejado: 0, usinado: 0 };
+            }
+            dataMap[factory].planejado += hours;
+        }
+        });
+
+        // 2. Combine all "machined" time sources.
+        const allMachinedRecords = [
+            ...filteredProductionRecords.map(r => ({ factory: r.factory, hours: (Number(r.machiningTime) || 0) / 60 })),
+            ...setupDataForChart.map(r => ({ factory: r.factory, hours: (Number(r.timeLost) || 0) / 60 })),
+            ...ddsDataForChart.map(r => ({ factory: r.factory, hours: (Number(r.timeLost) || 0) / 60 })),
+        ];
+        
+        allMachinedRecords.forEach(record => {
+            const { factory, hours } = record;
+            if (factory && hours > 0) {
+                if (!dataMap[factory]) {
+                    dataMap[factory] = { planejado: 0, usinado: 0 };
+                }
+                dataMap[factory].usinado += hours;
+            }
+        });
+
+        return Object.keys(dataMap).map(factory => ({
+        name: factory,
+        planejado: dataMap[factory].planejado,
+        usinado: dataMap[factory].usinado,
+        })).sort((a, b) => (b.planejado + b.usinado) - (a.planejado + a.usinado));
+
+  }, [filteredPlanejamentoData, filteredProductionRecords, setupDataForChart, ddsDataForChart]);
+
 
   useEffect(() => {
     // Let's celebrate the successful deployment!
@@ -528,15 +568,7 @@ export default function RecordsPage() {
         </CardContent>
       </Card>
        
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <HoursBySiteChart data={filteredPlanejamentoData} loading={loadingPlanejamento} />
-        <MachiningTimeByFactoryChart
-          productionData={filteredProductionRecords}
-          setupData={setupDataForChart}
-          ddsData={ddsDataForChart}
-          loading={loadingProduction || loadingLoss}
-        />
-      </div>
+      <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
        
       <LossReasonChart
         data={filteredLossRecords}
@@ -595,6 +627,7 @@ export default function RecordsPage() {
     
 
     
+
 
 
 
