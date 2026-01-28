@@ -42,6 +42,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Confetti } from '@/components/ui/confetti';
 import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
+import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
 
 
 const months = [
@@ -609,6 +610,12 @@ export default function RecordsPage() {
       </Card>
        
       <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
+      
+      <OeeLossWaterfallChart 
+        productionData={performanceProductionRecords}
+        lossData={performanceLossRecords}
+        loading={isLoading}
+      />
        
       <LossReasonChart
         data={filteredLossRecords}
