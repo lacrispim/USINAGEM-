@@ -183,7 +183,7 @@ export function LossReasonChart({
                           <Cell 
                               key={`cell-${index}`} 
                               cursor="pointer" 
-                              fill={entry.name === 'SETUP' ? 'hsl(36 94% 57%)' : 'var(--color-hours)'} 
+                              fill={(entry.name === 'SETUP' || entry.name === 'DDS/DDSHE') ? 'hsl(36 94% 57%)' : 'var(--color-hours)'} 
                               opacity={selectedReason ? (selectedReason === entry.name ? 1 : 0.3) : 1}
                           />
                       ))}
