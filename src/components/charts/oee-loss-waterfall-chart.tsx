@@ -32,10 +32,10 @@ interface OeeLossWaterfallChartProps {
 
 const chartConfig = {
   value: {
-    label: 'Loss %',
+    label: 'Horas Perdidas',
   },
   total: {
-    label: 'Total Loss %',
+    label: 'Total de Horas Perdidas',
   }
 };
 
@@ -45,17 +45,17 @@ export function OeeLossWaterfallChart({
   loading,
 }: OeeLossWaterfallChartProps) {
 
-  const { chartData, oee, totalLoss } = useMemo(() => {
+  const { chartData, totalMachiningHours, totalLostHours } = useMemo(() => {
     if (!productionData || !lossData) {
-      return { chartData: [], oee: 0, totalLoss: 0 };
+      return { chartData: [], totalMachiningHours: 0, totalLostHours: 0 };
     }
 
-    const totalMachiningTime = productionData.reduce(
+    const totalMachiningTime = productionData.reduce( // in minutes
       (sum, record) => sum + (Number(record.machiningTime) || 0),
       0
     );
 
-    const lossByReason = lossData.reduce((acc, record) => {
+    const lossByReason = lossData.reduce((acc, record) => { // in minutes
       if (record.lossReason && record.timeLost) {
         const reason = record.lossReason;
         if (!acc[reason]) {
@@ -66,45 +66,40 @@ export function OeeLossWaterfallChart({
       return acc;
     }, {} as Record<string, number>);
 
-    const totalLostTime = Object.values(lossByReason).reduce(
+    const totalLostTime = Object.values(lossByReason).reduce( // in minutes
       (sum, time) => sum + time,
       0
     );
-
-    const totalTime = totalMachiningTime + totalLostTime;
-
-    if (totalTime === 0) {
-      return { chartData: [], oee: 100, totalLoss: 0 };
-    }
     
-    const oeePercentage = (totalMachiningTime / totalTime) * 100;
-    const totalLossPercentage = 100 - oeePercentage;
-
     const sortedLosses = Object.entries(lossByReason)
       .map(([name, time]) => ({
         name,
-        lossPercentage: (time / totalTime) * 100,
+        lossHours: time / 60,
       }))
-      .sort((a, b) => b.lossPercentage - a.lossPercentage);
+      .sort((a, b) => b.lossHours - a.lossHours);
 
     let cumulative = 0;
     const waterfallData = sortedLosses.map(loss => {
       const item = {
         name: loss.name,
         start: cumulative,
-        value: loss.lossPercentage,
+        value: loss.lossHours,
       };
-      cumulative += loss.lossPercentage;
+      cumulative += loss.lossHours;
       return item;
     });
 
+    const currentTotalLostHours = totalLostTime / 60;
+
     waterfallData.push({
-      name: 'Perda Total',
+      name: 'Total de Perdas Apontadas',
       start: 0,
-      value: totalLossPercentage,
+      value: currentTotalLostHours,
     });
     
-    return { chartData: waterfallData, oee: oeePercentage, totalLoss: totalLossPercentage };
+    const currentTotalMachiningHours = totalMachiningTime / 60;
+
+    return { chartData: waterfallData, totalMachiningHours: currentTotalMachiningHours, totalLostHours: currentTotalLostHours };
 
   }, [productionData, lossData]);
 
@@ -118,8 +113,8 @@ export function OeeLossWaterfallChart({
             <p className="font-semibold">{label}</p>
             <div className="flex items-center gap-2">
                 <div className="flex justify-between flex-1">
-                    <span className="text-muted-foreground">Perda</span>
-                    <span className="font-bold">{value.toFixed(1)}%</span>
+                    <span className="text-muted-foreground">Horas</span>
+                    <span className="font-bold">{value.toFixed(1)}h</span>
                 </div>
             </div>
           </div>
@@ -129,20 +124,20 @@ export function OeeLossWaterfallChart({
     return null;
   };
 
-  const maxLoss = Math.ceil(totalLoss / 5) * 5 + 5;
+  const maxHours = totalLostHours > 0 ? Math.ceil(totalLostHours / 5) * 5 + 5 : 10;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
-                <CardTitle>TESTE</CardTitle>
-                <CardDescription>OEE Loss Waterfall</CardDescription>
+                <CardTitle>Análise de Eficiência e Perdas (OEE)</CardTitle>
+                <CardDescription>Análise em cascata do tempo produtivo versus os diversos motivos de perda.</CardDescription>
             </div>
             <div className="text-right">
-                <p className="text-sm font-bold text-green-500">{oee.toFixed(1)}%</p>
+                <p className="text-sm font-bold text-green-500">{totalMachiningHours.toFixed(1)}h</p>
                 <p className="text-xs text-muted-foreground">Usinagem Efetiva</p>
-                <p className="text-sm font-bold text-red-500 mt-1">{totalLoss.toFixed(1)}%</p>
+                <p className="text-sm font-bold text-red-500 mt-1">{totalLostHours.toFixed(1)}h</p>
                 <p className="text-xs text-muted-foreground">Perda Total</p>
             </div>
         </div>
@@ -175,8 +170,8 @@ export function OeeLossWaterfallChart({
                     tick={{fontSize: 12}}
                   />
                   <YAxis 
-                    unit="%" 
-                    domain={[0, maxLoss]}
+                    unit="h" 
+                    domain={[0, maxHours]}
                   />
                   <ChartTooltip 
                     cursor={{fill: 'hsl(var(--accent))', radius: 4}}
@@ -188,11 +183,11 @@ export function OeeLossWaterfallChart({
                     <LabelList 
                         dataKey="value" 
                         position="top"
-                        formatter={(value: number) => value > 0.1 ? `${value.toFixed(1)}%` : ''}
+                        formatter={(value: number) => value > 0.1 ? `${value.toFixed(1)}h` : ''}
                         className="text-xs fill-muted-foreground"
                     />
                      {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.name === 'Perda Total' ? 'hsl(var(--destructive))' : 'hsl(48 96% 51%)'} />
+                      <Cell key={`cell-${index}`} fill={entry.name === 'Total de Perdas Apontadas' ? 'hsl(var(--destructive))' : 'hsl(48 96% 51%)'} />
                     ))}
                   </Bar>
                 </BarChart>
