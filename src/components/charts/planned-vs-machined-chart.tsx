@@ -14,6 +14,7 @@ import {
   ChartTooltip,
 } from '@/components/ui/chart';
 import { Loader } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface PlannedVsMachinedChartProps {
   data: { 
@@ -59,6 +60,13 @@ export function PlannedVsMachinedChart({
   data,
   loading,
 }: PlannedVsMachinedChartProps) {
+
+  const totals = useMemo(() => {
+    const totalPlanejado = data.reduce((acc, curr) => acc + (curr.planejado || 0), 0);
+    const totalRealizado = data.reduce((acc, curr) => acc + (curr.usinado || 0), 0);
+    return { totalPlanejado, totalRealizado };
+  }, [data]);
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const planned = payload.find((p: any) => p.dataKey === 'planejado')?.value || 0;
@@ -143,10 +151,29 @@ export function PlannedVsMachinedChart({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Planejado vs Realizado</CardTitle>
-        <CardDescription>
-          Comparativo entre horas planejadas e as horas efetivamente realizadas (usinagem + perdas).
-        </CardDescription>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle>Planejado vs Realizado</CardTitle>
+                <CardDescription>
+                Comparativo entre horas planejadas e as horas efetivamente realizadas (usinagem + perdas).
+                </CardDescription>
+            </div>
+             {loading ? (
+                <div className="text-right">
+                    <Skeleton className="h-8 w-24" />
+                    <Skeleton className="h-4 w-20 mt-1" />
+                    <Skeleton className="h-8 w-24 mt-2" />
+                    <Skeleton className="h-4 w-20 mt-1" />
+                </div>
+            ) : (
+                <div className="text-right">
+                    <p className="text-2xl font-bold text-green-500">{totals.totalRealizado.toFixed(1)}h</p>
+                    <p className="text-xs text-muted-foreground">Total Realizado</p>
+                    <p className="text-2xl font-bold text-sky-400 mt-2">{totals.totalPlanejado.toFixed(1)}h</p>
+                    <p className="text-xs text-muted-foreground">Total Planejado</p>
+                </div>
+            )}
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
