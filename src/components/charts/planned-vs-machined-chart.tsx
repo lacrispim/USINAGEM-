@@ -47,7 +47,7 @@ const chartConfig = {
   },
   dds: {
     label: 'DDS/DDSHE',
-    color: 'hsl(48 96% 51%)',
+    color: 'hsl(90 80% 45%)',
   },
   outrasPerdas: {
     label: 'Outras Perdas',
