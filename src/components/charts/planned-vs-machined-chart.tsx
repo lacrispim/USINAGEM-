@@ -143,9 +143,9 @@ export function PlannedVsMachinedChart({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Horas Planejadas vs. Usinadas por Fábrica</CardTitle>
+        <CardTitle>Planejado vs Realizado</CardTitle>
         <CardDescription>
-          Comparativo entre horas planejadas e as horas efetivamente utilizadas (usinagem + perdas programadas).
+          Comparativo entre horas planejadas e as horas efetivamente realizadas (usinagem + perdas).
         </CardDescription>
       </CardHeader>
       <CardContent>
