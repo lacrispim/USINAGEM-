@@ -42,9 +42,9 @@ export function OeeLossWaterfallChart({
   loading,
 }: OeeLossWaterfallChartProps) {
 
-  const { chartData, totalMachiningHours, totalLostHours, totalWorkedHours } = useMemo(() => {
+  const { chartData, totalMachiningHours, totalLostHours } = useMemo(() => {
     if (!productionData || !lossData) {
-      return { chartData: [], totalMachiningHours: 0, totalLostHours: 0, totalWorkedHours: 0 };
+      return { chartData: [], totalMachiningHours: 0, totalLostHours: 0 };
     }
 
     const totalMachiningTime = productionData.reduce(
@@ -69,45 +69,35 @@ export function OeeLossWaterfallChart({
     const sortedLosses = Object.entries(lossByReason)
       .map(([name, time]) => ({
         name,
-        lossHours: time / 60,
+        value: time / 60,
       }))
-      .sort((a, b) => b.lossHours - a.lossHours);
+      .sort((a, b) => b.value - a.value);
 
     const totalMachiningHours = totalMachiningTime / 60;
-    const totalLostHours = sortedLosses.reduce((sum, loss) => sum + loss.lossHours, 0);
+    const totalLostHours = sortedLosses.reduce((sum, loss) => sum + loss.value, 0);
 
-    const waterfallData: {name: string, start: number, value: number, fill: string}[] = [];
+    const waterfallData: {name: string, start: number, value: number}[] = [];
     
-    // Productive time bar
-    waterfallData.push({
-      name: 'Usinagem Efetiva',
-      start: 0,
-      value: totalMachiningHours,
-      fill: 'hsl(142 71% 45%)' // green
-    });
-
-    let cumulative = totalMachiningHours;
+    let cumulative = 0;
 
     // Loss bars
     sortedLosses.forEach(loss => {
       waterfallData.push({
         name: loss.name,
         start: cumulative,
-        value: loss.lossHours,
-        fill: 'hsl(48 96% 51%)' // yellow
+        value: loss.value,
       });
-      cumulative += loss.lossHours;
+      cumulative += loss.value;
     });
 
-    // Total worked hours bar
+    // Total loss bar
     waterfallData.push({
-      name: 'Horas Trabalhadas',
+      name: 'Total',
       start: 0,
       value: cumulative,
-      fill: 'hsl(217 32.6% 77.5%)'
     });
 
-    return { chartData: waterfallData, totalMachiningHours, totalLostHours, totalWorkedHours: cumulative };
+    return { chartData: waterfallData, totalMachiningHours, totalLostHours };
 
   }, [productionData, lossData]);
 
@@ -132,7 +122,7 @@ export function OeeLossWaterfallChart({
     return null;
   };
 
-  const maxHours = totalWorkedHours > 0 ? Math.ceil(totalWorkedHours / 5) * 5 + 5 : 10;
+  const maxHours = totalLostHours > 0 ? Math.ceil(totalLostHours / 5) * 5 + 5 : 10;
 
   return (
     <Card>
@@ -140,12 +130,12 @@ export function OeeLossWaterfallChart({
         <div className="flex justify-between items-start">
             <div>
                 <CardTitle>Análise de Eficiência e Perdas (OEE)</CardTitle>
-                <CardDescription>Análise em cascata do tempo produtivo versus os diversos motivos de perda.</CardDescription>
+                <CardDescription>Análise em cascata das horas de perda.</CardDescription>
             </div>
             <div className="text-right">
                 <p className="text-sm font-bold text-green-500">{totalMachiningHours.toFixed(1)}h</p>
                 <p className="text-xs text-muted-foreground">Usinagem Efetiva</p>
-                <p className="text-sm font-bold text-red-500 mt-1">{totalLostHours.toFixed(1)}h</p>
+                <p className="text-sm font-bold text-blue-500 mt-1">{totalLostHours.toFixed(1)}h</p>
                 <p className="text-xs text-muted-foreground">Perda Total</p>
             </div>
         </div>
@@ -155,7 +145,7 @@ export function OeeLossWaterfallChart({
           <div className="flex h-[350px] w-full items-center justify-center">
             <Loader className="h-8 w-8 animate-spin" />
           </div>
-        ) : chartData.length > 0 ? (
+        ) : chartData.length > 1 ? (
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig}>
@@ -180,6 +170,7 @@ export function OeeLossWaterfallChart({
                   <YAxis 
                     unit="h" 
                     domain={[0, maxHours]}
+                    allowDecimals={false}
                   />
                   <ChartTooltip 
                     cursor={{fill: 'hsl(var(--accent))', radius: 4}}
@@ -191,12 +182,14 @@ export function OeeLossWaterfallChart({
                     <LabelList 
                         dataKey="value" 
                         position="top"
-                        formatter={(value: number) => value > 0.1 ? `${value.toFixed(1)}h` : ''}
+                        formatter={(value: number) => value > 0.05 ? `${value.toFixed(1)}h` : ''}
                         className="text-xs fill-muted-foreground"
                     />
-                     {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
+                     {chartData.map((entry, index) => {
+                        const isTotal = entry.name === 'Total';
+                        const color = isTotal ? 'hsl(221 83% 53%)' : 'hsl(48 96% 51%)';
+                        return <Cell key={`cell-${index}`} fill={color} />;
+                    })}
                   </Bar>
                 </BarChart>
               </ChartContainer>
