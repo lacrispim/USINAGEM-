@@ -133,6 +133,7 @@ export default function RecordsPage() {
     performanceLossRecords,
     setupDataForChart,
     ddsDataForChart,
+    otherLossesDataForChart,
   } = useMemo(() => {
     if (!productionRecords || !lossRecords || !planejamentoData) {
         return { 
@@ -145,6 +146,7 @@ export default function RecordsPage() {
           performanceLossRecords: [],
           setupDataForChart: [],
           ddsDataForChart: [],
+          otherLossesDataForChart: [],
         };
     }
 
@@ -229,6 +231,14 @@ export default function RecordsPage() {
       .filter(operatorFilterFirestore)
       .filter(record => record.lossReason?.toUpperCase() === 'DDS' || record.lossReason?.toUpperCase() === 'DDSHE');
 
+    const otherLossesData = perfLossRecords
+      .filter(operatorFilterFirestore)
+      .filter(record => {
+          if (!record.lossReason) return true;
+          const upperCaseReason = record.lossReason.toUpperCase();
+          return !upperCaseReason.includes('SETUP') && upperCaseReason !== 'DDS' && upperCaseReason !== 'DDSHE';
+      });
+
 
     // Filter Realtime DB records (planning)
     const planningFilter = (record: any) => {
@@ -262,11 +272,12 @@ export default function RecordsPage() {
         performanceLossRecords: perfLossRecords,
         setupDataForChart: setupData,
         ddsDataForChart: ddsData,
+        otherLossesDataForChart: otherLossesData,
     };
   }, [productionRecords, lossRecords, planejamentoData, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason, selectedOperator]);
 
     const plannedVsMachinedData = useMemo(() => {
-        const dataMap: { [factory: string]: { planejado: number; usinagem: number; setup: number; dds: number } } = {};
+        const dataMap: { [factory: string]: { planejado: number; usinagem: number; setup: number; dds: number; outrasPerdas: number } } = {};
 
         const normalizeFactoryName = (name: string | undefined): string | undefined => {
             if (!name) return undefined;
@@ -283,7 +294,7 @@ export default function RecordsPage() {
           const hours = Number(record['Horas Máquina']) || 0;
           if (factory) {
               if (!dataMap[factory]) {
-                dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0 };
+                dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
               }
               dataMap[factory].planejado += hours;
           }
@@ -295,7 +306,7 @@ export default function RecordsPage() {
             const hours = (Number(record.machiningTime) || 0) / 60;
             if (factory && hours > 0) {
                 if (!dataMap[factory]) {
-                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0 };
+                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
                 }
                 dataMap[factory].usinagem += hours;
             }
@@ -307,7 +318,7 @@ export default function RecordsPage() {
             const hours = (Number(record.timeLost) || 0) / 60;
             if (factory && hours > 0) {
                 if (!dataMap[factory]) {
-                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0 };
+                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
                 }
                 dataMap[factory].setup += hours;
             }
@@ -319,28 +330,43 @@ export default function RecordsPage() {
             const hours = (Number(record.timeLost) || 0) / 60;
             if (factory && hours > 0) {
                 if (!dataMap[factory]) {
-                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0 };
+                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
                 }
                 dataMap[factory].dds += hours;
             }
         });
 
-        // 5. Format for chart
+        // 5. Aggregate other losses
+        otherLossesDataForChart.forEach(record => {
+            const factory = normalizeFactoryName(record.factory);
+            const hours = (Number(record.timeLost) || 0) / 60;
+            if (factory && hours > 0) {
+                if (!dataMap[factory]) {
+                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+                }
+                dataMap[factory].outrasPerdas += hours;
+            }
+        });
+
+
+        // 6. Format for chart
         return Object.keys(dataMap).map(factory => {
           const usinagem = dataMap[factory].usinagem;
           const setup = dataMap[factory].setup;
           const dds = dataMap[factory].dds;
+          const outrasPerdas = dataMap[factory].outrasPerdas;
           return {
               name: factory,
               planejado: dataMap[factory].planejado,
-              usinado: usinagem + setup + dds, // Total for the label
+              usinado: usinagem + setup + dds + outrasPerdas, // Total for the label
               usinagem: usinagem,
               setup: setup,
               dds: dds,
+              outrasPerdas: outrasPerdas,
           }
       }).sort((a, b) => (b.planejado + b.usinado) - (a.planejado + a.usinado));
 
-  }, [filteredPlanejamentoData, filteredProductionRecords, setupDataForChart, ddsDataForChart]);
+  }, [filteredPlanejamentoData, filteredProductionRecords, setupDataForChart, ddsDataForChart, otherLossesDataForChart]);
 
 
   useEffect(() => {

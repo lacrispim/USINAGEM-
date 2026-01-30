@@ -23,6 +23,7 @@ interface PlannedVsMachinedChartProps {
     usinagem: number;
     setup: number;
     dds: number;
+    outrasPerdas: number;
   }[];
   loading: boolean;
 }
@@ -48,6 +49,10 @@ const chartConfig = {
     label: 'DDS/DDSHE',
     color: 'hsl(48 96% 51%)',
   },
+  outrasPerdas: {
+    label: 'Outras Perdas',
+    color: 'hsl(221 83% 53%)',
+  },
 };
 
 export function PlannedVsMachinedChart({
@@ -60,8 +65,9 @@ export function PlannedVsMachinedChart({
       const usinagem = payload.find((p: any) => p.dataKey === 'usinagem')?.value || 0;
       const setup = payload.find((p: any) => p.dataKey === 'setup')?.value || 0;
       const dds = payload.find((p: any) => p.dataKey === 'dds')?.value || 0;
+      const outrasPerdas = payload.find((p: any) => p.dataKey === 'outrasPerdas')?.value || 0;
 
-      const machinedTotal = usinagem + setup + dds;
+      const machinedTotal = usinagem + setup + dds + outrasPerdas;
       const difference = machinedTotal - planned;
 
       return (
@@ -106,6 +112,13 @@ export function PlannedVsMachinedChart({
                     <div className="flex justify-between flex-1">
                         <span className="text-muted-foreground text-xs">DDS/DDSHE</span>
                         <span className="font-bold text-xs">{dds.toFixed(1)}h</span>
+                    </div>
+                </div>}
+                {outrasPerdas > 0 && <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: chartConfig.outrasPerdas.color }} />
+                    <div className="flex justify-between flex-1">
+                        <span className="text-muted-foreground text-xs">Outras Perdas</span>
+                        <span className="font-bold text-xs">{outrasPerdas.toFixed(1)}h</span>
                     </div>
                 </div>}
             </div>
@@ -177,7 +190,8 @@ export function PlannedVsMachinedChart({
                   </Bar>
                   <Bar dataKey="usinagem" stackId="usinado" fill={chartConfig.usinagem.color} />
                   <Bar dataKey="setup" stackId="usinado" fill={chartConfig.setup.color} />
-                  <Bar dataKey="dds" stackId="usinado" fill={chartConfig.dds.color} radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="dds" stackId="usinado" fill={chartConfig.dds.color} />
+                  <Bar dataKey="outrasPerdas" stackId="usinado" fill={chartConfig.outrasPerdas.color} radius={[4, 4, 0, 0]}>
                     <LabelList
                         dataKey="usinado"
                         position="top"
