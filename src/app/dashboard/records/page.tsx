@@ -22,7 +22,6 @@ import {
 import { useFirestore, useCollection, useMemoFirebase, useDatabase } from '@/firebase';
 import { ref, onValue } from 'firebase/database';
 import { collection, query, where } from 'firebase/firestore';
-import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
 import { getYear, getMonth, format, startOfDay, endOfDay, getISOWeek, parse, endOfMonth, startOfISOWeek, endOfISOWeek, setISOWeek } from 'date-fns';
 import {
@@ -69,7 +68,6 @@ export default function RecordsPage() {
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
-  const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
 
   const [planejamentoData, setPlanejamentoData] = useState<any[]>([]);
@@ -244,10 +242,8 @@ export default function RecordsPage() {
 
   const operatorFilteredLossRecords = useMemo(() => {
     if (!lossRecords) return [];
-    return lossRecords.filter(operatorFilter).filter(record => {
-      return !selectedReason || record.lossReason === selectedReason;
-    });
-  }, [lossRecords, selectedOperator, selectedReason]);
+    return lossRecords.filter(operatorFilter);
+  }, [lossRecords, selectedOperator]);
 
   const setupDataForChart = useMemo(() => {
       return (lossRecords || []).filter(operatorFilter).filter(r => r.lossReason?.toUpperCase().includes('SETUP'));
@@ -373,7 +369,6 @@ export default function RecordsPage() {
 
   useEffect(() => {
     setSelectedFactory(null);
-    setSelectedReason(null);
     setSelectedOperator(null);
   }, [selectedYear, selectedMonth, selectedWeek, selectedDate]);
 
@@ -405,10 +400,6 @@ export default function RecordsPage() {
     setSelectedFactory(current => current === factoryName ? null : factoryName);
   };
   
-  const handleReasonSelect = (reasonName: string | null) => {
-    setSelectedReason(current => current === reasonName ? null : reasonName);
-  };
-
   const handleOperatorSelect = (operatorName: string | null) => {
     setSelectedOperator(current => current === operatorName ? null : operatorName);
   };
@@ -597,13 +588,6 @@ export default function RecordsPage() {
         loading={isLoading}
       />
        
-      <LossReasonChart
-        data={operatorFilteredLossRecords}
-        loading={loadingLoss}
-        selectedReason={selectedReason}
-        onReasonSelect={handleReasonSelect}
-      />
-      
       <Card>
         <CardHeader>
             <div>
