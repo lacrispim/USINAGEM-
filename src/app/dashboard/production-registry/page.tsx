@@ -62,23 +62,25 @@ import { ptBR } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { Label } from '@/components/ui/label';
 
-const lossReasonOptions = [
-    "MANUTENÇÃO PLANEJADA",
-    "TEMPO DE CAFÉ",
-    "LIMPEZA PLANEJADA",
-    "SETUP",
-    "DDS, APONTAMENTO HORAS, ATIVIDADE ADM",
-    "INSPEÇÃO & VALIDAÇÃO DAS PEÇAS",
-    "QUEBRA",
-    "FALHA DE PROCESSO",
-    "ABSENTEÍSMO",
-    "FALTA DE MATERIAL & FERRAMENTA",
-    "MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS",
-    "PEQUENAS PARADAS",
-    "AJUSTES CORRETIVOS DE PROCESSOS",
-    "VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)",
-    "RETRABALHO"
+const lossReasonDetails = [
+    { value: "MANUTENÇÃO PLANEJADA", description: "LUBRIFICAÇÃO DA MÁQUINA" },
+    { value: "TEMPO DE CAFÉ", description: "PARADA PARA CAFÉ" },
+    { value: "LIMPEZA PLANEJADA", description: "LIMPEZA DA MÁQUINA, ÁREA, E CAÇAMBA" },
+    { value: "SETUP", description: "SETUP PLANEJADO DE MÁQUINA E SETUP EMERGENCIAL (TROCA DE PEÇA PARA USINAGEM CORRETIVA)" },
+    { value: "DDS, APONTAMENTO HORAS, ATIVIDADE ADM", description: "DDS, APONTAMENTO HORAS, REUNIÕES, EXAME MÉDICO, TROCA DE TURNO, ATIVIDADE ADM PLANEJADA" },
+    { value: "INSPEÇÃO & VALIDAÇÃO DAS PEÇAS", description: "INSPEÇÃO DE QUALIDADE DAS PEÇAS" },
+    { value: "QUEBRA", description: "QUEBRA DO FERRAMENTAL, COLIZÃO, TRAVAMENTO DE ESTEIRA, ETC" },
+    { value: "FALHA DE PROCESSO", description: "FALTA DE AR COMPRIMIDO E ENERGIA" },
+    { value: "ABSENTEÍSMO", description: "FALTA DE MÃO DE OBRA" },
+    { value: "FALTA DE MATERIAL & FERRAMENTA", description: "FALTA DE AÇO, FALTA DE FERRAMENTA DE CORTE, FALTA DE ÓLEO" },
+    { value: "MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS", description: "RECEBIMENTO DE MATERIAL, MOVIMETANÇÃO DE MATERIA PRIMA E EQUIPAMENTOS, EX: PALETEIRA" },
+    { value: "PEQUENAS PARADAS", description: "PEQUENAS PARADAS NÃO PROGRAMADAS, ABAIXO DE 10 MINUTOS" },
+    { value: "AJUSTES CORRETIVOS DE PROCESSOS", description: "AJUSTES NÃO PLANEJADOS NECESSÁRIOS PARA FABRICAR A PEÇA (SEM CONSIDERAR O SETUP)" },
+    { value: "VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)", description: "MÁQUINA OPERANDO ABAIXO DO NOMINAL POR ALGUM PROBLEMA" },
+    { value: "RETRABALHO", description: "RETRABALHO DE OPERAÇÕES OU PEÇAS JÁ REALIZADAS" }
 ];
+
+const lossReasonOptions = lossReasonDetails.map(item => item.value);
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
@@ -511,6 +513,20 @@ const LossFormContent = () => {
         resolver: zodResolver(lossFormSchema),
         defaultValues: initialLossValues,
     });
+
+    const selectedLossReason = useWatch({
+        control: lossForm.control,
+        name: 'lossReason',
+    });
+
+    useEffect(() => {
+        if (selectedLossReason) {
+            const detail = lossReasonDetails.find(item => item.value === selectedLossReason);
+            if (detail) {
+                lossForm.setValue('observations', detail.description);
+            }
+        }
+    }, [selectedLossReason, lossForm]);
 
      useEffect(() => {
         setIsClient(true);
@@ -974,7 +990,16 @@ export default function ProductionRegistryPage() {
   };
 
   const handleLossSelectChange = (name: string, value: string) => {
-    setEditedLossRecord({ ...editedLossRecord, [name]: value });
+    const newRecord = { ...editedLossRecord, [name]: value };
+    if (name === 'lossReason') {
+      const detail = lossReasonDetails.find(item => item.value === value);
+      if (detail) {
+        newRecord.observations = detail.description;
+      } else {
+        newRecord.observations = '';
+      }
+    }
+    setEditedLossRecord(newRecord);
   };
 
 
@@ -1042,6 +1067,16 @@ export default function ProductionRegistryPage() {
                         />
                         </PopoverContent>
                     </Popover>
+                    {selectedDate && (
+                      <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-2 top-6 h-6 w-6"
+                          onClick={() => setSelectedDate(undefined)}
+                      >
+                          <X className="h-4 w-4" />
+                      </Button>
+                    )}
                 </div>
                 <div className="grid w-full sm:max-w-xs gap-1.5">
                     <Label htmlFor="operator-filter">Filtrar por Técnico</Label>
