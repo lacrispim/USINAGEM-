@@ -83,21 +83,12 @@ const lossFormSchema = z.object({
   date: z.string().min(1, 'A data da perda é obrigatória.'),
   machine: z.string().optional(),
   lossReason: z.string().optional(),
-  otherLossReason: z.string().optional(),
   deadPartsQuantity: z.coerce.number().optional(),
   factory: z.string().optional(),
   timeLost: z.coerce.number().optional(),
   observations: z.string().optional(),
   formsNumber: z.string().optional(),
-}).refine(data => {
-    if (data.lossReason === 'Outro' && !data.otherLossReason) {
-      return false;
-    }
-    return true;
-  }, {
-    message: 'Por favor, especifique o motivo da perda.',
-    path: ['otherLossReason'],
-  });
+});
 
 type ProductionFormValues = z.infer<typeof productionFormSchema>;
 type LossFormValues = z.infer<typeof lossFormSchema>;
@@ -123,7 +114,6 @@ const initialLossValues = {
     date: format(new Date(), 'dd/MM/yyyy'),
     machine: '',
     lossReason: '',
-    otherLossReason: '',
     deadPartsQuantity: 0,
     factory: '',
     timeLost: 0,
@@ -519,24 +509,12 @@ const LossFormContent = () => {
         name: 'timeLost',
     });
 
-    const lossReason = useWatch({
-        control: lossForm.control,
-        name: 'lossReason',
-    });
-
     async function onLossSubmit(values: LossFormValues) {
         if (!firestore) return;
         try {
-            const finalValues = {
-                ...values,
-                lossReason: values.lossReason === 'Outro' ? values.otherLossReason : values.lossReason,
-            };
-            // @ts-ignore
-            delete finalValues.otherLossReason;
-
             const date = parse(values.date, 'dd/MM/yyyy', new Date());
             await addDoc(collection(firestore, 'lossRecords'), {
-                ...finalValues,
+                ...values,
                 date,
                 createdAt: serverTimestamp(),
             });
@@ -704,40 +682,27 @@ const LossFormContent = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
+                               <SelectItem value="MANUTENÇÃO PLANEJADA">MANUTENÇÃO PLANEJADA</SelectItem>
+                               <SelectItem value="TEMPO DE CAFÉ">TEMPO DE CAFÉ</SelectItem>
+                               <SelectItem value="LIMPEZA PLANEJADA">LIMPEZA PLANEJADA</SelectItem>
                                <SelectItem value="SETUP">SETUP</SelectItem>
-                                <SelectItem value="Manutenção Corretiva">Manutenção Corretiva</SelectItem>
-                                <SelectItem value="Falta de Ferramenta">Falta de Ferramenta</SelectItem>
-                                <SelectItem value="Falta de Material">Falta de Material</SelectItem>
-                                <SelectItem value="Limpeza">Limpeza</SelectItem>
-                                <SelectItem value="Treinamento">Treinamento</SelectItem>
-                                <SelectItem value="Reunião">Reunião</SelectItem>
-                                <SelectItem value="DDS">DDS</SelectItem>
-                                <SelectItem value="DDSHE">DDSHE</SelectItem>
-                                <SelectItem value="Outro">Outro</SelectItem>
+                               <SelectItem value="DDS, APONTAMENTO HORAS, ATIVIDADE ADM">DDS, APONTAMENTO HORAS, ATIVIDADE ADM</SelectItem>
+                               <SelectItem value="INSPEÇÃO & VALIDAÇÃO DAS PEÇAS">INSPEÇÃO & VALIDAÇÃO DAS PEÇAS</SelectItem>
+                               <SelectItem value="QUEBRA">QUEBRA</SelectItem>
+                               <SelectItem value="FALHA DE PROCESSO">FALHA DE PROCESSO</SelectItem>
+                               <SelectItem value="ABSENTEÍSMO">ABSENTEÍSMO</SelectItem>
+                               <SelectItem value="FALTA DE MATERIAL & FERRAMENTA">FALTA DE MATERIAL & FERRAMENTA</SelectItem>
+                               <SelectItem value="MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS">MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS</SelectItem>
+                               <SelectItem value="PEQUENAS PARADAS">PEQUENAS PARADAS</SelectItem>
+                               <SelectItem value="AJUSTES CORRETIVOS DE PROCESSOS">AJUSTES CORRETIVOS DE PROCESSOS</SelectItem>
+                               <SelectItem value="VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)">VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)</SelectItem>
+                               <SelectItem value="RETRABALHO">RETRABALHO</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    {lossReason === 'Outro' && (
-                      <FormField
-                        control={lossForm.control}
-                        name="otherLossReason"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Especifique o Motivo</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Descreva o motivo da perda"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
                     <FormField
                       control={lossForm.control}
                       name="deadPartsQuantity"
@@ -1361,7 +1326,7 @@ export default function ProductionRegistryPage() {
                                 <TableCell><Input name="date" value={editedLossRecord.date} onChange={handleLossInputChange} /></TableCell>
                                 <TableCell>
                                     <Select value={editedLossRecord.factory} onValueChange={(value) => handleLossSelectChange('factory', value)}>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectTrigger><SelectValue /></SelectValue>
                                         <SelectContent>
                                             <SelectItem value="VALINHOS DOVE">VALINHOS DOVE</SelectItem>
                                             <SelectItem value="VALINHOS SABONETE">VALINHOS SABONETE</SelectItem>
