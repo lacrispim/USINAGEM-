@@ -601,11 +601,6 @@ export default function RecordsPage() {
                       {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione um dia</span>}
                   </Button>
                   </PopoverTrigger>
-                    {selectedDate && (
-                      <Button variant="ghost" size="icon" className="absolute right-0 top-6 h-8 w-8" onClick={() => setSelectedDate(undefined)}>
-                          <X className="h-4 w-4" />
-                      </Button>
-                  )}
                   <PopoverContent className="w-auto p-0">
                   <Calendar
                       mode="single"
@@ -704,4 +699,3 @@ export default function RecordsPage() {
     
 
     
-

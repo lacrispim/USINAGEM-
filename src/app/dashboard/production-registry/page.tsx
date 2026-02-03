@@ -62,6 +62,24 @@ import { ptBR } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { Label } from '@/components/ui/label';
 
+const lossReasonOptions = [
+    "MANUTENÇÃO PLANEJADA",
+    "TEMPO DE CAFÉ",
+    "LIMPEZA PLANEJADA",
+    "SETUP",
+    "DDS, APONTAMENTO HORAS, ATIVIDADE ADM",
+    "INSPEÇÃO & VALIDAÇÃO DAS PEÇAS",
+    "QUEBRA",
+    "FALHA DE PROCESSO",
+    "ABSENTEÍSMO",
+    "FALTA DE MATERIAL & FERRAMENTA",
+    "MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS",
+    "PEQUENAS PARADAS",
+    "AJUSTES CORRETIVOS DE PROCESSOS",
+    "VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)",
+    "RETRABALHO"
+];
+
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
   date: z.string().min(1, 'A data da produção é obrigatória.'),
@@ -682,21 +700,7 @@ const LossFormContent = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                               <SelectItem value="MANUTENÇÃO PLANEJADA">MANUTENÇÃO PLANEJADA</SelectItem>
-                               <SelectItem value="TEMPO DE CAFÉ">TEMPO DE CAFÉ</SelectItem>
-                               <SelectItem value="LIMPEZA PLANEJADA">LIMPEZA PLANEJADA</SelectItem>
-                               <SelectItem value="SETUP">SETUP</SelectItem>
-                               <SelectItem value="DDS, APONTAMENTO HORAS, ATIVIDADE ADM">DDS, APONTAMENTO HORAS, ATIVIDADE ADM</SelectItem>
-                               <SelectItem value="INSPEÇÃO & VALIDAÇÃO DAS PEÇAS">INSPEÇÃO & VALIDAÇÃO DAS PEÇAS</SelectItem>
-                               <SelectItem value="QUEBRA">QUEBRA</SelectItem>
-                               <SelectItem value="FALHA DE PROCESSO">FALHA DE PROCESSO</SelectItem>
-                               <SelectItem value="ABSENTEÍSMO">ABSENTEÍSMO</SelectItem>
-                               <SelectItem value="FALTA DE MATERIAL & FERRAMENTA">FALTA DE MATERIAL & FERRAMENTA</SelectItem>
-                               <SelectItem value="MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS">MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS</SelectItem>
-                               <SelectItem value="PEQUENAS PARADAS">PEQUENAS PARADAS</SelectItem>
-                               <SelectItem value="AJUSTES CORRETIVOS DE PROCESSOS">AJUSTES CORRETIVOS DE PROCESSOS</SelectItem>
-                               <SelectItem value="VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)">VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)</SelectItem>
-                               <SelectItem value="RETRABALHO">RETRABALHO</SelectItem>
+                                {lossReasonOptions.map(reason => <SelectItem key={reason} value={reason}>{reason}</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -806,7 +810,6 @@ export default function ProductionRegistryPage() {
     return productionRecords.filter(record => {
       const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
       
-      // The date filter should use the 'date' field (Data), not 'createdAt' (Registrado em)
       const dateMatch = !selectedDate || (record.date?.toDate && 
         record.date.toDate() >= startOfDay(selectedDate) &&
         record.date.toDate() <= endOfDay(selectedDate));
@@ -820,7 +823,6 @@ export default function ProductionRegistryPage() {
      return lossRecords.filter(record => {
       const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
       
-      // The date filter should use the 'date' field (Data), not 'createdAt' (Registrado em)
       const dateMatch = !selectedDate || (record.date?.toDate && 
         record.date.toDate() >= startOfDay(selectedDate) &&
         record.date.toDate() <= endOfDay(selectedDate));
@@ -865,8 +867,6 @@ export default function ProductionRegistryPage() {
       });
     }
   };
-
-  // --- Funções de Edição para Registros de Produção ---
 
   const handleEdit = (record: any) => {
     setEditingRecordId(record.id);
@@ -922,8 +922,6 @@ export default function ProductionRegistryPage() {
     setEditedRecord({ ...editedRecord, [name]: value });
   };
 
-
-  // --- Funções de Edição para Registros de Perda ---
   const handleEditLoss = (record: any) => {
     setEditingLossRecordId(record.id);
     setEditedLossRecord({ ...record, date: record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date });
@@ -1019,9 +1017,9 @@ export default function ProductionRegistryPage() {
           </div>
           <div className="mt-8 space-y-8">
              <div className="flex flex-col sm:flex-row justify-end gap-4">
-                <div className="grid w-full sm:max-w-xs gap-1.5">
+                <div className="grid w-full sm:max-w-xs gap-1.5 relative">
                     <Label htmlFor="date-filter">Filtrar por Data</Label>
-                     <Popover>
+                    <Popover>
                         <PopoverTrigger asChild>
                         <Button
                             id="date-filter"
@@ -1035,11 +1033,6 @@ export default function ProductionRegistryPage() {
                             {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione uma data</span>}
                         </Button>
                         </PopoverTrigger>
-                        {selectedDate && (
-                            <Button variant="ghost" size="icon" className="absolute right-0 top-6" onClick={() => setSelectedDate(undefined)}>
-                                <X className="h-4 w-4" />
-                            </Button>
-                        )}
                         <PopoverContent className="w-auto p-0">
                         <Calendar
                             mode="single"
@@ -1326,7 +1319,7 @@ export default function ProductionRegistryPage() {
                                 <TableCell><Input name="date" value={editedLossRecord.date} onChange={handleLossInputChange} /></TableCell>
                                 <TableCell>
                                     <Select value={editedLossRecord.factory} onValueChange={(value) => handleLossSelectChange('factory', value)}>
-                                        <SelectTrigger><SelectValue /></SelectValue>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="VALINHOS DOVE">VALINHOS DOVE</SelectItem>
                                             <SelectItem value="VALINHOS SABONETE">VALINHOS SABONETE</SelectItem>
@@ -1351,7 +1344,14 @@ export default function ProductionRegistryPage() {
                                         </SelectContent>
                                     </Select>
                                 </TableCell>
-                                <TableCell><Textarea name="lossReason" value={editedLossRecord.lossReason} onChange={handleLossInputChange} /></TableCell>
+                                <TableCell>
+                                    <Select value={editedLossRecord.lossReason} onValueChange={(value) => handleLossSelectChange('lossReason', value)}>
+                                        <SelectTrigger><SelectValue placeholder="Selecione um motivo" /></SelectTrigger>
+                                        <SelectContent>
+                                            {lossReasonOptions.map(reason => <SelectItem key={reason} value={reason}>{reason}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </TableCell>
                                 <TableCell><Input type="number" name="deadPartsQuantity" value={editedLossRecord.deadPartsQuantity} onChange={handleLossInputChange} /></TableCell>
                                 <TableCell><Input type="number" name="timeLost" value={editedLossRecord.timeLost} onChange={handleLossInputChange} /></TableCell>
                                 <TableCell><Textarea name="observations" value={editedLossRecord.observations} onChange={handleLossInputChange} /></TableCell>
