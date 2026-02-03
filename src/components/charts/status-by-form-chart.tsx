@@ -53,35 +53,49 @@ export function StatusByFormChart({
       return { chartData: [], statuses: [] };
     }
 
-    const formsData: { [form: string]: { [status: string]: number } } = {};
-    const statusSet = new Set<string>();
+    const formsData: { 
+        [form: string]: { 
+            [status: string]: { 
+                count: number; 
+                technicians: Set<string>;
+            } 
+        } 
+    } = {};
 
     data.forEach(record => {
-      if (record.formsNumber && record.status) {
+      if (record.formsNumber && record.status && record.operatorId) {
         const form = record.formsNumber;
         const status = record.status;
-        
+        const technician = record.operatorId;
+
         if (!formsData[form]) {
-          formsData[form] = {};
+            formsData[form] = {};
         }
         if (!formsData[form][status]) {
-          formsData[form][status] = 0;
+            formsData[form][status] = { count: 0, technicians: new Set() };
         }
-        formsData[form][status]++;
-        statusSet.add(status);
+        formsData[form][status].count++;
+        formsData[form][status].technicians.add(technician);
       }
     });
 
     const chartDataResult = Object.entries(formsData)
-      .map(([formsNumber, statusCounts]) => ({
-        formsNumber,
-        ...statusCounts,
-      }))
-      .sort((a, b) => a.formsNumber.localeCompare(b.formsNumber));
-    
-    // Ensure all statuses are present in the final list for consistent legend/colors
-    const allFoundStatuses = Array.from(statusSet).sort();
+      .map(([formsNumber, statusData]) => {
+          const row: { [key: string]: any } = { formsNumber };
+          
+          ALL_STATUSES.forEach(status => {
+            if (statusData[status]) {
+              row[status] = statusData[status].count;
+              row[`technicians_${status}`] = Array.from(statusData[status].technicians);
+            } else {
+              row[status] = 0;
+              row[`technicians_${status}`] = [];
+            }
+          });
 
+          return row;
+      })
+      .sort((a, b) => a.formsNumber.localeCompare(b.formsNumber));
 
     return { chartData: chartDataResult, statuses: ALL_STATUSES };
   }, [data]);
@@ -98,13 +112,23 @@ export function StatusByFormChart({
     if (active && payload && payload.length) {
       const total = payload.reduce((acc: number, item: any) => acc + item.value, 0);
 
+      const allTechniciansForForm = new Set<string>();
+      ALL_STATUSES.forEach(status => {
+          const techniciansKey = `technicians_${status}`;
+          if(payload[0].payload[techniciansKey]) {
+              payload[0].payload[techniciansKey].forEach((tech: string) => allTechniciansForForm.add(tech));
+          }
+      });
+      const technicianList = Array.from(allTechniciansForForm);
+
       return (
-        <div className="rounded-lg border bg-background p-2.5 shadow-sm">
+        <div className="min-w-[12rem] rounded-lg border bg-background p-2.5 shadow-sm">
           <div className="flex flex-col gap-1.5">
              <div className="flex items-center justify-between">
                 <span className="text-[0.8rem] font-semibold">{label}</span>
                 <span className="text-[0.75rem] text-muted-foreground font-semibold">{total} {total > 1 ? 'registros' : 'registro'}</span>
              </div>
+            <div className='my-1 h-px w-full bg-border' />
             <div className='flex flex-col gap-1'>
             {payload.slice().reverse().map((p: any, index: number) => (
               p.value > 0 && <div key={index} className="flex items-center justify-between gap-4">
@@ -116,6 +140,15 @@ export function StatusByFormChart({
               </div>
             ))}
             </div>
+            {technicianList.length > 0 && (
+                <>
+                    <div className='my-1 h-px w-full bg-border' />
+                    <div>
+                        <p className="text-xs font-semibold mb-1">Técnicos:</p>
+                        <p className="text-xs text-muted-foreground">{technicianList.join(', ')}</p>
+                    </div>
+                </>
+            )}
           </div>
         </div>
       );
