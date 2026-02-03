@@ -27,6 +27,7 @@ const STATUS_COLORS: { [key: string]: string } = {
     'Fila de produção': 'hsl(240 5% 65%)', // gray
     'Em produção': 'hsl(48 96% 51%)', // yellow
     'Encerrado': 'hsl(142 71% 45%)', // green
+    'Pronto/Enviar': 'hsl(262 84% 57%)', // purple
     'Rejeitado': 'hsl(0 72% 51%)', // red
     'Enviado': 'hsl(221 83% 53%)', // blue
 };
@@ -35,6 +36,7 @@ const ALL_STATUSES = [
   'Fila de produção',
   'Em produção',
   'Encerrado',
+  'Pronto/Enviar',
   'Rejeitado',
   'Enviado',
 ];

@@ -318,6 +318,9 @@ const ProductionFormContent = () => {
                                 <SelectItem value="Encerrado">
                                     Encerrado
                                 </SelectItem>
+                                <SelectItem value="Pronto/Enviar">
+                                    Pronto/Enviar
+                                </SelectItem>
                                  <SelectItem value="Rejeitado">
                                     Rejeitado
                                 </SelectItem>
@@ -792,6 +795,7 @@ const statusColorMap: { [key: string]: string } = {
     'Fila de produção': 'bg-gray-500',
     'Em produção': 'bg-yellow-500 text-black',
     'Encerrado': 'bg-green-500',
+    'Pronto/Enviar': 'bg-purple-500',
     'Rejeitado': 'bg-red-500',
     'Enviado': 'bg-blue-500',
 };
@@ -1042,7 +1046,7 @@ export default function ProductionRegistryPage() {
           </div>
           <div className="mt-8 space-y-8">
              <div className="flex flex-col sm:flex-row justify-end gap-4">
-                <div className="grid w-full sm:max-w-xs gap-1.5 relative">
+                <div className="grid w-full sm:max-w-xs gap-1.5">
                     <Label htmlFor="date-filter">Filtrar por Data</Label>
                     <Popover>
                         <PopoverTrigger asChild>
@@ -1067,16 +1071,6 @@ export default function ProductionRegistryPage() {
                         />
                         </PopoverContent>
                     </Popover>
-                    {selectedDate && (
-                      <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-2 top-6 h-6 w-6"
-                          onClick={() => setSelectedDate(undefined)}
-                      >
-                          <X className="h-4 w-4" />
-                      </Button>
-                    )}
                 </div>
                 <div className="grid w-full sm:max-w-xs gap-1.5">
                     <Label htmlFor="operator-filter">Filtrar por Técnico</Label>
@@ -1202,6 +1196,7 @@ export default function ProductionRegistryPage() {
                                         <SelectItem value="Fila de produção">Fila de produção</SelectItem>
                                         <SelectItem value="Em produção">Em produção</SelectItem>
                                         <SelectItem value="Encerrado">Encerrado</SelectItem>
+                                        <SelectItem value="Pronto/Enviar">Pronto/Enviar</SelectItem>
                                         <SelectItem value="Rejeitado">Rejeitado</SelectItem>
                                         <SelectItem value="Enviado">Enviado</SelectItem>
                                     </SelectContent>
@@ -1249,6 +1244,7 @@ export default function ProductionRegistryPage() {
                                         Em produção
                                         </SelectItem>
                                         <SelectItem value="Encerrado">Encerrado</SelectItem>
+                                        <SelectItem value="Pronto/Enviar">Pronto/Enviar</SelectItem>
                                         <SelectItem value="Rejeitado">Rejeitado</SelectItem>
                                         <SelectItem value="Enviado">Enviado</SelectItem>
                                     </SelectContent>
