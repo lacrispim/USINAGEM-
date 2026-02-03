@@ -35,7 +35,7 @@ const chartConfig = {
     color: 'hsl(var(--chart-2))',
   },
   usinado: {
-    label: 'Usinado',
+    label: 'Realizado',
     color: 'hsl(var(--chart-1))',
   },
   usinagem: {
@@ -95,7 +95,7 @@ export function PlannedVsMachinedChart({
             <div className="flex items-center gap-2">
                 <div className="h-2.5 w-2.5 rounded-[2px] bg-transparent" />
                 <div className="flex justify-between flex-1">
-                    <span className="text-muted-foreground">Usinado (Total)</span>
+                    <span className="text-muted-foreground">Realizado (Total)</span>
                     <span className="font-bold">{machinedTotal.toFixed(1)}h</span>
                 </div>
             </div>
@@ -147,6 +147,22 @@ export function PlannedVsMachinedChart({
     }
     return null;
   };
+  
+  const CustomLegend = () => {
+    return (
+      <div className="flex items-center justify-center gap-6 mt-4">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm" style={{backgroundColor: chartConfig.planejado.color}} />
+          <span className="text-sm text-muted-foreground">{chartConfig.planejado.label}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm" style={{backgroundColor: chartConfig.usinagem.color}} />
+          <span className="text-sm text-muted-foreground">Realizado</span>
+        </div>
+      </div>
+    );
+  };
+
 
   return (
     <Card>
@@ -205,7 +221,7 @@ export function PlannedVsMachinedChart({
                     cursor={{ fill: 'hsl(var(--accent))', radius: 4 }}
                     content={<CustomTooltip />}
                   />
-                  <Legend />
+                  <Legend content={<CustomLegend />} />
                   <Bar dataKey="planejado" fill={chartConfig.planejado.color} radius={[4, 4, 0, 0]}>
                      <LabelList
                         dataKey="planejado"
