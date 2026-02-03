@@ -17,15 +17,14 @@ import {
   TriangleAlert,
   PlusCircle,
   CalendarIcon,
-  X,
   User,
 } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useDatabase } from '@/firebase';
 import { ref, onValue } from 'firebase/database';
-import { collection, query } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { LossReasonChart } from '@/components/charts/loss-reason-chart';
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
-import { getYear, getMonth, format, startOfDay, endOfDay, getISOWeek, parse } from 'date-fns';
+import { getYear, getMonth, format, startOfDay, endOfDay, getISOWeek, parse, endOfMonth, startOfISOWeek, endOfISOWeek, setISOWeek } from 'date-fns';
 import {
   Select,
   SelectContent,
@@ -110,267 +109,234 @@ export default function RecordsPage() {
     return () => unsubscribe();
   }, [database]);
 
-
-  const productionRecordsQuery = useMemoFirebase(() => firestore
-    ? query(collection(firestore, 'productionRecords'))
-    : null, [firestore]);
-  const { data: productionRecords, loading: loadingProduction } =
-    useCollection(productionRecordsQuery);
-
-  const lossRecordsQuery = useMemoFirebase(() => firestore
-    ? query(collection(firestore, 'lossRecords'))
-    : null, [firestore]);
-  const { data: lossRecords, loading: loadingLoss } =
-    useCollection(lossRecordsQuery);
+  const { startDate, endDate } = useMemo(() => {
+    let start, end;
     
-  const {
-    availableYears,
-    availableWeeks,
-    filteredProductionRecords,
-    filteredLossRecords,
-    filteredPlanejamentoData,
-    performanceProductionRecords,
-    performanceLossRecords,
-    setupDataForChart,
-    ddsDataForChart,
-    otherLossesDataForChart,
-  } = useMemo(() => {
-    if (!productionRecords || !lossRecords || !planejamentoData) {
-        return { 
-          availableYears: [], 
-          availableWeeks: [], 
-          filteredProductionRecords: [], 
-          filteredLossRecords: [], 
-          filteredPlanejamentoData: [],
-          performanceProductionRecords: [],
-          performanceLossRecords: [],
-          setupDataForChart: [],
-          ddsDataForChart: [],
-          otherLossesDataForChart: [],
-        };
-    }
-
-    const recordYears = new Set<number>();
-    [...productionRecords, ...lossRecords].forEach((record) => {
-        if (record.date?.toDate) {
-            const year = getYear(record.date.toDate());
-            if (year > 2000 && year < 3000) {
-                 recordYears.add(year);
-            }
-        }
-    });
-
-    const sortedYears = Array.from(recordYears).sort((a, b) => b - a);
-    let weeks: number[] = [];
-    if (selectedYear !== 'all') {
-      weeks = Array.from({ length: 53 }, (_, i) => i + 1);
-    }
-
-    // A generic filter function for any record with a date
-    const dateFilter = (recordDate: Date) => {
-      if (selectedDate) {
-        return recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
+    if (selectedDate) {
+      start = startOfDay(selectedDate);
+      end = endOfDay(selectedDate);
+    } else if (selectedYear && selectedYear !== 'all') {
+      const year = parseInt(selectedYear, 10);
+      if (selectedWeek && selectedWeek !== 'all') {
+        const week = parseInt(selectedWeek, 10);
+        const midYearDate = new Date(year, 6, 1); 
+        const dateInWeek = setISOWeek(midYearDate, week);
+        start = startOfISOWeek(dateInWeek);
+        end = endOfISOWeek(dateInWeek);
+      } else if (selectedMonth && selectedMonth !== 'all') {
+        const month = parseInt(selectedMonth, 10);
+        start = new Date(year, month, 1);
+        end = endOfMonth(start);
+      } else {
+        start = new Date(year, 0, 1);
+        end = new Date(year, 11, 31, 23, 59, 59);
       }
-      
-      const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
-      if (!yearMatch) return false;
-      
-      if (selectedYear !== 'all') {
-          if (selectedWeek !== 'all') {
-              return getISOWeek(recordDate) === parseInt(selectedWeek, 10);
-          }
-          if (selectedMonth !== 'all') {
-              return getMonth(recordDate) === parseInt(selectedMonth, 10);
-          }
-      }
-      return true;
     }
+    return { startDate: start, endDate: end };
+  }, [selectedDate, selectedYear, selectedMonth, selectedWeek]);
 
-    // Filter Firestore records (production/loss)
-    const baseFilterFirestore = (record: any) => {
-        if (!record.date?.toDate) return false;
-        const recordDate = record.date.toDate();
-        if (!dateFilter(recordDate)) return false;
-
-        const factoryMatch = !selectedFactory || record.factory === selectedFactory;
-        if (!factoryMatch) return false;
-
-        return true;
-    };
+  const productionRecordsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
     
-    // Unfiltered by operator for performance chart
-    const perfProdRecords = productionRecords.filter(baseFilterFirestore);
-    const perfLossRecords = lossRecords.filter(baseFilterFirestore);
+    const constraints = [];
+    if (startDate && endDate) {
+      constraints.push(where('date', '>=', startDate));
+      constraints.push(where('date', '<=', endDate));
+    }
+    if (selectedFactory) {
+      constraints.push(where('factory', '==', selectedFactory));
+    }
 
-    // Filtered by operator for other charts
-    const operatorFilterFirestore = (record: any) => {
-        if (!selectedOperator) return true;
-        const recordOp = record.operatorId || record['Técnicos'];
-        if (!recordOp) return false;
+    return query(collection(firestore, 'productionRecords'), ...constraints);
+  }, [firestore, startDate, endDate, selectedFactory]);
+
+  const { data: productionRecords, loading: loadingProduction } = useCollection(productionRecordsQuery);
+
+  const lossRecordsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
         
-        const operatorName = String(selectedOperator);
-        const recordOperatorName = String(recordOp);
+    const constraints = [];
+    if (startDate && endDate) {
+      constraints.push(where('date', '>=', startDate));
+      constraints.push(where('date', '<=', endDate));
+    }
+    if (selectedFactory) {
+      constraints.push(where('factory', '==', selectedFactory));
+    }
 
-        // Handles both direct match and partial match (e.g., "William" in "William Martinucci")
-        return recordOperatorName.includes(operatorName) || operatorName.includes(recordOperatorName);
-    };
+    return query(collection(firestore, 'lossRecords'), ...constraints);
+  }, [firestore, startDate, endDate, selectedFactory]);
 
-    const filteredProd = perfProdRecords.filter(operatorFilterFirestore);
+  const { data: lossRecords, loading: loadingLoss } = useCollection(lossRecordsQuery);
     
-    const filteredLoss = perfLossRecords.filter(operatorFilterFirestore).filter(record => {
-      const reasonMatch = !selectedReason || record.lossReason === selectedReason;
-      return reasonMatch;
-    });
-    
-    // Data for MachiningTimeByFactoryChart
-    const setupData = perfLossRecords
-      .filter(operatorFilterFirestore)
-      .filter(record => record.lossReason?.toUpperCase().includes('SETUP'));
-      
-    const ddsData = perfLossRecords
-      .filter(operatorFilterFirestore)
-      .filter(record => record.lossReason?.toUpperCase() === 'DDS' || record.lossReason?.toUpperCase() === 'DDSHE');
-
-    const otherLossesData = perfLossRecords
-      .filter(operatorFilterFirestore)
-      .filter(record => {
-          if (!record.lossReason) return true;
-          const upperCaseReason = record.lossReason.toUpperCase();
-          return !upperCaseReason.includes('SETUP') && upperCaseReason !== 'DDS' && upperCaseReason !== 'DDSHE';
+  const { availableYears, availableWeeks } = useMemo(() => {
+      const allRecords = [...(productionRecords || []), ...(lossRecords || [])];
+      const recordYears = new Set<number>();
+      allRecords.forEach((record) => {
+          if (record.date?.toDate) {
+              const year = getYear(record.date.toDate());
+              if (year > 2000 && year < 3000) {
+                  recordYears.add(year);
+              }
+          }
       });
 
+      const sortedYears = Array.from(recordYears).sort((a, b) => b - a);
+      let weeks: number[] = [];
+      if (selectedYear !== 'all') {
+          weeks = Array.from({ length: 53 }, (_, i) => i + 1);
+      }
 
-    // Filter Realtime DB records (planning)
-    const planningFilter = (record: any) => {
-      if (!record['Data Execução']) return false;
-      let recordDate;
-      try {
-        recordDate = parse(record['Data Execução'], 'dd/MM/yyyy', new Date());
-        if (isNaN(recordDate.getTime())) {
-          recordDate = new Date(record['Data Execução']);
+      return { availableYears: sortedYears, availableWeeks: weeks };
+  }, [productionRecords, lossRecords, selectedYear]);
+
+  const operatorFilter = (record: any) => {
+    if (!selectedOperator) return true;
+    const recordOp = record.operatorId || record['Técnicos'];
+    if (!recordOp) return false;
+    
+    const operatorName = String(selectedOperator);
+    const recordOperatorName = String(recordOp);
+
+    return recordOperatorName.includes(operatorName) || operatorName.includes(recordOperatorName);
+  };
+  
+  const filteredPlanejamentoData = useMemo(() => {
+      const dateFilter = (recordDate: Date) => {
+        if (selectedDate) {
+          return recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
         }
-        if (isNaN(recordDate.getTime())) return false;
-      } catch { return false; }
-      
-      if (!dateFilter(recordDate)) return false;
+        const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
+        if (!yearMatch) return false;
+        if (selectedYear !== 'all') {
+            if (selectedWeek !== 'all') {
+                return getISOWeek(recordDate) === parseInt(selectedWeek, 10);
+            }
+            if (selectedMonth !== 'all') {
+                return getMonth(recordDate) === parseInt(selectedMonth, 10);
+            }
+        }
+        return true;
+      };
 
-      const factoryMatch = !selectedFactory || record['Site'] === selectedFactory;
-      if (!factoryMatch) return false;
-      
-      return operatorFilterFirestore(record);
+      return planejamentoData.filter(record => {
+          if (!record['Data Execução']) return false;
+          let recordDate;
+          try {
+              recordDate = parse(record['Data Execução'], 'dd/MM/yyyy', new Date());
+              if (isNaN(recordDate.getTime())) recordDate = new Date(record['Data Execução']);
+              if (isNaN(recordDate.getTime())) return false;
+          } catch { return false; }
+          
+          if (!dateFilter(recordDate)) return false;
+          const factoryMatch = !selectedFactory || record['Site'] === selectedFactory;
+          if (!factoryMatch) return false;
+          
+          return operatorFilter(record);
+      });
+
+  }, [planejamentoData, selectedDate, selectedYear, selectedMonth, selectedWeek, selectedFactory, selectedOperator]);
+
+  const operatorFilteredProductionRecords = useMemo(() => {
+    if (!productionRecords) return [];
+    return productionRecords.filter(operatorFilter);
+  }, [productionRecords, selectedOperator]);
+
+  const operatorFilteredLossRecords = useMemo(() => {
+    if (!lossRecords) return [];
+    return lossRecords.filter(operatorFilter).filter(record => {
+      return !selectedReason || record.lossReason === selectedReason;
+    });
+  }, [lossRecords, selectedOperator, selectedReason]);
+
+  const setupDataForChart = useMemo(() => {
+      return (lossRecords || []).filter(operatorFilter).filter(r => r.lossReason?.toUpperCase().includes('SETUP'));
+  }, [lossRecords, selectedOperator]);
+  
+  const ddsDataForChart = useMemo(() => {
+      return (lossRecords || []).filter(operatorFilter).filter(r => r.lossReason?.toUpperCase() === 'DDS' || r.lossReason?.toUpperCase() === 'DDSHE');
+  }, [lossRecords, selectedOperator]);
+  
+  const otherLossesDataForChart = useMemo(() => {
+      return (lossRecords || []).filter(operatorFilter).filter(r => {
+          if (!r.lossReason) return true;
+          const upperCaseReason = r.lossReason.toUpperCase();
+          return !upperCaseReason.includes('SETUP') && upperCaseReason !== 'DDS' && upperCaseReason !== 'DDSHE';
+      });
+  }, [lossRecords, selectedOperator]);
+
+  const plannedVsMachinedData = useMemo(() => {
+    const dataMap: { [factory: string]: { planejado: number; usinagem: number; setup: number; dds: number; outrasPerdas: number } } = {};
+
+    const normalizeFactoryName = (name: string | undefined): string | undefined => {
+        if (!name) return undefined;
+        const upperName = name.toUpperCase().trim();
+        if (upperName === 'AGUAI' || upperName === 'AGUAÍ') return 'AGUAÍ';
+        return name;
     };
 
-    const filteredPlanData = planejamentoData.filter(planningFilter);
+    filteredPlanejamentoData.forEach(record => {
+      const factory = normalizeFactoryName(record['Site']);
+      const hours = Number(record['Horas Máquina']) || 0;
+      if (factory) {
+          if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+          dataMap[factory].planejado += hours;
+      }
+    });
+    
+    operatorFilteredProductionRecords.forEach(record => {
+        const factory = normalizeFactoryName(record.factory);
+        const hours = (Number(record.machiningTime) || 0) / 60;
+        if (factory && hours > 0) {
+            if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+            dataMap[factory].usinagem += hours;
+        }
+    });
 
-    return { 
-        availableYears: sortedYears, 
-        availableWeeks: weeks, 
-        filteredProductionRecords: filteredProd, 
-        filteredLossRecords: filteredLoss, 
-        filteredPlanejamentoData: filteredPlanData,
-        performanceProductionRecords: perfProdRecords,
-        performanceLossRecords: perfLossRecords,
-        setupDataForChart: setupData,
-        ddsDataForChart: ddsData,
-        otherLossesDataForChart: otherLossesData,
-    };
-  }, [productionRecords, lossRecords, planejamentoData, selectedYear, selectedMonth, selectedWeek, selectedDate, selectedFactory, selectedReason, selectedOperator]);
+    setupDataForChart.forEach(record => {
+        const factory = normalizeFactoryName(record.factory);
+        const hours = (Number(record.timeLost) || 0) / 60;
+        if (factory && hours > 0) {
+            if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+            dataMap[factory].setup += hours;
+        }
+    });
 
-    const plannedVsMachinedData = useMemo(() => {
-        const dataMap: { [factory: string]: { planejado: number; usinagem: number; setup: number; dds: number; outrasPerdas: number } } = {};
+    ddsDataForChart.forEach(record => {
+        const factory = normalizeFactoryName(record.factory);
+        const hours = (Number(record.timeLost) || 0) / 60;
+        if (factory && hours > 0) {
+            if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+            dataMap[factory].dds += hours;
+        }
+    });
 
-        const normalizeFactoryName = (name: string | undefined): string | undefined => {
-            if (!name) return undefined;
-            const upperName = name.toUpperCase().trim();
-            if (upperName === 'AGUAI' || upperName === 'AGUAÍ') {
-                return 'AGUAÍ';
-            }
-            return name;
-        };
+    otherLossesDataForChart.forEach(record => {
+        const factory = normalizeFactoryName(record.factory);
+        const hours = (Number(record.timeLost) || 0) / 60;
+        if (factory && hours > 0) {
+            if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+            dataMap[factory].outrasPerdas += hours;
+        }
+    });
 
-        // 1. Aggregate planned hours from filtered Realtime DB data
-        filteredPlanejamentoData.forEach(record => {
-          const factory = normalizeFactoryName(record['Site']);
-          const hours = Number(record['Horas Máquina']) || 0;
-          if (factory) {
-              if (!dataMap[factory]) {
-                dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-              }
-              dataMap[factory].planejado += hours;
-          }
-        });
-        
-        // 2. Aggregate production time
-        filteredProductionRecords.forEach(record => {
-            const factory = normalizeFactoryName(record.factory);
-            const hours = (Number(record.machiningTime) || 0) / 60;
-            if (factory && hours > 0) {
-                if (!dataMap[factory]) {
-                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-                }
-                dataMap[factory].usinagem += hours;
-            }
-        });
+    return Object.keys(dataMap).map(factory => {
+      const { usinagem, setup, dds, outrasPerdas } = dataMap[factory];
+      return {
+          name: factory,
+          planejado: dataMap[factory].planejado,
+          usinado: usinagem + setup + dds + outrasPerdas,
+          usinagem,
+          setup,
+          dds,
+          outrasPerdas,
+      }
+  }).sort((a, b) => (b.planejado + b.usinado) - (a.planejado + a.usinado));
 
-        // 3. Aggregate setup time
-        setupDataForChart.forEach(record => {
-            const factory = normalizeFactoryName(record.factory);
-            const hours = (Number(record.timeLost) || 0) / 60;
-            if (factory && hours > 0) {
-                if (!dataMap[factory]) {
-                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-                }
-                dataMap[factory].setup += hours;
-            }
-        });
-
-        // 4. Aggregate DDS time
-        ddsDataForChart.forEach(record => {
-            const factory = normalizeFactoryName(record.factory);
-            const hours = (Number(record.timeLost) || 0) / 60;
-            if (factory && hours > 0) {
-                if (!dataMap[factory]) {
-                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-                }
-                dataMap[factory].dds += hours;
-            }
-        });
-
-        // 5. Aggregate other losses
-        otherLossesDataForChart.forEach(record => {
-            const factory = normalizeFactoryName(record.factory);
-            const hours = (Number(record.timeLost) || 0) / 60;
-            if (factory && hours > 0) {
-                if (!dataMap[factory]) {
-                    dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-                }
-                dataMap[factory].outrasPerdas += hours;
-            }
-        });
-
-
-        // 6. Format for chart
-        return Object.keys(dataMap).map(factory => {
-          const usinagem = dataMap[factory].usinagem;
-          const setup = dataMap[factory].setup;
-          const dds = dataMap[factory].dds;
-          const outrasPerdas = dataMap[factory].outrasPerdas;
-          return {
-              name: factory,
-              planejado: dataMap[factory].planejado,
-              usinado: usinagem + setup + dds + outrasPerdas, // Total for the label
-              usinagem: usinagem,
-              setup: setup,
-              dds: dds,
-              outrasPerdas: outrasPerdas,
-          }
-      }).sort((a, b) => (b.planejado + b.usinado) - (a.planejado + a.usinado));
-
-  }, [filteredPlanejamentoData, filteredProductionRecords, setupDataForChart, ddsDataForChart, otherLossesDataForChart]);
+  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, setupDataForChart, ddsDataForChart, otherLossesDataForChart]);
 
 
   useEffect(() => {
-    // Let's celebrate the successful deployment!
     setShowConfetti(true);
   }, []);
 
@@ -413,15 +379,11 @@ export default function RecordsPage() {
 
 
   const totalHoursData = useMemo(() => {
-    if (loadingProduction || loadingLoss) {
-      return { totalHours: '0.0', isLoading: true };
-    }
-
-    const totalMachiningMinutes = filteredProductionRecords.reduce(
+    const totalMachiningMinutes = (operatorFilteredProductionRecords || []).reduce(
       (sum, record) => sum + (Number(record.machiningTime) || 0),
       0
     );
-    const totalLostMinutes = filteredLossRecords.reduce(
+    const totalLostMinutes = (operatorFilteredLossRecords || []).reduce(
       (sum, record) => sum + (Number(record.timeLost) || 0),
       0
     );
@@ -431,14 +393,11 @@ export default function RecordsPage() {
 
     return {
       totalHours: totalHours.toFixed(1),
-      isLoading: false,
     };
-  }, [filteredProductionRecords, filteredLossRecords, loadingProduction, loadingLoss]);
+  }, [operatorFilteredProductionRecords, operatorFilteredLossRecords]);
 
-  const totalProductionRecords = filteredProductionRecords
-    ? filteredProductionRecords.length
-    : 0;
-  const totalLossRecords = filteredLossRecords ? filteredLossRecords.length : 0;
+  const totalProductionRecords = operatorFilteredProductionRecords?.length || 0;
+  const totalLossRecords = operatorFilteredLossRecords?.length || 0;
 
   const isLoading = loadingProduction || loadingLoss;
   
@@ -621,8 +580,8 @@ export default function RecordsPage() {
         </CardHeader>
         <CardContent>
           <OperatorPerformanceChart 
-            productionData={performanceProductionRecords}
-            lossData={performanceLossRecords}
+            productionData={productionRecords || []}
+            lossData={lossRecords || []}
             loading={isLoading}
             selectedOperator={selectedOperator}
             onOperatorSelect={handleOperatorSelect}
@@ -633,13 +592,13 @@ export default function RecordsPage() {
       <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
       
       <OeeLossWaterfallChart 
-        productionData={filteredProductionRecords}
-        lossData={filteredLossRecords}
+        productionData={operatorFilteredProductionRecords}
+        lossData={operatorFilteredLossRecords}
         loading={isLoading}
       />
        
       <LossReasonChart
-        data={filteredLossRecords}
+        data={operatorFilteredLossRecords}
         loading={loadingLoss}
         selectedReason={selectedReason}
         onReasonSelect={handleReasonSelect}
@@ -656,7 +615,7 @@ export default function RecordsPage() {
         </CardHeader>
         <CardContent>
           <MachiningTimeTrendChart
-            data={filteredProductionRecords}
+            data={operatorFilteredProductionRecords}
             setupData={setupDataForChart}
             ddsData={ddsDataForChart}
             loading={loadingProduction}
@@ -667,7 +626,7 @@ export default function RecordsPage() {
       </Card>
       <Card>
         <OperatorDailyTimeChart
-          productionData={filteredProductionRecords}
+          productionData={operatorFilteredProductionRecords}
           loading={isLoading}
           isWeekView={selectedWeek !== 'all'}
           isDayView={!!selectedDate}
@@ -684,7 +643,7 @@ export default function RecordsPage() {
         </CardHeader>
         <CardContent>
           <OperatorDailyLossChart
-            lossData={filteredLossRecords}
+            lossData={operatorFilteredLossRecords}
             loading={isLoading}
             isWeekView={selectedWeek !== 'all'}
             isDayView={!!selectedDate}
@@ -694,6 +653,8 @@ export default function RecordsPage() {
     </div>
   );
 }
+    
+
     
 
     
