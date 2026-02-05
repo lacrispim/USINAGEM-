@@ -318,8 +318,8 @@ const ProductionFormContent = () => {
                                 <SelectItem value="Encerrado">
                                     Encerrado
                                 </SelectItem>
-                                <SelectItem value="Pronto/Enviar">
-                                    Pronto/Enviar
+                                <SelectItem value="Inspeção/Qualidade">
+                                    Inspeção/Qualidade
                                 </SelectItem>
                                  <SelectItem value="Rejeitado">
                                     Rejeitado
@@ -795,7 +795,7 @@ const statusColorMap: { [key: string]: string } = {
     'Fila de produção': 'bg-gray-500',
     'Em produção': 'bg-yellow-500 text-black',
     'Encerrado': 'bg-green-500',
-    'Pronto/Enviar': 'bg-purple-500',
+    'Inspeção/Qualidade': 'bg-purple-500',
     'Rejeitado': 'bg-red-500',
     'Enviado': 'bg-blue-500',
 };
@@ -1196,7 +1196,7 @@ export default function ProductionRegistryPage() {
                                         <SelectItem value="Fila de produção">Fila de produção</SelectItem>
                                         <SelectItem value="Em produção">Em produção</SelectItem>
                                         <SelectItem value="Encerrado">Encerrado</SelectItem>
-                                        <SelectItem value="Pronto/Enviar">Pronto/Enviar</SelectItem>
+                                        <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
                                         <SelectItem value="Rejeitado">Rejeitado</SelectItem>
                                         <SelectItem value="Enviado">Enviado</SelectItem>
                                     </SelectContent>
@@ -1244,7 +1244,7 @@ export default function ProductionRegistryPage() {
                                         Em produção
                                         </SelectItem>
                                         <SelectItem value="Encerrado">Encerrado</SelectItem>
-                                        <SelectItem value="Pronto/Enviar">Pronto/Enviar</SelectItem>
+                                        <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
                                         <SelectItem value="Rejeitado">Rejeitado</SelectItem>
                                         <SelectItem value="Enviado">Enviado</SelectItem>
                                     </SelectContent>
