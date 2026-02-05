@@ -324,8 +324,8 @@ const ProductionFormContent = () => {
                                  <SelectItem value="Rejeitado">
                                     Rejeitado
                                 </SelectItem>
-                                 <SelectItem value="Enviado">
-                                    Enviado
+                                 <SelectItem value="Serviços Externos">
+                                    Serviços Externos
                                 </SelectItem>
                                 </SelectContent>
                             </Select>
@@ -797,7 +797,7 @@ const statusColorMap: { [key: string]: string } = {
     'Encerrado': 'bg-green-500',
     'Inspeção/Qualidade': 'bg-purple-500',
     'Rejeitado': 'bg-red-500',
-    'Enviado': 'bg-blue-500',
+    'Serviços Externos': 'bg-blue-500',
 };
 
 
@@ -1198,7 +1198,7 @@ export default function ProductionRegistryPage() {
                                         <SelectItem value="Encerrado">Encerrado</SelectItem>
                                         <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
                                         <SelectItem value="Rejeitado">Rejeitado</SelectItem>
-                                        <SelectItem value="Enviado">Enviado</SelectItem>
+                                        <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
                                     </SelectContent>
                                   </Select>
                               </TableCell>
@@ -1246,7 +1246,7 @@ export default function ProductionRegistryPage() {
                                         <SelectItem value="Encerrado">Encerrado</SelectItem>
                                         <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
                                         <SelectItem value="Rejeitado">Rejeitado</SelectItem>
-                                        <SelectItem value="Enviado">Enviado</SelectItem>
+                                        <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
                                     </SelectContent>
                                     </Select>
                               </TableCell>

@@ -29,7 +29,7 @@ const STATUS_COLORS: { [key: string]: string } = {
     'Encerrado': 'hsl(142 71% 45%)', // green
     'Inspeção/Qualidade': 'hsl(262 84% 57%)', // purple
     'Rejeitado': 'hsl(0 72% 51%)', // red
-    'Enviado': 'hsl(221 83% 53%)', // blue
+    'Serviços Externos': 'hsl(221 83% 53%)', // blue
 };
 
 const ALL_STATUSES = [
@@ -38,7 +38,7 @@ const ALL_STATUSES = [
   'Encerrado',
   'Inspeção/Qualidade',
   'Rejeitado',
-  'Enviado',
+  'Serviços Externos',
 ];
 
 interface StatusByFormChartProps {
