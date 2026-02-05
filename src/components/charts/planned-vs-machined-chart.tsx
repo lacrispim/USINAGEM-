@@ -32,7 +32,7 @@ interface PlannedVsMachinedChartProps {
 const chartConfig = {
   planejado: {
     label: 'Planejado',
-    color: 'hsl(var(--chart-2))',
+    color: 'hsl(var(--chart-5))',
   },
   usinado: {
     label: 'Realizado',
@@ -185,7 +185,7 @@ export function PlannedVsMachinedChart({
                 <div className="text-right">
                     <p className="text-2xl font-bold text-green-500">{totals.totalRealizado.toFixed(1)}h</p>
                     <p className="text-xs text-muted-foreground">Total Realizado</p>
-                    <p className="text-2xl font-bold text-sky-400 mt-2">{totals.totalPlanejado.toFixed(1)}h</p>
+                    <p className="text-2xl font-bold text-chart-5 mt-2">{totals.totalPlanejado.toFixed(1)}h</p>
                     <p className="text-xs text-muted-foreground">Total Planejado</p>
                 </div>
             )}
@@ -222,7 +222,7 @@ export function PlannedVsMachinedChart({
                     content={<CustomTooltip />}
                   />
                   <Legend content={<CustomLegend />} />
-                  <Bar dataKey="planejado" fill={chartConfig.planejado.color} radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="planejado" fill="var(--color-planejado)" radius={[4, 4, 0, 0]}>
                      <LabelList
                         dataKey="planejado"
                         position="top"
