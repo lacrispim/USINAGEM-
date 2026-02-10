@@ -42,6 +42,7 @@ import { Confetti } from '@/components/ui/confetti';
 import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
 import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
 import { StatusByFormChart } from '@/components/charts/status-by-form-chart';
+import { DailyPdlMplLossChart } from '@/components/charts/daily-pdl-mpl-loss-chart';
 
 
 const months = [
@@ -640,6 +641,12 @@ export default function RecordsPage() {
           />
         </CardContent>
       </Card>
+      <DailyPdlMplLossChart 
+        lossData={operatorFilteredLossRecords}
+        loading={isLoading}
+        isWeekView={selectedWeek !== 'all'}
+        isDayView={!!selectedDate}
+      />
     </div>
   );
 }
