@@ -42,7 +42,6 @@ import { Confetti } from '@/components/ui/confetti';
 import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
 import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
 import { StatusByFormChart } from '@/components/charts/status-by-form-chart';
-import { PdlMplLossChart } from '@/components/charts/pdl-mpl-loss-chart';
 
 
 const months = [
@@ -586,11 +585,6 @@ export default function RecordsPage() {
       
       <OeeLossWaterfallChart 
         productionData={operatorFilteredProductionRecords}
-        lossData={operatorFilteredLossRecords}
-        loading={isLoading}
-      />
-      
-      <PdlMplLossChart
         lossData={operatorFilteredLossRecords}
         loading={isLoading}
       />
