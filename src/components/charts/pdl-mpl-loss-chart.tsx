@@ -69,10 +69,13 @@ export function PdlMplLossChart({
 
     lossData.forEach(record => {
       const time = Number(record.timeLost) || 0;
-      if (PDL_REASONS.includes(record.lossReason)) {
-        lossTotals.PDL += time;
-      } else if (MPL_REASONS.includes(record.lossReason)) {
-        lossTotals.MPL += time;
+      if (record.lossReason) {
+        const reason = String(record.lossReason).trim().toUpperCase();
+        if (PDL_REASONS.includes(reason)) {
+          lossTotals.PDL += time;
+        } else if (MPL_REASONS.includes(reason)) {
+          lossTotals.MPL += time;
+        }
       }
     });
 
