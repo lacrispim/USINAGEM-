@@ -42,6 +42,7 @@ import { Confetti } from '@/components/ui/confetti';
 import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
 import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
 import { StatusByFormChart } from '@/components/charts/status-by-form-chart';
+import { PdlMplLossChart } from '@/components/charts/pdl-mpl-loss-chart';
 
 
 const months = [
@@ -135,13 +136,13 @@ export default function RecordsPage() {
   }, [selectedDate, selectedYear, selectedMonth, selectedWeek]);
 
   const productionRecordsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !startDate || !endDate) return null;
     
-    const constraints = [];
-    if (startDate && endDate) {
-      constraints.push(where('date', '>=', startDate));
-      constraints.push(where('date', '<=', endDate));
-    }
+    const constraints = [
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
+    ];
+   
     if (selectedFactory) {
       constraints.push(where('factory', '==', selectedFactory));
     }
@@ -152,13 +153,13 @@ export default function RecordsPage() {
   const { data: productionRecords, loading: loadingProduction } = useCollection(productionRecordsQuery);
 
   const lossRecordsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !startDate || !endDate) return null;
         
-    const constraints = [];
-    if (startDate && endDate) {
-      constraints.push(where('date', '>=', startDate));
-      constraints.push(where('date', '<=', endDate));
-    }
+    const constraints = [
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
+    ];
+   
     if (selectedFactory) {
       constraints.push(where('factory', '==', selectedFactory));
     }
@@ -585,6 +586,11 @@ export default function RecordsPage() {
       
       <OeeLossWaterfallChart 
         productionData={operatorFilteredProductionRecords}
+        lossData={operatorFilteredLossRecords}
+        loading={isLoading}
+      />
+      
+      <PdlMplLossChart
         lossData={operatorFilteredLossRecords}
         loading={isLoading}
       />
