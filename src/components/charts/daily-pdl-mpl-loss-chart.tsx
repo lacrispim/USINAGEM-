@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
   LabelList,
-  Legend,
+  Cell,
 } from 'recharts';
 import {
   Card,
@@ -23,8 +23,6 @@ import {
   ChartTooltip,
 } from '@/components/ui/chart';
 import { Loader } from 'lucide-react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 interface DailyPdlMplLossChartProps {
   lossData: any[];
@@ -63,125 +61,115 @@ const chartConfig = {
     label: 'MPL (Não Planejada)',
     color: 'hsl(48 96% 51%)', // yellow
   },
+  total: {
+      label: 'Total',
+      color: 'hsl(221 83% 53%)', // blue
+  }
 };
 
 export function DailyPdlMplLossChart({
   lossData,
   loading,
-  isWeekView,
-  isDayView,
 }: DailyPdlMplLossChartProps) {
-  const { chartData, maxHours } = useMemo(() => {
+  const { chartData, totalPdlHours, totalMplHours } = useMemo(() => {
     if (!lossData) {
-      return { chartData: [], maxHours: 10 };
+      return { chartData: [], totalPdlHours: 0, totalMplHours: 0 };
     }
 
-    const dailyData: { [date: string]: { pdl: number; mpl: number } } = {};
+    let pdlTotal = 0;
+    let mplTotal = 0;
 
     lossData.forEach(record => {
-      if (record.lossReason && record.date && record.date.toDate) {
-        const dateObj = record.date.toDate();
-        const dateStr = format(dateObj, 'yyyy-MM-dd');
+      if (record.lossReason && record.timeLost) {
         const reason = String(record.lossReason).toUpperCase().trim();
         const timeInHours = (Number(record.timeLost) || 0) / 60;
 
-        if (!dailyData[dateStr]) {
-          dailyData[dateStr] = { pdl: 0, mpl: 0 };
-        }
-
         if (pdlReasons.includes(reason)) {
-          dailyData[dateStr].pdl += timeInHours;
+          pdlTotal += timeInHours;
         } else if (mplReasons.includes(reason)) {
-          dailyData[dateStr].mpl += timeInHours;
+          mplTotal += timeInHours;
         }
       }
     });
 
-    const chartDataResult = Object.entries(dailyData)
-      .map(([date, values]) => ({
-        date,
-        total: values.pdl + values.mpl,
-        pdl: values.pdl,
-        mpl: values.mpl,
-      }))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const waterfallData: {name: string, start: number, value: number, color: string}[] = [];
     
-    const maxDailyTotal = Math.max(...chartDataResult.map(d => d.total), 0);
-    const calculatedMaxHours = maxDailyTotal > 0 ? Math.ceil(maxDailyTotal / 2) * 2 + 2 : 10;
+    waterfallData.push({
+      name: 'PDL',
+      start: 0,
+      value: pdlTotal,
+      color: chartConfig.pdl.color,
+    });
     
-    return { chartData: chartDataResult, maxHours: calculatedMaxHours };
+    waterfallData.push({
+      name: 'MPL',
+      start: pdlTotal,
+      value: mplTotal,
+      color: chartConfig.mpl.color,
+    });
+
+    waterfallData.push({
+      name: 'Total',
+      start: 0,
+      value: pdlTotal + mplTotal,
+      color: chartConfig.total.color,
+    });
+
+    return { chartData: waterfallData, totalPdlHours: pdlTotal, totalMplHours: mplTotal };
 
   }, [lossData]);
 
-  const xAxisFormatter = (value: string) => {
-    const date = new Date(value);
-    date.setDate(date.getDate() + 1); // Adjust for timezone issues
-    if (isDayView) return format(date, 'dd/MM');
-    return isWeekView ? format(date, 'EEE', { locale: ptBR }) : format(date, 'dd/MM');
-  }
-
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      const total = data.total || 0;
-      
-      const date = new Date(label);
-      date.setDate(date.getDate() + 1);
-      const formattedLabel = format(date, 'dd/MM/yyyy');
+      const value = payload.find((p: any) => p.dataKey === 'value')?.value || 0;
+      let description = '';
+      if(label === 'PDL') description = 'Perda por Parada Planejada';
+      if(label === 'MPL') description = 'Perda do Processo de Manufatura';
+      if(label === 'Total') description = 'Perda Total';
 
       return (
-        <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[10rem]">
+        <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[12rem]">
           <div className="grid gap-1.5">
-            <div className="flex justify-between items-center">
-              <p className="font-semibold">{formattedLabel}</p>
-              <p className="font-bold">{total.toFixed(1)}h</p>
-            </div>
-            <div className="h-px w-full my-1 bg-border" />
-            {payload.slice().reverse().map((pld: any) => (
-                pld.value > 0 &&
-                <div key={pld.dataKey} className="flex justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: pld.fill}}/>
-                        <span>{pld.name}</span>
-                    </div>
-                    <span className="font-medium">{(pld.value || 0).toFixed(1)}h</span>
+            <p className="font-semibold">{label}</p>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+            <div className="flex items-center gap-2 mt-1">
+                <div className="flex justify-between flex-1">
+                    <span className="text-muted-foreground">Horas</span>
+                    <span className="font-bold">{value.toFixed(1)}h</span>
                 </div>
-            ))}
+            </div>
           </div>
         </div>
       );
     }
     return null;
   };
-
-  const CustomLegend = (props: any) => {
-    const { payload } = props;
-    return (
-      <div className="flex justify-center flex-wrap gap-4">
-        {payload.map((entry: any, index: number) => (
-          <div key={`item-${index}`} className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: entry.color }} />
-            <span className="text-xs text-muted-foreground">{entry.value === 'pdl' ? 'PDL (Planejada)' : 'MPL (Não Planejada)'}</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
+  
+  const totalLoss = totalPdlHours + totalMplHours;
+  const maxHours = totalLoss > 0 ? Math.ceil(totalLoss / 5) * 5 + 5 : 10;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Análise de Perdas Diárias (PDL vs MPL)</CardTitle>
-        <CardDescription>
-          Visualização das horas de perda diárias, com detalhamento de PDL (Planejada) e MPL (Não Planejada).
-        </CardDescription>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle>Análise de Perdas em Cascata (PDL vs MPL)</CardTitle>
+                <CardDescription>Análise em cascata das perdas planejadas e não planejadas.</CardDescription>
+            </div>
+            <div className="text-right">
+                <p className="text-sm font-bold" style={{color: chartConfig.pdl.color}}>{totalPdlHours.toFixed(1)}h</p>
+                <p className="text-xs text-muted-foreground">Perda Planejada (PDL)</p>
+                <p className="text-sm font-bold mt-1" style={{color: chartConfig.mpl.color}}>{totalMplHours.toFixed(1)}h</p>
+                <p className="text-xs text-muted-foreground">Perda Não Planejada (MPL)</p>
+            </div>
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
           <div className="flex h-[350px] w-full items-center justify-center">
             <Loader className="h-8 w-8 animate-spin" />
           </div>
-        ) : chartData.length > 0 ? (
+        ) : chartData.length > 1 ? (
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig}>
@@ -191,17 +179,14 @@ export function DailyPdlMplLossChart({
                     top: 20,
                     right: 30,
                     left: 0,
-                    bottom: (isWeekView || chartData.length > 7) ? 60 : 20,
+                    bottom: 0,
                   }}
                 >
                   <CartesianGrid vertical={false} />
                   <XAxis 
-                    dataKey="date"
-                    tickFormatter={xAxisFormatter}
-                    angle={(isWeekView || chartData.length > 7) ? -45 : 0}
-                    textAnchor={(isWeekView || chartData.length > 7) ? "end" : "middle"}
+                    dataKey="name"
                     interval={0}
-                    height={(isWeekView || chartData.length > 7) ? 70 : 30}
+                    height={40}
                     tick={{fontSize: 12}}
                   />
                   <YAxis 
@@ -213,15 +198,18 @@ export function DailyPdlMplLossChart({
                     cursor={{fill: 'hsl(var(--accent))', radius: 4}}
                     content={<CustomTooltip />}
                   />
-                  <Legend verticalAlign="top" content={<CustomLegend />}/>
-                  <Bar dataKey="pdl" name="PDL (Planejada)" stackId="a" fill={chartConfig.pdl.color} />
-                  <Bar dataKey="mpl" name="MPL (Não Planejada)" stackId="a" fill={chartConfig.mpl.color} radius={[4, 4, 0, 0]}>
-                    <LabelList
-                      dataKey="total"
-                      position="top"
-                      formatter={(value: number) => value > 0.1 ? `${value.toFixed(1)}h` : ''}
-                      className="text-xs fill-muted-foreground"
+                  
+                  <Bar dataKey="start" stackId="a" fill="transparent" />
+                  <Bar dataKey="value" stackId="a" radius={[4, 4, 0, 0]}>
+                    <LabelList 
+                        dataKey="value" 
+                        position="top"
+                        formatter={(value: number) => value > 0.05 ? `${value.toFixed(1)}h` : ''}
+                        className="text-xs fill-muted-foreground"
                     />
+                     {chartData.map((entry, index) => {
+                        return <Cell key={`cell-${index}`} fill={entry.color} />;
+                    })}
                   </Bar>
                 </BarChart>
               </ChartContainer>
