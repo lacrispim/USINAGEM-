@@ -590,6 +590,13 @@ export default function RecordsPage() {
         loading={isLoading}
       />
 
+      <DailyPdlMplLossChart 
+        lossData={operatorFilteredLossRecords}
+        loading={isLoading}
+        isWeekView={selectedWeek !== 'all'}
+        isDayView={!!selectedDate}
+      />
+
       <StatusByFormChart
         data={operatorFilteredProductionRecords}
         loading={isLoading}
@@ -641,12 +648,6 @@ export default function RecordsPage() {
           />
         </CardContent>
       </Card>
-      <DailyPdlMplLossChart 
-        lossData={operatorFilteredLossRecords}
-        loading={isLoading}
-        isWeekView={selectedWeek !== 'all'}
-        isDayView={!!selectedDate}
-      />
     </div>
   );
 }
