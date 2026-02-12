@@ -285,7 +285,7 @@ const ProductionFormContent = () => {
                                 <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
                                 <SelectItem value="SUAPE">SUAPE</SelectItem>
                                 <SelectItem value="IGARASSU">IGARASSU</SelectItem>
-                                <SelectItem value="GARANHUS">GARANHUS</SelectItem>
+                                <SelectItem value="GARANHUNS">GARANHUNS</SelectItem>
                                 <SelectItem value="TORRE">TORRE</SelectItem>
                             </SelectContent>
                         </Select>
@@ -654,7 +654,7 @@ const LossFormContent = () => {
                                 <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
                                 <SelectItem value="SUAPE">SUAPE</SelectItem>
                                 <SelectItem value="IGARASSU">IGARASSU</SelectItem>
-                                <SelectItem value="GARANHUS">GARANHUS</SelectItem>
+                                <SelectItem value="GARANHUNS">GARANHUNS</SelectItem>
                                 <SelectItem value="TORRE">TORRE</SelectItem>
                             </SelectContent>
                           </Select>
@@ -1161,7 +1161,7 @@ export default function ProductionRegistryPage() {
                                     <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
                                     <SelectItem value="SUAPE">SUAPE</SelectItem>
                                     <SelectItem value="IGARASSU">IGARASSU</SelectItem>
-                                    <SelectItem value="GARANHUS">GARANHUS</SelectItem>
+                                    <SelectItem value="GARANHUNS">GARANHUNS</SelectItem>
                                     <SelectItem value="TORRE">TORRE</SelectItem>
                                   </SelectContent>
                                 </Select>
@@ -1360,7 +1360,7 @@ export default function ProductionRegistryPage() {
                                             <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
                                             <SelectItem value="SUAPE">SUAPE</SelectItem>
                                             <SelectItem value="IGARASSU">IGARASSU</SelectItem>
-                                            <SelectItem value="GARANHUS">GARANHUS</SelectItem>
+                                            <SelectItem value="GARANHUNS">GARANHUNS</SelectItem>
                                             <SelectItem value="TORRE">TORRE</SelectItem>
                                         </SelectContent>
                                     </Select>

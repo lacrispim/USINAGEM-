@@ -42,7 +42,7 @@ const FACTORY_COLORS: { [key: string]: string } = {
   'AGUAÍ': 'hsl(var(--chart-6))',
   'SUAPE': 'hsl(var(--chart-7))',
   'IGARASSU': 'hsl(var(--chart-8))',
-  'GARANHUS': 'hsl(var(--chart-9))',
+  'GARANHUNS': 'hsl(var(--chart-9))',
   'TORRE': 'hsl(var(--chart-10))',
 };
 
