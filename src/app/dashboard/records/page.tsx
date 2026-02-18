@@ -44,7 +44,6 @@ import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-ch
 import { StatusByFormChart } from '@/components/charts/status-by-form-chart';
 import { DailyPdlMplLossChart } from '@/components/charts/daily-pdl-mpl-loss-chart';
 
-
 const months = [
     { value: '0', label: 'Janeiro' },
     { value: '1', label: 'Fevereiro' },
@@ -58,6 +57,14 @@ const months = [
     { value: '9', label: 'Outubro' },
     { value: '10', label: 'Novembro' },
     { value: '11', label: 'Dezembro' },
+];
+
+const operatorList = [
+    "Daniel Solivo",
+    "Rodrigo Cantano",
+    "Gustavo Gozzi",
+    "William Martinucci",
+    "Nathan Xavier"
 ];
 
 
@@ -191,7 +198,7 @@ export default function RecordsPage() {
   }, [productionRecords, lossRecords, selectedYear]);
 
   const operatorFilter = (record: any) => {
-    if (!selectedOperator) return true;
+    if (!selectedOperator || selectedOperator === 'all') return true;
     const recordOp = record.operatorId || record['Técnicos'];
     if (!recordOp) return false;
     
@@ -563,6 +570,25 @@ export default function RecordsPage() {
                   </PopoverContent>
               </Popover>
           </div>
+          <div className="grid w-full sm:max-w-[200px] gap-1.5">
+              <Label htmlFor="operator-filter">Técnico</Label>
+              <Select value={selectedOperator || 'all'} onValueChange={setSelectedOperator}>
+                  <SelectTrigger id="operator-filter">
+                      <div className='flex items-center gap-2'>
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <SelectValue placeholder="Selecione o técnico" />
+                      </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Todos os Técnicos</SelectItem>
+                      {operatorList.map((op) => (
+                          <SelectItem key={op} value={op}>
+                              {op}
+                          </SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+          </div>
       </div>
        <Card>
         <CardHeader>
@@ -651,10 +677,3 @@ export default function RecordsPage() {
     </div>
   );
 }
-    
-
-    
-
-    
-
-    
