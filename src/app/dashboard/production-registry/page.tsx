@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -145,7 +146,8 @@ const operatorList = [
     "Daniel Solivo",
     "Rodrigo Cantano",
     "Gustavo Gozzi",
-    "William Martinucci"
+    "William Martinucci",
+    "Nathan Xavier"
 ];
 
 

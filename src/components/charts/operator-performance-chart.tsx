@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -40,7 +41,8 @@ const OPERATOR_COLORS: { [key: string]: string } = {
   'Rodrigo Cantano': 'hsl(var(--chart-2))',
   'Gustavo Gozzi': 'hsl(var(--chart-3))',
   'William Martinucci': 'hsl(var(--chart-4))',
-  'Outro': 'hsl(var(--chart-5))',
+  'Nathan Xavier': 'hsl(var(--chart-5))',
+  'Outro': 'hsl(var(--chart-6))',
 };
 
 export function OperatorPerformanceChart({
@@ -189,6 +191,3 @@ export function OperatorPerformanceChart({
         )
   );
 }
-    
-
-    
