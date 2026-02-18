@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -71,7 +72,7 @@ export default function RecordsPage() {
   const firestore = useFirestore();
   const database = useDatabase();
   const [showConfetti, setShowConfetti] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
+  const [selectedYear, setSelectedYear] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -80,6 +81,12 @@ export default function RecordsPage() {
 
   const [planejamentoData, setPlanejamentoData] = useState<any[]>([]);
   const [loadingPlanejamento, setLoadingPlanejamento] = useState(true);
+
+  // Fix hydration by setting current year only on client
+  useEffect(() => {
+    setSelectedYear(String(new Date().getFullYear()));
+    setShowConfetti(true);
+  }, []);
 
   useEffect(() => {
     if (!database) {
@@ -115,8 +122,9 @@ export default function RecordsPage() {
   }, [database]);
 
   const { startDate, endDate } = useMemo(() => {
-    let start, end;
+    if (!selectedYear) return { startDate: undefined, endDate: undefined };
     
+    let start, end;
     if (selectedDate) {
       start = startOfDay(selectedDate);
       end = endOfDay(selectedDate);
@@ -188,7 +196,7 @@ export default function RecordsPage() {
 
       const sortedYears = Array.from(recordYears).sort((a, b) => b - a);
       let weeks: number[] = [];
-      if (selectedYear !== 'all') {
+      if (selectedYear && selectedYear !== 'all') {
           weeks = Array.from({ length: 53 }, (_, i) => i + 1);
       }
 
@@ -211,6 +219,7 @@ export default function RecordsPage() {
         if (selectedDate) {
           return recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
         }
+        if (!selectedYear) return true;
         const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
         if (!yearMatch) return false;
         if (selectedYear !== 'all') {
@@ -340,10 +349,6 @@ export default function RecordsPage() {
 
 
   useEffect(() => {
-    setShowConfetti(true);
-  }, []);
-
-  useEffect(() => {
     setSelectedMonth('all');
     setSelectedWeek('all');
     setSelectedDate(undefined);
@@ -368,7 +373,7 @@ export default function RecordsPage() {
       setSelectedMonth('all');
       setSelectedWeek('all');
       const year = getYear(selectedDate);
-      if (String(year) !== selectedYear) {
+      if (selectedYear && String(year) !== selectedYear) {
         setSelectedYear(String(year));
       }
     }
@@ -492,7 +497,7 @@ export default function RecordsPage() {
       <div className="flex flex-col sm:flex-row justify-start gap-2">
           <div className="grid w-full sm:max-w-[120px] gap-1.5">
               <Label htmlFor="year-filter">Ano</Label>
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <Select value={selectedYear || 'all'} onValueChange={setSelectedYear}>
                   <SelectTrigger id="year-filter">
                   <SelectValue placeholder="Selecione o ano" />
                   </SelectTrigger>
@@ -508,7 +513,7 @@ export default function RecordsPage() {
           </div>
             <div className="grid w-full sm:max-w-[120px] gap-1.5">
               <Label htmlFor="month-filter">Mês</Label>
-              <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={selectedYear === 'all' || !!selectedDate || selectedWeek !== 'all'}>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={!selectedYear || selectedYear === 'all' || !!selectedDate || selectedWeek !== 'all'}>
                   <SelectTrigger id="month-filter">
                       <SelectValue placeholder="Selecione o mês" />
                   </SelectTrigger>
@@ -524,7 +529,7 @@ export default function RecordsPage() {
           </div>
           <div className="grid w-full sm:max-w-[150px] gap-1.5">
               <Label htmlFor="week-filter">Semana</Label>
-              <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={selectedYear === 'all' || !!selectedDate || selectedMonth !== 'all'}>
+              <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={!selectedYear || selectedYear === 'all' || !!selectedDate || selectedMonth !== 'all'}>
                   <SelectTrigger id="week-filter">
                   <SelectValue placeholder="Selecione a semana" />
                   </SelectTrigger>

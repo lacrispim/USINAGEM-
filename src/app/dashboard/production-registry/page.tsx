@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -55,10 +56,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, orderBy, query, limit, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, orderBy, query, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { format, parse, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { ptBR } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { Label } from '@/components/ui/label';
 
@@ -115,7 +115,7 @@ type LossFormValues = z.infer<typeof lossFormSchema>;
 
 const initialProductionValues = {
   operatorId: '',
-  date: format(new Date(), 'dd/MM/yyyy'),
+  date: '',
   factory: '',
   formsNumber: '',
   activityType: '',
@@ -131,7 +131,7 @@ const initialProductionValues = {
 
 const initialLossValues = {
     operatorId: '',
-    date: format(new Date(), 'dd/MM/yyyy'),
+    date: '',
     machine: '',
     lossReason: '',
     deadPartsQuantity: 0,
@@ -149,7 +149,6 @@ const operatorList = [
     "Nathan Xavier"
 ];
 
-
 const ProductionFormContent = () => {
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -162,13 +161,11 @@ const ProductionFormContent = () => {
 
      useEffect(() => {
         setIsClient(true);
-        if (isClient) {
-            productionForm.reset({
-                ...initialProductionValues,
-                date: format(new Date(), 'dd/MM/yyyy'),
-            });
-        }
-    }, [isClient, productionForm]);
+        productionForm.reset({
+            ...initialProductionValues,
+            date: format(new Date(), 'dd/MM/yyyy'),
+        });
+    }, [productionForm]);
 
     const machiningTime = useWatch({
         control: productionForm.control,
@@ -184,33 +181,31 @@ const ProductionFormContent = () => {
     async function onProductionSubmit(values: ProductionFormValues) {
         if (!firestore) return;
         try {
-        const date = parse(values.date, 'dd/MM/yyyy', new Date());
-        await addDoc(collection(firestore, 'productionRecords'), {
-            ...values,
-            date,
-            createdAt: serverTimestamp(),
-        });
-        toast({
-            title: 'Produção Registrada',
-            description: 'Os dados de produção foram salvos com sucesso.',
-        });
-        productionForm.reset({
-            ...initialProductionValues,
-            date: format(new Date(), 'dd/MM/yyyy'),
-        });
+            const date = parse(values.date, 'dd/MM/yyyy', new Date());
+            await addDoc(collection(firestore, 'productionRecords'), {
+                ...values,
+                date,
+                createdAt: serverTimestamp(),
+            });
+            toast({
+                title: 'Produção Registrada',
+                description: 'Os dados de produção foram salvos com sucesso.',
+            });
+            productionForm.reset({
+                ...initialProductionValues,
+                date: format(new Date(), 'dd/MM/yyyy'),
+            });
         } catch (error) {
-        console.error('Error adding production record: ', error);
-        toast({
-            title: 'Erro',
-            description: 'Não foi possível salvar o registro de produção.',
-            variant: 'destructive',
-        });
+            console.error('Error adding production record: ', error);
+            toast({
+                title: 'Erro',
+                description: 'Não foi possível salvar o registro de produção.',
+                variant: 'destructive',
+            });
         }
     }
     
-    if (!isClient) {
-        return null; 
-    }
+    if (!isClient) return null;
 
     return (
         <Card>
@@ -238,7 +233,7 @@ const ProductionFormContent = () => {
                           >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Selecione o operador" />
+                                <SelectValue placeholder="Selecione o técnico" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -493,9 +488,7 @@ const ProductionFormContent = () => {
                         title="Cronômetro de Produção"
                         initialTimeInMinutes={machiningTime || 0}
                         onTimeChange={(time) => {
-                            requestAnimationFrame(() => {
-                                productionForm.setValue('machiningTime', time)
-                            });
+                            productionForm.setValue('machiningTime', time);
                         }}
                     />
                     <Button type="submit" className="w-full">
@@ -511,7 +504,7 @@ const ProductionFormContent = () => {
 const LossFormContent = () => {
     const { toast } = useToast();
     const firestore = useFirestore();
-     const [isClient, setIsClient] = useState(false);
+    const [isClient, setIsClient] = useState(false);
 
     const lossForm = useForm<LossFormValues>({
         resolver: zodResolver(lossFormSchema),
@@ -534,13 +527,11 @@ const LossFormContent = () => {
 
      useEffect(() => {
         setIsClient(true);
-        if (isClient) {
-            lossForm.reset({
-                ...initialLossValues,
-                date: format(new Date(), 'dd/MM/yyyy'),
-            });
-        }
-    }, [isClient, lossForm]);
+        lossForm.reset({
+            ...initialLossValues,
+            date: format(new Date(), 'dd/MM/yyyy'),
+        });
+    }, [lossForm]);
 
     const timeLost = useWatch({
         control: lossForm.control,
@@ -576,10 +567,7 @@ const LossFormContent = () => {
         }
     }
     
-    if (!isClient) {
-        return null;
-    }
-
+    if (!isClient) return null;
 
     return (
         <Card>
@@ -607,7 +595,7 @@ const LossFormContent = () => {
                           >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Selecione o operador" />
+                                <SelectValue placeholder="Selecione o técnico" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -623,7 +611,7 @@ const LossFormContent = () => {
                       name="date"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Data da Perda</Label>
+                          <FormLabel>Data da Perda</FormLabel>
                           <FormControl>
                             <Input placeholder="dd/MM/yyyy" {...field} />
                           </FormControl>
@@ -745,7 +733,7 @@ const LossFormContent = () => {
                       name="timeLost"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Tempo Perdido (minutos)</FormLabel>
+                          <FormLabel>Tempo Perdido (minutos)</Label>
                           <FormControl>
                              <Input type="number" value={field.value || ''} onChange={(e) => field.onChange(e.target.valueAsNumber)} />
                           </FormControl>
@@ -773,9 +761,7 @@ const LossFormContent = () => {
                         title="Cronômetro de Perda"
                         initialTimeInMinutes={timeLost || 0}
                         onTimeChange={(time) => {
-                            requestAnimationFrame(() => {
-                                lossForm.setValue('timeLost', time)
-                            });
+                            lossForm.setValue('timeLost', time);
                         }}
                      />
                     <Button
@@ -790,7 +776,7 @@ const LossFormContent = () => {
               </CardContent>
             </Card>
     );
-}
+};
 
 const statusColorMap: { [key: string]: string } = {
     'Fila de produção': 'bg-gray-500',
@@ -1465,3 +1451,4 @@ export default function ProductionRegistryPage() {
     </div>
   );
 }
+
