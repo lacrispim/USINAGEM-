@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -624,7 +623,7 @@ const LossFormContent = () => {
                       name="date"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Data da Perda</FormLabel>
+                          <FormLabel>Data da Perda</Label>
                           <FormControl>
                             <Input placeholder="dd/MM/yyyy" {...field} />
                           </FormControl>

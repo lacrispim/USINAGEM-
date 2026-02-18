@@ -67,7 +67,6 @@ const operatorList = [
     "Nathan Xavier"
 ];
 
-
 export default function RecordsPage() {
   const firestore = useFirestore();
   const database = useDatabase();
@@ -112,7 +111,6 @@ export default function RecordsPage() {
       }
     );
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [database]);
 
@@ -157,7 +155,7 @@ export default function RecordsPage() {
     return query(collection(firestore, 'productionRecords'), ...constraints);
   }, [firestore, startDate, endDate, selectedFactory]);
 
-  const { data: productionRecords, loading: loadingProduction } = useCollection(productionRecordsQuery);
+  const { data: productionRecords, isLoading: loadingProduction } = useCollection(productionRecordsQuery);
 
   const lossRecordsQuery = useMemoFirebase(() => {
     if (!firestore || !startDate || !endDate) return null;
@@ -174,7 +172,7 @@ export default function RecordsPage() {
     return query(collection(firestore, 'lossRecords'), ...constraints);
   }, [firestore, startDate, endDate, selectedFactory]);
 
-  const { data: lossRecords, loading: loadingLoss } = useCollection(lossRecordsQuery);
+  const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossRecordsQuery);
     
   const { availableYears, availableWeeks } = useMemo(() => {
       const allRecords = [...(productionRecords || []), ...(lossRecords || [])];
@@ -259,14 +257,14 @@ export default function RecordsPage() {
   }, [lossRecords, selectedOperator]);
   
   const ddsDataForChart = useMemo(() => {
-      return (lossRecords || []).filter(operatorFilter).filter(r => r.lossReason?.toUpperCase() === 'DDS' || r.lossReason?.toUpperCase() === 'DDSHE');
+      return (lossRecords || []).filter(operatorFilter).filter(r => r.lossReason?.toUpperCase() === 'DDS' || r.lossReason?.toUpperCase() === 'DDSHE' || r.lossReason?.toUpperCase() === 'DDS, APONTAMENTO HORAS, ATIVIDADE ADM');
   }, [lossRecords, selectedOperator]);
   
   const otherLossesDataForChart = useMemo(() => {
       return (lossRecords || []).filter(operatorFilter).filter(r => {
           if (!r.lossReason) return true;
           const upperCaseReason = r.lossReason.toUpperCase();
-          return !upperCaseReason.includes('SETUP') && upperCaseReason !== 'DDS' && upperCaseReason !== 'DDSHE';
+          return !upperCaseReason.includes('SETUP') && !upperCaseReason.includes('DDS');
       });
   }, [lossRecords, selectedOperator]);
 
@@ -404,10 +402,6 @@ export default function RecordsPage() {
   const totalLossRecords = operatorFilteredLossRecords?.length || 0;
 
   const isLoading = loadingProduction || loadingLoss;
-  
-  const handleFactorySelect = (factoryName: string | null) => {
-    setSelectedFactory(current => current === factoryName ? null : factoryName);
-  };
   
   const handleOperatorSelect = (operatorName: string | null) => {
     setSelectedOperator(current => current === operatorName ? null : operatorName);
