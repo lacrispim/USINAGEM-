@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, Monitor, Smartphone, TrendingUp, Trash2, Edit, Save, XCircle, FileSpreadsheet, User, X } from 'lucide-react';
+import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -82,6 +81,27 @@ const lossReasonDetails = [
 
 const lossReasonOptions = lossReasonDetails.map(item => item.value);
 
+const operatorList = [
+    "Daniel Solivo",
+    "Rodrigo Cantano",
+    "Gustavo Gozzi",
+    "William Martinucci",
+    "Nathan Xavier"
+];
+
+const factoryList = [
+    "VALINHOS DOVE",
+    "VALINHOS SABONETE",
+    "VINHEDO",
+    "POUSO ALEGRE",
+    "INDAIATUBA",
+    "AGUAÍ",
+    "SUAPE",
+    "IGARASSU",
+    "GARANHUNS",
+    "TORRE"
+];
+
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
   date: z.string().min(1, 'A data da produção é obrigatória.'),
@@ -141,14 +161,6 @@ const initialLossValues = {
     formsNumber: '',
 };
 
-const operatorList = [
-    "Daniel Solivo",
-    "Rodrigo Cantano",
-    "Gustavo Gozzi",
-    "William Martinucci",
-    "Nathan Xavier"
-];
-
 const ProductionFormContent = () => {
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -159,7 +171,7 @@ const ProductionFormContent = () => {
         defaultValues: initialProductionValues,
     });
 
-     useEffect(() => {
+    useEffect(() => {
         setIsClient(true);
         productionForm.reset({
             ...initialProductionValues,
@@ -176,7 +188,6 @@ const ProductionFormContent = () => {
         control: productionForm.control,
         name: 'machine',
     });
-
 
     async function onProductionSubmit(values: ProductionFormValues) {
         if (!firestore) return;
@@ -273,16 +284,7 @@ const ProductionFormContent = () => {
                             </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                                <SelectItem value="VALINHOS DOVE">VALINHOS DOVE</SelectItem>
-                                <SelectItem value="VALINHOS SABONETE">VALINHOS SABONETE</SelectItem>
-                                <SelectItem value="VINHEDO">VINHEDO</SelectItem>
-                                <SelectItem value="POUSO ALEGRE">POUSO ALEGRE</SelectItem>
-                                <SelectItem value="INDAIATUBA">INDAIATUBA</SelectItem>
-                                <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
-                                <SelectItem value="SUAPE">SUAPE</SelectItem>
-                                <SelectItem value="IGARASSU">IGARASSU</SelectItem>
-                                <SelectItem value="GARANHUNS">GARANHUNS</SelectItem>
-                                <SelectItem value="TORRE">TORRE</SelectItem>
+                                {factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                             </SelectContent>
                         </Select>
                         <FormMessage />
@@ -305,24 +307,12 @@ const ProductionFormContent = () => {
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                <SelectItem value="Fila de produção">
-                                    Fila de produção
-                                </SelectItem>
-                                <SelectItem value="Em produção">
-                                    Em produção
-                                </SelectItem>
-                                <SelectItem value="Encerrado">
-                                    Encerrado
-                                </SelectItem>
-                                <SelectItem value="Inspeção/Qualidade">
-                                    Inspeção/Qualidade
-                                </SelectItem>
-                                 <SelectItem value="Rejeitado">
-                                    Rejeitado
-                                </SelectItem>
-                                 <SelectItem value="Serviços Externos">
-                                    Serviços Externos
-                                </SelectItem>
+                                <SelectItem value="Fila de produção">Fila de produção</SelectItem>
+                                <SelectItem value="Em produção">Em produção</SelectItem>
+                                <SelectItem value="Encerrado">Encerrado</SelectItem>
+                                <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
+                                <SelectItem value="Rejeitado">Rejeitado</SelectItem>
+                                <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -359,12 +349,8 @@ const ProductionFormContent = () => {
                             </FormControl>
                             <SelectContent>
                             <SelectItem value="usinagem">USINAGEM</SelectItem>
-                            <SelectItem value="programacao">
-                                PROGRAMAÇÃO
-                            </SelectItem>
-                            <SelectItem value="primeira-peca">
-                                PRIMEIRA PEÇA
-                            </SelectItem>
+                            <SelectItem value="programacao">PROGRAMAÇÃO</SelectItem>
+                            <SelectItem value="primeira-peca">PRIMEIRA PEÇA</SelectItem>
                             </SelectContent>
                         </Select>
                         <FormMessage />
@@ -387,12 +373,8 @@ const ProductionFormContent = () => {
                             </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="TORNO CNC CENTUR 30">
-                                TORNO CNC CENTUR 30
-                              </SelectItem>
-                              <SelectItem value="CENTRO DE USINAGEM D600">
-                                CENTRO DE USINAGEM D600
-                              </SelectItem>
+                              <SelectItem value="TORNO CNC CENTUR 30">TORNO CNC CENTUR 30</SelectItem>
+                              <SelectItem value="CENTRO DE USINAGEM D600">CENTRO DE USINAGEM D600</SelectItem>
                             </SelectContent>
                         </Select>
                         <FormMessage />
@@ -525,7 +507,7 @@ const LossFormContent = () => {
         }
     }, [selectedLossReason, lossForm]);
 
-     useEffect(() => {
+    useEffect(() => {
         setIsClient(true);
         lossForm.reset({
             ...initialLossValues,
@@ -635,16 +617,7 @@ const LossFormContent = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                                <SelectItem value="VALINHOS DOVE">VALINHOS DOVE</SelectItem>
-                                <SelectItem value="VALINHOS SABONETE">VALINHOS SABONETE</SelectItem>
-                                <SelectItem value="VINHEDO">VINHEDO</SelectItem>
-                                <SelectItem value="POUSO ALEGRE">POUSO ALEGRE</SelectItem>
-                                <SelectItem value="INDAIATUBA">INDAIATUBA</SelectItem>
-                                <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
-                                <SelectItem value="SUAPE">SUAPE</SelectItem>
-                                <SelectItem value="IGARASSU">IGARASSU</SelectItem>
-                                <SelectItem value="GARANHUNS">GARANHUNS</SelectItem>
-                                <SelectItem value="TORRE">TORRE</SelectItem>
+                                {factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -680,12 +653,8 @@ const LossFormContent = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                               <SelectItem value="TORNO CNC CENTUR 30">
-                                TORNO CNC CENTUR 30
-                              </SelectItem>
-                              <SelectItem value="CENTRO DE USINAGEM D600">
-                                CENTRO DE USINAGEM D600
-                              </SelectItem>
+                               <SelectItem value="TORNO CNC CENTUR 30">TORNO CNC CENTUR 30</SelectItem>
+                               <SelectItem value="CENTRO DE USINAGEM D600">CENTRO DE USINAGEM D600</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -733,7 +702,7 @@ const LossFormContent = () => {
                       name="timeLost"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Tempo Perdido (minutos)</Label>
+                          <FormLabel>Tempo Perdido (minutos)</FormLabel>
                           <FormControl>
                              <Input type="number" value={field.value || ''} onChange={(e) => field.onChange(e.target.valueAsNumber)} />
                           </FormControl>
@@ -787,7 +756,6 @@ const statusColorMap: { [key: string]: string } = {
     'Serviços Externos': 'bg-blue-500',
 };
 
-
 export default function ProductionRegistryPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -800,7 +768,6 @@ export default function ProductionRegistryPage() {
   
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-
 
   const productionRecordsQuery = useMemoFirebase(() => 
     firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc')) : null
@@ -993,7 +960,6 @@ export default function ProductionRegistryPage() {
     setEditedLossRecord(newRecord);
   };
 
-
   const exportToExcel = (data: any[], fileName: string) => {
     if (!data || data.length === 0) {
       toast({
@@ -1018,12 +984,8 @@ export default function ProductionRegistryPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Registro de Produção
-        </h1>
-        <p className="text-muted-foreground">
-          Monitore a produção, registre novas atividades e perdas.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Registro de Produção</h1>
+        <p className="text-muted-foreground">Monitore a produção, registre novas atividades e perdas.</p>
       </div>
 
       <div>
@@ -1084,9 +1046,7 @@ export default function ProductionRegistryPage() {
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>Registros de Produção Recentes</CardTitle>
-                        <CardDescription>
-                        Últimas entradas de produção bem-sucedida.
-                        </CardDescription>
+                        <CardDescription>Últimas entradas de produção bem-sucedida.</CardDescription>
                     </div>
                     <Button onClick={() => exportToExcel(filteredProductionRecords, 'Registros_Producao')}>
                         <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -1116,9 +1076,7 @@ export default function ProductionRegistryPage() {
                   <TableBody>
                     {loadingProduction ? (
                       <TableRow>
-                        <TableCell colSpan={13} className="text-center h-24">
-                          Carregando...
-                        </TableCell>
+                        <TableCell colSpan={13} className="text-center h-24">Carregando...</TableCell>
                       </TableRow>
                     ) : filteredProductionRecords && filteredProductionRecords.length > 0 ? (
                       filteredProductionRecords.map((record: any) => (
@@ -1133,23 +1091,12 @@ export default function ProductionRegistryPage() {
                                   </SelectContent>
                                 </Select>
                               </TableCell>
-                               <TableCell>
-                                <Input name="date" value={editedRecord.date} onChange={handleInputChange} />
-                              </TableCell>
+                               <TableCell><Input name="date" value={editedRecord.date} onChange={handleInputChange} /></TableCell>
                               <TableCell>
                                 <Select value={editedRecord.factory} onValueChange={(value) => handleSelectChange('factory', value)}>
                                   <SelectTrigger><SelectValue /></SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="VALINHOS DOVE">VALINHOS DOVE</SelectItem>
-                                    <SelectItem value="VALINHOS SABONETE">VALINHOS SABONETE</SelectItem>
-                                    <SelectItem value="VINHEDO">VINHEDO</SelectItem>
-                                    <SelectItem value="POUSO ALEGRE">POUSO ALEGRE</SelectItem>
-                                    <SelectItem value="INDAIATUBA">INDAIATUBA</SelectItem>
-                                    <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
-                                    <SelectItem value="SUAPE">SUAPE</SelectItem>
-                                    <SelectItem value="IGARASSU">IGARASSU</SelectItem>
-                                    <SelectItem value="GARANHUNS">GARANHUNS</SelectItem>
-                                    <SelectItem value="TORRE">TORRE</SelectItem>
+                                     {factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </TableCell>
@@ -1192,12 +1139,8 @@ export default function ProductionRegistryPage() {
                               <TableCell><Textarea name="observations" value={editedRecord.observations} onChange={handleInputChange} /></TableCell>
                               <TableCell>{record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}</TableCell>
                               <TableCell className="flex gap-2">
-                                <Button variant="ghost" size="icon" onClick={handleSaveEdit}>
-                                  <Save className="h-4 w-4 text-green-500" />
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={handleCancelEdit}>
-                                  <XCircle className="h-4 w-4 text-red-500" />
-                                </Button>
+                                <Button variant="ghost" size="icon" onClick={handleSaveEdit}><Save className="h-4 w-4 text-green-500" /></Button>
+                                <Button variant="ghost" size="icon" onClick={handleCancelEdit}><XCircle className="h-4 w-4 text-red-500" /></Button>
                               </TableCell>
                             </>
                           ) : (
@@ -1205,64 +1148,41 @@ export default function ProductionRegistryPage() {
                               <TableCell>{record.operatorId}</TableCell>
                               <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
                               <TableCell>{record.factory}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{record.activityType}</Badge>
-                              </TableCell>
+                              <TableCell><Badge variant="outline">{record.activityType}</Badge></TableCell>
                               <TableCell>{record.machine}</TableCell>
                               <TableCell>{record.formsNumber}</TableCell>
                               <TableCell>{record.operationsNumber}</TableCell>
                               <TableCell>{record.quantityProduced}</TableCell>
                               <TableCell>{record.machiningTime} min</TableCell>
                                <TableCell>
-                                    <Select
-                                    value={record.status}
-                                    onValueChange={(newStatus) =>
-                                        handleStatusChange(record.id, newStatus)
-                                    }
-                                    >
-                                    <SelectTrigger className={cn("w-[180px] text-white", statusColorMap[record.status])}>
-                                        <SelectValue placeholder="Selecione um status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Fila de produção">
-                                        Fila de produção
-                                        </SelectItem>
-                                        <SelectItem value="Em produção">
-                                        Em produção
-                                        </SelectItem>
-                                        <SelectItem value="Encerrado">Encerrado</SelectItem>
-                                        <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
-                                        <SelectItem value="Rejeitado">Rejeitado</SelectItem>
-                                        <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
-                                    </SelectContent>
+                                    <Select value={record.status} onValueChange={(newStatus) => handleStatusChange(record.id, newStatus)}>
+                                      <SelectTrigger className={cn("w-[180px] text-white", statusColorMap[record.status])}><SelectValue placeholder="Selecione um status" /></SelectTrigger>
+                                      <SelectContent>
+                                          <SelectItem value="Fila de produção">Fila de produção</SelectItem>
+                                          <SelectItem value="Em produção">Em produção</SelectItem>
+                                          <SelectItem value="Encerrado">Encerrado</SelectItem>
+                                          <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
+                                          <SelectItem value="Rejeitado">Rejeitado</SelectItem>
+                                          <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
+                                      </SelectContent>
                                     </Select>
                               </TableCell>
                               <TableCell>{record.observations}</TableCell>
-                              <TableCell>
-                                {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
-                              </TableCell>
+                              <TableCell>{record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}</TableCell>
                               <TableCell className='flex gap-2'>
-                                <Button variant="ghost" size="icon" onClick={() => handleEdit(record)}>
-                                  <Edit className="h-4 w-4 text-blue-500" />
-                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(record)}><Edit className="h-4 w-4 text-blue-500" /></Button>
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
+                                    <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500" /></Button>
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente o registro de produção.
-                                      </AlertDialogDescription>
+                                      <AlertDialogDescription>Essa ação não pode ser desfeita. Isso excluirá permanentemente o registro de produção.</AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDelete('productionRecords', record.id)}>
-                                        Excluir
-                                      </AlertDialogAction>
+                                      <AlertDialogAction onClick={() => handleDelete('productionRecords', record.id)}>Excluir</AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
@@ -1272,11 +1192,7 @@ export default function ProductionRegistryPage() {
                         </TableRow>
                       ))
                     ) : (
-                      <TableRow>
-                        <TableCell colSpan={13} className="text-center h-24">
-                          Nenhum registro recente.
-                        </TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={13} className="text-center h-24">Nenhum registro recente.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -1287,9 +1203,7 @@ export default function ProductionRegistryPage() {
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>Registros de Perdas Recentes</CardTitle>
-                        <CardDescription>
-                        Entradas de perdas de produção.
-                        </CardDescription>
+                        <CardDescription>Entradas de perdas de produção.</CardDescription>
                     </div>
                     <Button onClick={() => exportToExcel(filteredLossRecords, 'Registros_Perdas')}>
                         <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -1316,11 +1230,7 @@ export default function ProductionRegistryPage() {
                   </TableHeader>
                   <TableBody>
                     {loadingLoss ? (
-                       <TableRow>
-                        <TableCell colSpan={11} className="text-center h-24">
-                          Carregando...
-                        </TableCell>
-                      </TableRow>
+                       <TableRow><TableCell colSpan={11} className="text-center h-24">Carregando...</TableCell></TableRow>
                     ) : filteredLossRecords && filteredLossRecords.length > 0 ? (
                       filteredLossRecords.map((record: any) => (
                       <TableRow key={record.id}>
@@ -1339,16 +1249,7 @@ export default function ProductionRegistryPage() {
                                     <Select value={editedLossRecord.factory} onValueChange={(value) => handleLossSelectChange('factory', value)}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="VALINHOS DOVE">VALINHOS DOVE</SelectItem>
-                                            <SelectItem value="VALINHOS SABONETE">VALINHOS SABONETE</SelectItem>
-                                            <SelectItem value="VINHEDO">VINHEDO</SelectItem>
-                                            <SelectItem value="POUSO ALEGRE">POUSO ALEGRE</SelectItem>
-                                            <SelectItem value="INDAIATUBA">INDAIATUBA</SelectItem>
-                                            <SelectItem value="AGUAÍ">AGUAÍ</SelectItem>
-                                            <SelectItem value="SUAPE">SUAPE</SelectItem>
-                                            <SelectItem value="IGARASSU">IGARASSU</SelectItem>
-                                            <SelectItem value="GARANHUNS">GARANHUNS</SelectItem>
-                                            <SelectItem value="TORRE">TORRE</SelectItem>
+                                             {factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </TableCell>
@@ -1375,12 +1276,8 @@ export default function ProductionRegistryPage() {
                                 <TableCell><Textarea name="observations" value={editedLossRecord.observations} onChange={handleLossInputChange} /></TableCell>
                                 <TableCell>{record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}</TableCell>
                                 <TableCell className="flex gap-2">
-                                    <Button variant="ghost" size="icon" onClick={handleSaveEditLoss}>
-                                        <Save className="h-4 w-4 text-green-500" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" onClick={handleCancelEditLoss}>
-                                        <XCircle className="h-4 w-4 text-red-500" />
-                                    </Button>
+                                    <Button variant="ghost" size="icon" onClick={handleSaveEditLoss}><Save className="h-4 w-4 text-green-500" /></Button>
+                                    <Button variant="ghost" size="icon" onClick={handleCancelEditLoss}><XCircle className="h-4 w-4 text-red-500" /></Button>
                                 </TableCell>
                             </>
                         ) : (
@@ -1390,44 +1287,24 @@ export default function ProductionRegistryPage() {
                                 <TableCell>{record.factory}</TableCell>
                                 <TableCell>{record.formsNumber}</TableCell>
                                 <TableCell>{record.machine}</TableCell>
-                                <TableCell>
-                                    <Badge
-                                    className="bg-yellow-400 text-black hover:bg-yellow-500"
-                                    >
-                                    {record.lossReason}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="text-red-500">
-                                    {record.deadPartsQuantity}
-                                </TableCell>
+                                <TableCell><Badge className="bg-yellow-400 text-black hover:bg-yellow-500">{record.lossReason}</Badge></TableCell>
+                                <TableCell className="text-red-500">{record.deadPartsQuantity}</TableCell>
                                 <TableCell>{record.timeLost} min</TableCell>
                                 <TableCell>{record.observations}</TableCell>
-                                <TableCell>
-                                    {record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}
-                                </TableCell>
+                                <TableCell>{record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}</TableCell>
                                 <TableCell className="flex gap-2">
-                                    <Button variant="ghost" size="icon" onClick={() => handleEditLoss(record)}>
-                                        <Edit className="h-4 w-4 text-blue-500" />
-                                    </Button>
+                                    <Button variant="ghost" size="icon" onClick={() => handleEditLoss(record)}><Edit className="h-4 w-4 text-blue-500" /></Button>
                                     <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon">
-                                            <Trash2 className="h-4 w-4 text-red-500" />
-                                        </Button>
-                                        </AlertDialogTrigger>
+                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500" /></Button></AlertDialogTrigger>
                                         <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                            Essa ação não pode ser desfeita. Isso excluirá permanentemente o registro de perda.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDelete('lossRecords', record.id)}>
-                                            Excluir
-                                            </AlertDialogAction>
-                                        </AlertDialogFooter>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                <AlertDialogDescription>Essa ação não pode ser desfeita. Isso excluirá permanentemente o registro de perda.</AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDelete('lossRecords', record.id)}>Excluir</AlertDialogAction>
+                                            </AlertDialogFooter>
                                         </AlertDialogContent>
                                     </AlertDialog>
                                 </TableCell>
@@ -1436,11 +1313,7 @@ export default function ProductionRegistryPage() {
                       </TableRow>
                     ))
                     ) : (
-                      <TableRow>
-                        <TableCell colSpan={11} className="text-center h-24">
-                           Nenhum registro de perda.
-                        </TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={11} className="text-center h-24">Nenhum registro de perda.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -1451,4 +1324,3 @@ export default function ProductionRegistryPage() {
     </div>
   );
 }
-
