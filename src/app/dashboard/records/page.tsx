@@ -81,13 +81,21 @@ export default function RecordsPage() {
   const [planejamentoData, setPlanejamentoData] = useState<any[]>([]);
   const [loadingPlanejamento, setLoadingPlanejamento] = useState(true);
 
-  // Normalization logic to handle typos in raw data
+  // Normalization logic to handle typos and case inconsistency in raw data
   const normalizeFactoryName = (name: string | undefined): string | undefined => {
     if (!name) return undefined;
     const upperName = name.toUpperCase().trim();
     if (upperName === 'AGUAI' || upperName === 'AGUAÍ') return 'AGUAÍ';
-    if (upperName === 'GARANHUS') return 'GARANHUNS';
-    return name;
+    if (upperName === 'GARANHUS' || upperName === 'GARANHUNS') return 'GARANHUNS';
+    if (upperName === 'SUAPE') return 'SUAPE';
+    if (upperName === 'IGARASSU') return 'IGARASSU';
+    if (upperName === 'VINHEDO') return 'VINHEDO';
+    if (upperName === 'VALINHOS DOVE') return 'VALINHOS DOVE';
+    if (upperName === 'VALINHOS SABONETE') return 'VALINHOS SABONETE';
+    if (upperName === 'POUSO ALEGRE') return 'POUSO ALEGRE';
+    if (upperName === 'INDAIATUBA') return 'INDAIATUBA';
+    if (upperName === 'TORRE') return 'TORRE';
+    return upperName;
   };
 
   // Fix hydration by setting current year only on client
@@ -292,10 +300,13 @@ export default function RecordsPage() {
 
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record['Site']);
-      const hours = Number(record['Horas Máquina']) || 0;
+      const machineHours = Number(record['Horas Máquina']) || 0;
+      const plannedLosses = Number(record['Perdas planejadas']) || 0;
+      
       if (factory) {
           if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-          dataMap[factory].planejado += hours;
+          // SOMA AS HORAS DE MÁQUINA + AS PERDAS PLANEJADAS NO CAMPO PLANEJADO
+          dataMap[factory].planejado += (machineHours + plannedLosses);
       }
     });
     
