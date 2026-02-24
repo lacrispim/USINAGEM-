@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { CalendarIcon, Loader, X } from 'lucide-react';
+import { CalendarIcon, Loader } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -34,6 +34,7 @@ interface PlanejamentoItem {
   Requisição?: string;
   'Nome da Peça'?: string;
   Quantidade?: number;
+  'Perdas planejadas'?: number;
   'Horas Máquina'?: number;
   Técnicos?: string;
   Observação?: string;
@@ -207,6 +208,7 @@ export default function ProgrammingPage() {
                     <TableHead>Requisição</TableHead>
                     <TableHead>Nome da Peça</TableHead>
                     <TableHead>Quantidade</TableHead>
+                    <TableHead>Perdas planejadas</TableHead>
                     <TableHead>Horas Máquina</TableHead>
                     <TableHead>Técnicos</TableHead>
                     <TableHead>Observação</TableHead>
@@ -221,6 +223,7 @@ export default function ProgrammingPage() {
                       <TableCell>{item['Requisição'] ?? 'N/A'}</TableCell>
                       <TableCell>{item['Nome da Peça'] ?? 'N/A'}</TableCell>
                       <TableCell>{item['Quantidade'] ?? 'N/A'}</TableCell>
+                      <TableCell>{item['Perdas planejadas'] ?? 'N/A'}</TableCell>
                       <TableCell>{item['Horas Máquina'] ?? 'N/A'}</TableCell>
                       <TableCell>{item['Técnicos'] ?? 'N/A'}</TableCell>
                       <TableCell>{item['Observação'] ?? 'N/A'}</TableCell>
