@@ -206,7 +206,7 @@ const ProductionFormContent = () => {
                 ...initialProductionValues,
                 date: format(new Date(), 'dd/MM/yyyy'),
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error adding production record: ', error);
             toast({
                 title: 'Erro',
@@ -539,7 +539,7 @@ const LossFormContent = () => {
                 ...initialLossValues,
                 date: format(new Date(), 'dd/MM/yyyy'),
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error adding loss record: ', error);
             toast({
                 title: 'Erro',
@@ -813,7 +813,7 @@ export default function ProductionRegistryPage() {
         title: 'Registro Excluído',
         description: 'O registro foi excluído com sucesso.',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting record: ', error);
       toast({
         title: 'Erro',
@@ -832,7 +832,7 @@ export default function ProductionRegistryPage() {
         title: 'Status Atualizado',
         description: `O status do registro foi alterado para ${newStatus}.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating status: ', error);
       toast({
         title: 'Erro',
@@ -859,7 +859,7 @@ export default function ProductionRegistryPage() {
     if (typeof dataToSave.date === 'string') {
         try {
             dataToSave.date = parse(dataToSave.date, 'dd/MM/yyyy', new Date());
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error parsing date:", error);
             toast({
                 title: 'Erro de Data',
@@ -877,7 +877,7 @@ export default function ProductionRegistryPage() {
         description: 'O registro de produção foi atualizado com sucesso.',
       });
       handleCancelEdit();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating record: ', error);
       toast({
         title: 'Erro',
@@ -913,7 +913,7 @@ export default function ProductionRegistryPage() {
     if (typeof dataToSave.date === 'string') {
         try {
             dataToSave.date = parse(dataToSave.date, 'dd/MM/yyyy', new Date());
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error parsing date:", error);
             toast({
                 title: 'Erro de Data',
@@ -932,7 +932,7 @@ export default function ProductionRegistryPage() {
         description: 'O registro de perda foi atualizado com sucesso.',
       });
       handleCancelEditLoss();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating loss record: ', error);
       toast({
         title: 'Erro',

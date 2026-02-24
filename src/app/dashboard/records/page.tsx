@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -81,6 +80,15 @@ export default function RecordsPage() {
 
   const [planejamentoData, setPlanejamentoData] = useState<any[]>([]);
   const [loadingPlanejamento, setLoadingPlanejamento] = useState(true);
+
+  // Normalization logic to handle typos in raw data
+  const normalizeFactoryName = (name: string | undefined): string | undefined => {
+    if (!name) return undefined;
+    const upperName = name.toUpperCase().trim();
+    if (upperName === 'AGUAI' || upperName === 'AGUAÍ') return 'AGUAÍ';
+    if (upperName === 'GARANHUS') return 'GARANHUNS';
+    return name;
+  };
 
   // Fix hydration by setting current year only on client
   useEffect(() => {
@@ -243,7 +251,9 @@ export default function RecordsPage() {
           } catch { return false; }
           
           if (!dateFilter(recordDate)) return false;
-          const factoryMatch = !selectedFactory || record['Site'] === selectedFactory;
+          
+          const normalizedSite = normalizeFactoryName(record['Site']);
+          const factoryMatch = !selectedFactory || normalizedSite === selectedFactory;
           if (!factoryMatch) return false;
           
           return operatorFilter(record);
@@ -279,13 +289,6 @@ export default function RecordsPage() {
 
   const plannedVsMachinedData = useMemo(() => {
     const dataMap: { [factory: string]: { planejado: number; usinagem: number; setup: number; dds: number; outrasPerdas: number } } = {};
-
-    const normalizeFactoryName = (name: string | undefined): string | undefined => {
-        if (!name) return undefined;
-        const upperName = name.toUpperCase().trim();
-        if (upperName === 'AGUAI' || upperName === 'AGUAÍ') return 'AGUAÍ';
-        return name;
-    };
 
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record['Site']);
