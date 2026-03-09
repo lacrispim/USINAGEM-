@@ -98,7 +98,6 @@ export default function RecordsPage() {
     return upperName;
   };
 
-  // Fix hydration by setting current year only on client
   useEffect(() => {
     setSelectedYear(String(new Date().getFullYear()));
     setShowConfetti(true);
@@ -296,7 +295,7 @@ export default function RecordsPage() {
   }, [lossRecords, selectedOperator]);
 
   const plannedVsMachinedData = useMemo(() => {
-    const dataMap: { [factory: string]: { planejado: number; usinagem: number; setup: number; dds: number; outrasPerdas: number } } = {};
+    const dataMap: { [factory: string]: { usinagemPlanejada: number; perdaPlanejada: number; usinagem: number; setup: number; dds: number; outrasPerdas: number } } = {};
 
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record['Site']);
@@ -304,9 +303,9 @@ export default function RecordsPage() {
       const plannedLosses = Number(record['Perdas planejadas']) || 0;
       
       if (factory) {
-          if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-          // SOMA AS HORAS DE MÁQUINA + AS PERDAS PLANEJADAS NO CAMPO PLANEJADO
-          dataMap[factory].planejado += (machineHours + plannedLosses);
+          if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+          dataMap[factory].usinagemPlanejada += machineHours;
+          dataMap[factory].perdaPlanejada += plannedLosses;
       }
     });
     
@@ -314,7 +313,7 @@ export default function RecordsPage() {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.machiningTime) || 0) / 60;
         if (factory && hours > 0) {
-            if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+            if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
             dataMap[factory].usinagem += hours;
         }
     });
@@ -323,7 +322,7 @@ export default function RecordsPage() {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.timeLost) || 0) / 60;
         if (factory && hours > 0) {
-            if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+            if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
             dataMap[factory].setup += hours;
         }
     });
@@ -332,7 +331,7 @@ export default function RecordsPage() {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.timeLost) || 0) / 60;
         if (factory && hours > 0) {
-            if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+            if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
             dataMap[factory].dds += hours;
         }
     });
@@ -341,23 +340,24 @@ export default function RecordsPage() {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.timeLost) || 0) / 60;
         if (factory && hours > 0) {
-            if (!dataMap[factory]) dataMap[factory] = { planejado: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+            if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
             dataMap[factory].outrasPerdas += hours;
         }
     });
 
     return Object.keys(dataMap).map(factory => {
-      const { usinagem, setup, dds, outrasPerdas } = dataMap[factory];
+      const { usinagemPlanejada, perdaPlanejada, usinagem, setup, dds, outrasPerdas } = dataMap[factory];
       return {
           name: factory,
-          planejado: dataMap[factory].planejado,
+          usinagemPlanejada,
+          perdaPlanejada,
           usinado: usinagem + setup + dds + outrasPerdas,
           usinagem,
           setup,
           dds,
           outrasPerdas,
       }
-  }).sort((a, b) => (b.planejado + b.usinado) - (a.planejado + a.usinado));
+  }).sort((a, b) => (b.usinagemPlanejada + b.perdaPlanejada + b.usinado) - (a.usinagemPlanejada + a.perdaPlanejada + a.usinado));
 
   }, [filteredPlanejamentoData, operatorFilteredProductionRecords, setupDataForChart, ddsDataForChart, otherLossesDataForChart]);
 
