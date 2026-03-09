@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -197,8 +198,12 @@ export default function RecordsPage() {
 
   const operatorFilter = (record: any) => {
     if (!selectedOperator || selectedOperator === 'all') return true;
-    const recordOp = record.operatorId || record['Técnicos'];
+    let recordOp = record.operatorId || record['Técnicos'];
     if (!recordOp) return false;
+    
+    // Mapeamento "Gustavo" para "Gustavo Gozzi"
+    if (String(recordOp).trim() === "Gustavo") recordOp = "Gustavo Gozzi";
+    
     return String(recordOp).includes(String(selectedOperator));
   };
   
@@ -486,6 +491,22 @@ export default function RecordsPage() {
           </div>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Horas Trabalhadas por Técnico</CardTitle>
+          <CardDescription>Visualização do desempenho e horas totais por operador.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <OperatorPerformanceChart 
+            productionData={operatorFilteredProductionRecords}
+            lossData={operatorFilteredLossRecords}
+            loading={isLoading}
+            selectedOperator={selectedOperator}
+            onOperatorSelect={(op) => setSelectedOperator(op)}
+          />
+        </CardContent>
+      </Card>
+
       <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
       
       <OeeLossWaterfallChart 
@@ -510,16 +531,6 @@ export default function RecordsPage() {
             loading={isLoading}
           />
         </CardContent>
-      </Card>
-
-      <Card>
-        <OperatorPerformanceChart 
-          productionData={operatorFilteredProductionRecords}
-          lossData={operatorFilteredLossRecords}
-          loading={isLoading}
-          selectedOperator={selectedOperator}
-          onOperatorSelect={(op) => setSelectedOperator(op)}
-        />
       </Card>
     </div>
   );
