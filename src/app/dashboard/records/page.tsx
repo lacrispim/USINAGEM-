@@ -71,6 +71,7 @@ export default function RecordsPage() {
   const firestore = useFirestore();
   const database = useDatabase();
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
@@ -81,24 +82,16 @@ export default function RecordsPage() {
   const [planejamentoData, setPlanejamentoData] = useState<any[]>([]);
   const [loadingPlanejamento, setLoadingPlanejamento] = useState(true);
 
-  // Normalization logic to handle typos and case inconsistency in raw data
   const normalizeFactoryName = (name: string | undefined): string | undefined => {
     if (!name) return undefined;
     const upperName = name.toUpperCase().trim();
     if (upperName === 'AGUAI' || upperName === 'AGUAÍ') return 'AGUAÍ';
     if (upperName === 'GARANHUS' || upperName === 'GARANHUNS') return 'GARANHUNS';
-    if (upperName === 'SUAPE') return 'SUAPE';
-    if (upperName === 'IGARASSU') return 'IGARASSU';
-    if (upperName === 'VINHEDO') return 'VINHEDO';
-    if (upperName === 'VALINHOS DOVE') return 'VALINHOS DOVE';
-    if (upperName === 'VALINHOS SABONETE') return 'VALINHOS SABONETE';
-    if (upperName === 'POUSO ALEGRE') return 'POUSO ALEGRE';
-    if (upperName === 'INDAIATUBA') return 'INDAIATUBA';
-    if (upperName === 'TORRE') return 'TORRE';
     return upperName;
   };
 
   useEffect(() => {
+    setIsClient(true);
     setSelectedYear(String(new Date().getFullYear()));
     setShowConfetti(true);
   }, []);
@@ -137,7 +130,7 @@ export default function RecordsPage() {
   }, [database]);
 
   const { startDate, endDate } = useMemo(() => {
-    if (!selectedYear) return { startDate: undefined, endDate: undefined };
+    if (!selectedYear || !isClient) return { startDate: undefined, endDate: undefined };
     
     let start, end;
     if (selectedDate) {
@@ -161,20 +154,15 @@ export default function RecordsPage() {
       }
     }
     return { startDate: start, endDate: end };
-  }, [selectedDate, selectedYear, selectedMonth, selectedWeek]);
+  }, [selectedDate, selectedYear, selectedMonth, selectedWeek, isClient]);
 
   const productionRecordsQuery = useMemoFirebase(() => {
     if (!firestore || !startDate || !endDate) return null;
-    
     const constraints = [
       where('date', '>=', startDate),
       where('date', '<=', endDate)
     ];
-   
-    if (selectedFactory) {
-      constraints.push(where('factory', '==', selectedFactory));
-    }
-
+    if (selectedFactory) constraints.push(where('factory', '==', selectedFactory));
     return query(collection(firestore, 'productionRecords'), ...constraints);
   }, [firestore, startDate, endDate, selectedFactory]);
 
@@ -182,16 +170,11 @@ export default function RecordsPage() {
 
   const lossRecordsQuery = useMemoFirebase(() => {
     if (!firestore || !startDate || !endDate) return null;
-        
     const constraints = [
       where('date', '>=', startDate),
       where('date', '<=', endDate)
     ];
-   
-    if (selectedFactory) {
-      constraints.push(where('factory', '==', selectedFactory));
-    }
-
+    if (selectedFactory) constraints.push(where('factory', '==', selectedFactory));
     return query(collection(firestore, 'lossRecords'), ...constraints);
   }, [firestore, startDate, endDate, selectedFactory]);
 
@@ -203,18 +186,12 @@ export default function RecordsPage() {
       allRecords.forEach((record) => {
           if (record.date?.toDate) {
               const year = getYear(record.date.toDate());
-              if (year > 2000 && year < 3000) {
-                  recordYears.add(year);
-              }
+              if (year > 2000 && year < 3000) recordYears.add(year);
           }
       });
-
       const sortedYears = Array.from(recordYears).sort((a, b) => b - a);
       let weeks: number[] = [];
-      if (selectedYear && selectedYear !== 'all') {
-          weeks = Array.from({ length: 53 }, (_, i) => i + 1);
-      }
-
+      if (selectedYear && selectedYear !== 'all') weeks = Array.from({ length: 53 }, (_, i) => i + 1);
       return { availableYears: sortedYears, availableWeeks: weeks };
   }, [productionRecords, lossRecords, selectedYear]);
 
@@ -222,28 +199,18 @@ export default function RecordsPage() {
     if (!selectedOperator || selectedOperator === 'all') return true;
     const recordOp = record.operatorId || record['Técnicos'];
     if (!recordOp) return false;
-    
-    const operatorName = String(selectedOperator);
-    const recordOperatorName = String(recordOp);
-
-    return recordOperatorName.includes(operatorName) || operatorName.includes(recordOperatorName);
+    return String(recordOp).includes(String(selectedOperator));
   };
   
   const filteredPlanejamentoData = useMemo(() => {
       const dateFilter = (recordDate: Date) => {
-        if (selectedDate) {
-          return recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
-        }
+        if (selectedDate) return recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
         if (!selectedYear) return true;
         const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
         if (!yearMatch) return false;
         if (selectedYear !== 'all') {
-            if (selectedWeek !== 'all') {
-                return getISOWeek(recordDate) === parseInt(selectedWeek, 10);
-            }
-            if (selectedMonth !== 'all') {
-                return getMonth(recordDate) === parseInt(selectedMonth, 10);
-            }
+            if (selectedWeek !== 'all') return getISOWeek(recordDate) === parseInt(selectedWeek, 10);
+            if (selectedMonth !== 'all') return getMonth(recordDate) === parseInt(selectedMonth, 10);
         }
         return true;
       };
@@ -256,16 +223,12 @@ export default function RecordsPage() {
               if (isNaN(recordDate.getTime())) recordDate = new Date(record['Data Execução']);
               if (isNaN(recordDate.getTime())) return false;
           } catch { return false; }
-          
           if (!dateFilter(recordDate)) return false;
-          
           const normalizedSite = normalizeFactoryName(record['Site']);
           const factoryMatch = !selectedFactory || normalizedSite === selectedFactory;
           if (!factoryMatch) return false;
-          
           return operatorFilter(record);
       });
-
   }, [planejamentoData, selectedDate, selectedYear, selectedMonth, selectedWeek, selectedFactory, selectedOperator]);
 
   const operatorFilteredProductionRecords = useMemo(() => {
@@ -278,34 +241,24 @@ export default function RecordsPage() {
     return lossRecords.filter(operatorFilter);
   }, [lossRecords, selectedOperator]);
 
-  const setupDataForChart = useMemo(() => {
-      return (lossRecords || []).filter(operatorFilter).filter(r => r.lossReason?.toUpperCase().includes('SETUP'));
-  }, [lossRecords, selectedOperator]);
-  
-  const ddsDataForChart = useMemo(() => {
-      return (lossRecords || []).filter(operatorFilter).filter(r => r.lossReason?.toUpperCase() === 'DDS' || r.lossReason?.toUpperCase() === 'DDSHE' || r.lossReason?.toUpperCase() === 'DDS, APONTAMENTO HORAS, ATIVIDADE ADM');
-  }, [lossRecords, selectedOperator]);
-  
-  const otherLossesDataForChart = useMemo(() => {
-      return (lossRecords || []).filter(operatorFilter).filter(r => {
-          if (!r.lossReason) return true;
-          const upperCaseReason = r.lossReason.toUpperCase();
-          return !upperCaseReason.includes('SETUP') && !upperCaseReason.includes('DDS');
-      });
-  }, [lossRecords, selectedOperator]);
-
   const plannedVsMachinedData = useMemo(() => {
     const dataMap: { [factory: string]: { usinagemPlanejada: number; perdaPlanejada: number; usinagem: number; setup: number; dds: number; outrasPerdas: number } } = {};
 
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record['Site']);
-      const machineHours = Number(record['Horas Máquina']) || 0;
-      const plannedLosses = Number(record['Perdas planejadas']) || 0;
+      const machineHours = typeof record['Horas Máquina'] === 'string' 
+        ? parseFloat(record['Horas Máquina'].replace(',', '.')) 
+        : (Number(record['Horas Máquina']) || 0);
       
+      const isPlannedLoss = !!record['Perdas planejadas'] && String(record['Perdas planejadas']).trim() !== '';
+
       if (factory) {
           if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-          dataMap[factory].usinagemPlanejada += machineHours;
-          dataMap[factory].perdaPlanejada += plannedLosses;
+          if (isPlannedLoss) {
+            dataMap[factory].perdaPlanejada += machineHours;
+          } else {
+            dataMap[factory].usinagemPlanejada += machineHours;
+          }
       }
     });
     
@@ -318,30 +271,15 @@ export default function RecordsPage() {
         }
     });
 
-    setupDataForChart.forEach(record => {
+    operatorFilteredLossRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.timeLost) || 0) / 60;
         if (factory && hours > 0) {
             if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-            dataMap[factory].setup += hours;
-        }
-    });
-
-    ddsDataForChart.forEach(record => {
-        const factory = normalizeFactoryName(record.factory);
-        const hours = (Number(record.timeLost) || 0) / 60;
-        if (factory && hours > 0) {
-            if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-            dataMap[factory].dds += hours;
-        }
-    });
-
-    otherLossesDataForChart.forEach(record => {
-        const factory = normalizeFactoryName(record.factory);
-        const hours = (Number(record.timeLost) || 0) / 60;
-        if (factory && hours > 0) {
-            if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-            dataMap[factory].outrasPerdas += hours;
+            const reason = record.lossReason?.toUpperCase() || '';
+            if (reason.includes('SETUP')) dataMap[factory].setup += hours;
+            else if (reason.includes('DDS')) dataMap[factory].dds += hours;
+            else dataMap[factory].outrasPerdas += hours;
         }
     });
 
@@ -357,9 +295,9 @@ export default function RecordsPage() {
           dds,
           outrasPerdas,
       }
-  }).sort((a, b) => (b.usinagemPlanejada + b.perdaPlanejada + b.usinado) - (a.usinagemPlanejada + a.perdaPlanejada + a.usinado));
+  }).sort((a, b) => (b.usinagemPlanejada + b.perdaPlanejada) - (a.usinagemPlanejada + a.perdaPlanejada));
 
-  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, setupDataForChart, ddsDataForChart, otherLossesDataForChart]);
+  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords]);
 
 
   useEffect(() => {
@@ -387,17 +325,9 @@ export default function RecordsPage() {
       setSelectedMonth('all');
       setSelectedWeek('all');
       const year = getYear(selectedDate);
-      if (selectedYear && String(year) !== selectedYear) {
-        setSelectedYear(String(year));
-      }
+      if (selectedYear && String(year) !== selectedYear) setSelectedYear(String(year));
     }
   }, [selectedDate, selectedYear]);
-
-  useEffect(() => {
-    setSelectedFactory(null);
-    setSelectedOperator(null);
-  }, [selectedYear, selectedMonth, selectedWeek, selectedDate]);
-
 
   const totalHoursData = useMemo(() => {
     const totalMachiningMinutes = (operatorFilteredProductionRecords || []).reduce(
@@ -408,23 +338,14 @@ export default function RecordsPage() {
       (sum, record) => sum + (Number(record.timeLost) || 0),
       0
     );
-
     const totalMinutes = totalMachiningMinutes + totalLostMinutes;
     const totalHours = totalMinutes / 60;
-
-    return {
-      totalHours: totalHours.toFixed(1),
-    };
+    return { totalHours: totalHours.toFixed(1) };
   }, [operatorFilteredProductionRecords, operatorFilteredLossRecords]);
 
-  const totalProductionRecords = operatorFilteredProductionRecords?.length || 0;
-  const totalLossRecords = operatorFilteredLossRecords?.length || 0;
+  const isLoading = loadingProduction || loadingLoss || !isClient;
 
-  const isLoading = loadingProduction || loadingLoss;
-  
-  const handleOperatorSelect = (operatorName: string | null) => {
-    setSelectedOperator(current => current === operatorName ? null : operatorName);
-  };
+  if (!isClient) return null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -432,78 +353,42 @@ export default function RecordsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Visão Supervisor</h1>
-          <p className="text-muted-foreground">
-            Uma visão geral dos dados de produção.
-          </p>
+          <p className="text-muted-foreground">Monitoramento de produtividade e análise de dados.</p>
         </div>
         <Button asChild>
           <Link href="/dashboard/production-registry">
             <PlusCircle className="mr-2 h-4 w-4" />
-            Add New Record
+            Novo Registro
           </Link>
         </Button>
       </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Horas Totais de Usinagem Utilizadas
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Horas Totais Utilizadas</CardTitle>
             <Hourglass className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-10">
-                <Loader className="animate-spin" />
-              </div>
-            ) : (
-              <div className="text-2xl font-bold">
-                {totalHoursData.totalHours}h
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Soma de tempo de usinagem e tempo perdido.
-            </p>
+            {isLoading ? <Loader className="animate-spin" /> : <div className="text-2xl font-bold">{totalHoursData.totalHours}h</div>}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total de Registros de Produção
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Registros de Produção</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-10">
-                <Loader className="animate-spin" />
-              </div>
-            ) : (
-              <div className="text-2xl font-bold">{totalProductionRecords}</div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Total de registros no período selecionado.
-            </p>
+            {isLoading ? <Loader className="animate-spin" /> : <div className="text-2xl font-bold">{operatorFilteredProductionRecords.length}</div>}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total de Registros de Perda
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Registros de Perda</CardTitle>
             <TriangleAlert className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-10">
-                <Loader className="animate-spin" />
-              </div>
-            ) : (
-              <div className="text-2xl font-bold">{totalLossRecords}</div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Total de perdas registradas no período.
-            </p>
+            {isLoading ? <Loader className="animate-spin" /> : <div className="text-2xl font-bold">{operatorFilteredLossRecords.length}</div>}
           </CardContent>
         </Card>
       </div>
@@ -512,115 +397,57 @@ export default function RecordsPage() {
           <div className="grid w-full sm:max-w-[120px] gap-1.5">
               <Label htmlFor="year-filter">Ano</Label>
               <Select value={selectedYear || 'all'} onValueChange={setSelectedYear}>
-                  <SelectTrigger id="year-filter">
-                  <SelectValue placeholder="Selecione o ano" />
-                  </SelectTrigger>
+                  <SelectTrigger id="year-filter"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {availableYears.map((year) => (
-                      <SelectItem key={year} value={String(year)}>
-                      {year}
-                      </SelectItem>
-                  ))}
+                      <SelectItem value="all">Todos</SelectItem>
+                      {availableYears.map(year => <SelectItem key={year} value={String(year)}>{year}</SelectItem>)}
                   </SelectContent>
               </Select>
           </div>
-            <div className="grid w-full sm:max-w-[120px] gap-1.5">
+          <div className="grid w-full sm:max-w-[120px] gap-1.5">
               <Label htmlFor="month-filter">Mês</Label>
               <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={!selectedYear || selectedYear === 'all' || !!selectedDate || selectedWeek !== 'all'}>
-                  <SelectTrigger id="month-filter">
-                      <SelectValue placeholder="Selecione o mês" />
-                  </SelectTrigger>
+                  <SelectTrigger id="month-filter"><SelectValue /></SelectTrigger>
                   <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
-                      {months.map((month) => (
-                          <SelectItem key={month.value} value={month.value}>
-                              {month.label}
-                          </SelectItem>
-                      ))}
+                      {months.map(month => <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>)}
                   </SelectContent>
               </Select>
           </div>
           <div className="grid w-full sm:max-w-[150px] gap-1.5">
               <Label htmlFor="week-filter">Semana</Label>
               <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={!selectedYear || selectedYear === 'all' || !!selectedDate || selectedMonth !== 'all'}>
-                  <SelectTrigger id="week-filter">
-                  <SelectValue placeholder="Selecione a semana" />
-                  </SelectTrigger>
+                  <SelectTrigger id="week-filter"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {availableWeeks.map((week) => (
-                      <SelectItem key={week} value={String(week)}>
-                          {`Semana ${week}`}
-                      </SelectItem>
-                  ))}
+                      <SelectItem value="all">Todas</SelectItem>
+                      {availableWeeks.map(week => <SelectItem key={week} value={String(week)}>Semana {week}</SelectItem>)}
                   </SelectContent>
               </Select>
           </div>
-          <div className="grid w-full sm:max-w-[180px] gap-1.5 relative">
+          <div className="grid w-full sm:max-w-[180px] gap-1.5">
               <Label htmlFor="date-filter">Dia</Label>
-                  <Popover>
+              <Popover>
                   <PopoverTrigger asChild>
-                  <Button
-                      id="date-filter"
-                      variant={"outline"}
-                      className={cn(
-                      "justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
-                      )}
-                  >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione um dia</span>}
-                  </Button>
+                      <Button variant="outline" className={cn("justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione um dia</span>}
+                      </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                  <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      initialFocus
-                  />
-                  </PopoverContent>
+                  <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus /></PopoverContent>
               </Popover>
           </div>
           <div className="grid w-full sm:max-w-[200px] gap-1.5">
               <Label htmlFor="operator-filter">Técnico</Label>
               <Select value={selectedOperator || 'all'} onValueChange={setSelectedOperator}>
-                  <SelectTrigger id="operator-filter">
-                      <div className='flex items-center gap-2'>
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <SelectValue placeholder="Selecione o técnico" />
-                      </div>
-                  </SelectTrigger>
+                  <SelectTrigger id="operator-filter"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                      <SelectItem value="all">Todos os Técnicos</SelectItem>
-                      {operatorList.map((op) => (
-                          <SelectItem key={op} value={op}>
-                              {op}
-                          </SelectItem>
-                      ))}
+                      <SelectItem value="all">Todos</SelectItem>
+                      {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
                   </SelectContent>
               </Select>
           </div>
       </div>
-       <Card>
-        <CardHeader>
-          <CardTitle>Horas Trabalhadas por Técnico</CardTitle>
-          <CardDescription>
-            Progresso da jornada de trabalho de cada operador até a meta de 7 horas. Clique em um técnico para filtrar.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <OperatorPerformanceChart 
-            productionData={productionRecords || []}
-            lossData={lossRecords || []}
-            loading={isLoading}
-            selectedOperator={selectedOperator}
-            onOperatorSelect={handleOperatorSelect}
-          />
-        </CardContent>
-      </Card>
-       
+
       <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
       
       <OeeLossWaterfallChart 
@@ -629,63 +456,32 @@ export default function RecordsPage() {
         loading={isLoading}
       />
 
-      <DailyPdlMplLossChart 
-        lossData={operatorFilteredLossRecords}
-        loading={isLoading}
-        isWeekView={selectedWeek !== 'all'}
-        isDayView={!!selectedDate}
-      />
-
-      <StatusByFormChart
-        data={operatorFilteredProductionRecords}
-        loading={isLoading}
-      />
-       
+      <DailyPdlMplLossChart lossData={operatorFilteredLossRecords} loading={isLoading} />
+      <StatusByFormChart data={operatorFilteredProductionRecords} loading={isLoading} />
+      
       <Card>
         <CardHeader>
-            <div>
-              <CardTitle>Análise diária do Tempo de Usinagem</CardTitle>
-              <CardDescription>
-                Análise diária do tempo de usinagem (em minutos) por fábrica.
-              </CardDescription>
-            </div>
+          <CardTitle>Análise de Tempo de Usinagem</CardTitle>
+          <CardDescription>Tempo de usinagem real segmentado por fábrica.</CardDescription>
         </CardHeader>
         <CardContent>
-          <MachiningTimeTrendChart
-            data={operatorFilteredProductionRecords}
-            setupData={setupDataForChart}
-            ddsData={ddsDataForChart}
-            loading={loadingProduction}
-            isWeekView={selectedWeek !== 'all'}
-            isDayView={!!selectedDate}
-          />
-        </CardContent>
-      </Card>
-      <Card>
-        <OperatorDailyTimeChart
-          productionData={operatorFilteredProductionRecords}
-          loading={isLoading}
-          isWeekView={selectedWeek !== 'all'}
-          isDayView={!!selectedDate}
-        />
-      </Card>
-      <Card>
-        <CardHeader>
-            <div>
-              <CardTitle>Análise de Perda por Operador</CardTitle>
-              <CardDescription>
-                Tempo total de perda por operador a cada dia.
-              </CardDescription>
-            </div>
-        </CardHeader>
-        <CardContent>
-          <OperatorDailyLossChart
-            lossData={operatorFilteredLossRecords}
+          <MachiningTimeTrendChart 
+            data={operatorFilteredProductionRecords} 
+            setupData={operatorFilteredLossRecords.filter(r => r.lossReason?.toUpperCase().includes('SETUP'))}
+            ddsData={operatorFilteredLossRecords.filter(r => r.lossReason?.toUpperCase().includes('DDS'))}
             loading={isLoading}
-            isWeekView={selectedWeek !== 'all'}
-            isDayView={!!selectedDate}
           />
         </CardContent>
+      </Card>
+
+      <Card>
+        <OperatorPerformanceChart 
+          productionData={operatorFilteredProductionRecords}
+          lossData={operatorFilteredLossRecords}
+          loading={isLoading}
+          selectedOperator={selectedOperator}
+          onOperatorSelect={(op) => setSelectedOperator(op)}
+        />
       </Card>
     </div>
   );

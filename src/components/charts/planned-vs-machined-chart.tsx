@@ -192,7 +192,7 @@ export function PlannedVsMachinedChart({
             <div>
                 <CardTitle>Planejado vs Realizado</CardTitle>
                 <CardDescription>
-                Comparativo entre horas planejadas (empilhadas) e as horas efetivamente realizadas.
+                Comparativo visual: SETUP Planejado em marrom e Usinagem em cinza.
                 </CardDescription>
             </div>
              {loading ? (
@@ -242,7 +242,6 @@ export function PlannedVsMachinedChart({
                   />
                   <Legend content={<CustomLegend />} />
                   
-                  {/* Barra da Esquerda: Planejado */}
                   <Bar dataKey="usinagemPlanejada" stackId="planejado" fill={chartConfig.usinagemPlanejada.color} />
                   <Bar dataKey="perdaPlanejada" stackId="planejado" fill={chartConfig.perdaPlanejada.color} radius={[4, 4, 0, 0]}>
                      <LabelList
@@ -254,7 +253,6 @@ export function PlannedVsMachinedChart({
                       />
                   </Bar>
 
-                  {/* Barra da Direita: Realizado */}
                   <Bar dataKey="usinagem" stackId="usinado" fill={chartConfig.usinagem.color} />
                   <Bar dataKey="setup" stackId="usinado" fill={chartConfig.setup.color} />
                   <Bar dataKey="dds" stackId="usinado" fill={chartConfig.dds.color} />

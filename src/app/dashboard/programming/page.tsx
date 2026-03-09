@@ -34,8 +34,8 @@ interface PlanejamentoItem {
   Requisição?: string;
   'Nome da Peça'?: string;
   Quantidade?: number;
-  'Perdas planejadas'?: number;
-  'Horas Máquina'?: number;
+  'Perdas planejadas'?: string;
+  'Horas Máquina'?: number | string;
   Técnicos?: string;
   Observação?: string;
   EQUIPAMENTO?: string;
@@ -85,7 +85,6 @@ export default function ProgrammingPage() {
       }
     );
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [database]);
   
@@ -121,22 +120,19 @@ export default function ProgrammingPage() {
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     try {
-      // First, try to parse the date assuming a 'dd/MM/yyyy' format.
       const parsedDate = parse(dateString, 'dd/MM/yyyy', new Date());
       if (!isNaN(parsedDate.getTime())) {
         return format(parsedDate, 'dd/MM/yyyy', { locale: ptBR });
       }
 
-      // As a fallback, try letting new Date() parse it, which handles ISO 8601 and other formats.
       const fallbackDate = new Date(dateString);
       if (!isNaN(fallbackDate.getTime())) {
         return format(fallbackDate, 'dd/MM/yyyy', { locale: ptBR });
       }
 
-      // If all parsing fails, return the original string.
       return dateString;
     } catch {
-      return dateString; // Return original string if any error occurs during formatting
+      return dateString;
     }
   };
 
@@ -145,7 +141,7 @@ export default function ProgrammingPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Programação</h1>
         <p className="text-muted-foreground">
-          Visualizando os dados do seu Realtime Database.
+          Visualizando os dados do Planejamento de Produção em tempo real.
         </p>
       </div>
 
@@ -182,7 +178,7 @@ export default function ProgrammingPage() {
         <CardHeader>
           <CardTitle>Planejamento de Produção</CardTitle>
           <CardDescription>
-            Abaixo estão os itens de planejamento encontrados em tempo real.
+            Itens de planejamento extraídos da planilha de controle.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -212,7 +208,7 @@ export default function ProgrammingPage() {
                     <TableHead>Horas Máquina</TableHead>
                     <TableHead>Técnicos</TableHead>
                     <TableHead>Observação</TableHead>
-                    <TableHead>Equipamento</TableHead>
+                    <TableHead>EQUIPAMENTO</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -234,7 +230,7 @@ export default function ProgrammingPage() {
               </Table>
             ) : (
                <p className="flex h-64 items-center justify-center text-center text-muted-foreground">
-                {selectedDate ? "Nenhum dado encontrado para a data selecionada." : 'Nenhum dado encontrado no nó "Planejamento S".'}
+                {selectedDate ? "Nenhum dado encontrado para a data selecionada." : 'Nenhum dado encontrado no planejamento.'}
               </p>
             ))}
         </CardContent>
