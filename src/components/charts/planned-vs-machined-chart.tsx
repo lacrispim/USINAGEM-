@@ -108,7 +108,7 @@ export function PlannedVsMachinedChart({
             
             <div className="flex flex-col gap-1 border-b pb-2 mb-1">
                 <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold">Planejado (Total)</span>
+                    <span className="text-sm font-semibold">Plan (Total)</span>
                     <span className="font-bold">{plannedTotal.toFixed(1)}h</span>
                 </div>
                 <div className="pl-3 flex flex-col gap-0.5">
@@ -159,7 +159,7 @@ export function PlannedVsMachinedChart({
 
             <div className="flex flex-col gap-1">
                 <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold">Realizado (Total)</span>
+                    <span className="text-sm font-semibold">Real (Total)</span>
                     <span className="font-bold">{machinedTotal.toFixed(1)}h</span>
                 </div>
                 <div className="pl-3 flex flex-col gap-0.5">
@@ -307,10 +307,10 @@ export function PlannedVsMachinedChart({
                   {/* BARRA PLANEJADO (ESQUERDA) */}
                   <Bar dataKey="usinagemPlanejada" stackId="planejado" fill={chartConfig.usinagemPlanejada.color}>
                     <LabelList 
-                      dataKey={() => "planejado"} 
+                      dataKey={() => "plan"} 
                       position="bottom" 
                       offset={10} 
-                      className="fill-muted-foreground text-[8px] uppercase font-medium" 
+                      className="fill-muted-foreground text-[8px] uppercase font-bold" 
                     />
                   </Bar>
                   <Bar dataKey="paradaCafePlanejada" stackId="planejado" fill={chartConfig.paradaCafePlanejada.color} />
@@ -330,10 +330,10 @@ export function PlannedVsMachinedChart({
                   {/* BARRA REALIZADO (DIREITA) */}
                   <Bar dataKey="usinagem" stackId="usinado" fill={chartConfig.usinagem.color}>
                     <LabelList 
-                      dataKey={() => "realizado"} 
+                      dataKey={() => "real"} 
                       position="bottom" 
                       offset={10} 
-                      className="fill-muted-foreground text-[8px] uppercase font-medium" 
+                      className="fill-muted-foreground text-[8px] uppercase font-bold" 
                     />
                   </Bar>
                   <Bar dataKey="setup" stackId="usinado" fill={chartConfig.setup.color} />
