@@ -68,15 +68,15 @@ const chartConfig = {
   },
   setup: {
     label: 'Setup Realizado',
-    color: 'hsl(36 94% 57%)',
+    color: '#ef4444', // Vermelho (Igual ao planejado para consistência)
   },
   dds: {
     label: 'DDS/DDSHE Realizado',
-    color: 'hsl(90 80% 45%)',
+    color: '#f97316', // Laranja (Igual ao planejado, resolvendo o conflito com Verde)
   },
   outrasPerdas: {
     label: 'Outras Perdas',
-    color: 'hsl(221 83% 53%)',
+    color: '#3b82f6', // Azul
   },
 };
 
@@ -307,7 +307,7 @@ export function PlannedVsMachinedChart({
                   {/* BARRA PLANEJADO (ESQUERDA) */}
                   <Bar dataKey="usinagemPlanejada" stackId="planejado" fill={chartConfig.usinagemPlanejada.color}>
                     <LabelList 
-                      dataKey={() => "plan"} 
+                      dataKey={() => "Plan"} 
                       position="bottom" 
                       offset={10} 
                       className="fill-muted-foreground text-[8px] uppercase font-bold" 
@@ -330,7 +330,7 @@ export function PlannedVsMachinedChart({
                   {/* BARRA REALIZADO (DIREITA) */}
                   <Bar dataKey="usinagem" stackId="usinado" fill={chartConfig.usinagem.color}>
                     <LabelList 
-                      dataKey={() => "real"} 
+                      dataKey={() => "Real"} 
                       position="bottom" 
                       offset={10} 
                       className="fill-muted-foreground text-[8px] uppercase font-bold" 
