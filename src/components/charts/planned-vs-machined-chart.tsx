@@ -40,31 +40,31 @@ interface PlannedVsMachinedChartProps {
 const chartConfig = {
   usinagemPlanejada: {
     label: 'Usinagem Planejada',
-    color: 'hsl(0 0% 35%)',
+    color: '#444444', // Cinza escuro
   },
   paradaCafePlanejada: {
     label: 'Café Planejado',
-    color: '#eab308',
+    color: '#eab308', // Amarelo
   },
   limpezaPlanejada: {
     label: 'Limpeza Planejada',
-    color: '#22c55e',
+    color: '#22c55e', // Verde
   },
   apontamentoPlanejado: {
     label: 'DDS/ADM Planejado',
-    color: '#f97316',
+    color: '#f97316', // Laranja
   },
   inspecaoPlanejada: {
     label: 'Qualidade Planejada',
-    color: '#3b82f6',
+    color: '#3b82f6', // Azul
   },
   setupPlanejado: {
     label: 'Setup Planejado',
-    color: '#ef4444',
+    color: '#ef4444', // Vermelho
   },
   usinagem: {
     label: 'Usinagem Realizada',
-    color: 'hsl(var(--chart-1))',
+    color: '#e2e8f0', // Cinza claro (fundo da barra realizada)
   },
   setup: {
     label: 'Setup Realizado',
@@ -143,7 +143,7 @@ export function PlannedVsMachinedChart({
                     {p.inspecaoPlanejada > 0 && <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.inspecaoPlanejada.color }} />
                         <div className="flex justify-between flex-1">
-                            <span className="text-muted-foreground text-xs">Inspecao/Qualidade</span>
+                            <span className="text-muted-foreground text-xs">Inspeção/Qualidade</span>
                             <span className="font-bold text-xs">{p.inspecaoPlanejada.toFixed(1)}h</span>
                         </div>
                     </div>}
@@ -231,7 +231,7 @@ export function PlannedVsMachinedChart({
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: chartConfig.inspecaoPlanejada.color}} />
-          <span className="text-[10px] text-muted-foreground">Inspecao/Qualidade</span>
+          <span className="text-[10px] text-muted-foreground">Qualidade</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: chartConfig.setupPlanejado.color}} />
@@ -280,17 +280,18 @@ export function PlannedVsMachinedChart({
           <div className="h-[450px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig}>
-                <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 5 }} barGap={4}>
+                <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 60 }} barGap={4}>
                   <CartesianGrid vertical={false} />
                   <XAxis
                     dataKey="name"
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
-                    angle={-45}
-                    textAnchor="end"
+                    angle={0}
+                    textAnchor="middle"
                     interval={0}
                     height={80}
+                    className="text-sm font-bold uppercase"
                   />
                   <YAxis
                     unit="h"
@@ -303,27 +304,13 @@ export function PlannedVsMachinedChart({
                   />
                   <Legend content={<CustomLegend />} />
                   
+                  {/* BARRA PLANEJADO (ESQUERDA) */}
                   <Bar dataKey="usinagemPlanejada" stackId="planejado" fill={chartConfig.usinagemPlanejada.color}>
-                    <LabelList
-                      dataKey="usinagemPlanejada"
-                      position="center"
-                      content={(props: any) => {
-                        const { x, y, width, height } = props;
-                        if (height < 60) return null;
-                        return (
-                          <text
-                            x={x + width / 2}
-                            y={y + height / 2}
-                            fill="#fff"
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            transform={`rotate(-90, ${x + width / 2}, ${y + height / 2})`}
-                            className="text-[10px] font-bold uppercase pointer-events-none"
-                          >
-                            planejado
-                          </text>
-                        );
-                      }}
+                    <LabelList 
+                      dataKey={() => "planejado"} 
+                      position="bottom" 
+                      offset={10} 
+                      className="fill-muted-foreground text-[10px] uppercase font-medium" 
                     />
                   </Bar>
                   <Bar dataKey="paradaCafePlanejada" stackId="planejado" fill={chartConfig.paradaCafePlanejada.color} />
@@ -335,33 +322,19 @@ export function PlannedVsMachinedChart({
                         dataKey="totalPlanejado"
                         position="top"
                         offset={4}
-                        className="fill-foreground text-xs"
+                        className="fill-foreground text-xs font-bold"
                         formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
                       />
                   </Bar>
 
+                  {/* BARRA REALIZADO (DIREITA) */}
                   <Bar dataKey="usinagem" stackId="usinado" fill={chartConfig.usinagem.color}>
-                    <LabelList
-                        dataKey="usinagem"
-                        position="center"
-                        content={(props: any) => {
-                          const { x, y, width, height } = props;
-                          if (height < 60) return null;
-                          return (
-                            <text
-                              x={x + width / 2}
-                              y={y + height / 2}
-                              fill="#fff"
-                              textAnchor="middle"
-                              dominantBaseline="middle"
-                              transform={`rotate(-90, ${x + width / 2}, ${y + height / 2})`}
-                              className="text-[10px] font-bold uppercase pointer-events-none"
-                            >
-                              realizado
-                            </text>
-                          );
-                        }}
-                      />
+                    <LabelList 
+                      dataKey={() => "realizado"} 
+                      position="bottom" 
+                      offset={10} 
+                      className="fill-muted-foreground text-[10px] uppercase font-medium" 
+                    />
                   </Bar>
                   <Bar dataKey="setup" stackId="usinado" fill={chartConfig.setup.color} />
                   <Bar dataKey="dds" stackId="usinado" fill={chartConfig.dds.color} />
@@ -370,7 +343,7 @@ export function PlannedVsMachinedChart({
                         dataKey="totalRealizado"
                         position="top"
                         offset={4}
-                        className="fill-foreground text-xs"
+                        className="fill-foreground text-xs font-bold"
                         formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
                       />
                   </Bar>
