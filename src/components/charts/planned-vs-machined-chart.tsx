@@ -277,21 +277,21 @@ export function PlannedVsMachinedChart({
             <Loader className="h-8 w-8 animate-spin" />
           </div>
         ) : data && data.length > 0 ? (
-          <div className="h-[450px] w-full">
+          <div className="h-[550px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig}>
-                <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 60 }} barGap={4}>
+                <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 120 }} barGap={4}>
                   <CartesianGrid vertical={false} />
                   <XAxis
                     dataKey="name"
                     tickLine={false}
                     axisLine={false}
-                    tickMargin={8}
-                    angle={0}
-                    textAnchor="middle"
+                    tickMargin={35}
+                    angle={-45}
+                    textAnchor="end"
                     interval={0}
-                    height={80}
-                    className="text-sm font-bold uppercase"
+                    height={120}
+                    className="text-[10px] font-bold uppercase"
                   />
                   <YAxis
                     unit="h"
@@ -310,7 +310,7 @@ export function PlannedVsMachinedChart({
                       dataKey={() => "planejado"} 
                       position="bottom" 
                       offset={10} 
-                      className="fill-muted-foreground text-[10px] uppercase font-medium" 
+                      className="fill-muted-foreground text-[8px] uppercase font-medium" 
                     />
                   </Bar>
                   <Bar dataKey="paradaCafePlanejada" stackId="planejado" fill={chartConfig.paradaCafePlanejada.color} />
@@ -333,7 +333,7 @@ export function PlannedVsMachinedChart({
                       dataKey={() => "realizado"} 
                       position="bottom" 
                       offset={10} 
-                      className="fill-muted-foreground text-[10px] uppercase font-medium" 
+                      className="fill-muted-foreground text-[8px] uppercase font-medium" 
                     />
                   </Bar>
                   <Bar dataKey="setup" stackId="usinado" fill={chartConfig.setup.color} />
