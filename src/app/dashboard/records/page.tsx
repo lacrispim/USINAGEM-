@@ -242,23 +242,62 @@ export default function RecordsPage() {
   }, [lossRecords, selectedOperator]);
 
   const plannedVsMachinedData = useMemo(() => {
-    const dataMap: { [factory: string]: { usinagemPlanejada: number; perdaPlanejada: number; usinagem: number; setup: number; dds: number; outrasPerdas: number } } = {};
+    const dataMap: { [factory: string]: { 
+        usinagemPlanejada: number; 
+        paradaCafePlanejada: number;
+        limpezaPlanejada: number;
+        apontamentoPlanejado: number;
+        inspecaoPlanejada: number;
+        setupPlanejado: number;
+        usinagem: number; 
+        setup: number; 
+        dds: number; 
+        outrasPerdas: number 
+    } } = {};
+
+    const initFactory = (factory: string) => {
+      if (!dataMap[factory]) {
+        dataMap[factory] = { 
+          usinagemPlanejada: 0, 
+          paradaCafePlanejada: 0,
+          limpezaPlanejada: 0,
+          apontamentoPlanejado: 0,
+          inspecaoPlanejada: 0,
+          setupPlanejado: 0,
+          usinagem: 0, 
+          setup: 0, 
+          dds: 0, 
+          outrasPerdas: 0 
+        };
+      }
+    };
 
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record['Site']);
+      if (!factory) return;
+
       const machineHours = typeof record['Horas Máquina'] === 'string' 
         ? parseFloat(record['Horas Máquina'].replace(',', '.')) 
         : (Number(record['Horas Máquina']) || 0);
       
-      const isPlannedLoss = !!record['Perdas planejadas'] && String(record['Perdas planejadas']).trim() !== '';
+      const lossReason = String(record['Perdas planejadas'] || '').toUpperCase().trim();
 
-      if (factory) {
-          if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
-          if (isPlannedLoss) {
-            dataMap[factory].perdaPlanejada += machineHours;
-          } else {
-            dataMap[factory].usinagemPlanejada += machineHours;
-          }
+      initFactory(factory);
+
+      if (lossReason === '') {
+        dataMap[factory].usinagemPlanejada += machineHours;
+      } else if (lossReason.includes('CAFÉ') || lossReason.includes('CAFE')) {
+        dataMap[factory].paradaCafePlanejada += machineHours;
+      } else if (lossReason.includes('LIMPEZA')) {
+        dataMap[factory].limpezaPlanejada += machineHours;
+      } else if (lossReason.includes('APONTAMENTO') || lossReason.includes('TURNO') || lossReason.includes('DDS')) {
+        dataMap[factory].apontamentoPlanejado += machineHours;
+      } else if (lossReason.includes('INSPEÇÃO') || lossReason.includes('INSPECAO') || lossReason.includes('QUALIDADE')) {
+        dataMap[factory].inspecaoPlanejada += machineHours;
+      } else if (lossReason.includes('SETUP')) {
+        dataMap[factory].setupPlanejado += machineHours;
+      } else {
+        dataMap[factory].usinagemPlanejada += machineHours;
       }
     });
     
@@ -266,7 +305,7 @@ export default function RecordsPage() {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.machiningTime) || 0) / 60;
         if (factory && hours > 0) {
-            if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+            initFactory(factory);
             dataMap[factory].usinagem += hours;
         }
     });
@@ -275,7 +314,7 @@ export default function RecordsPage() {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.timeLost) || 0) / 60;
         if (factory && hours > 0) {
-            if (!dataMap[factory]) dataMap[factory] = { usinagemPlanejada: 0, perdaPlanejada: 0, usinagem: 0, setup: 0, dds: 0, outrasPerdas: 0 };
+            initFactory(factory);
             const reason = record.lossReason?.toUpperCase() || '';
             if (reason.includes('SETUP')) dataMap[factory].setup += hours;
             else if (reason.includes('DDS')) dataMap[factory].dds += hours;
@@ -284,18 +323,17 @@ export default function RecordsPage() {
     });
 
     return Object.keys(dataMap).map(factory => {
-      const { usinagemPlanejada, perdaPlanejada, usinagem, setup, dds, outrasPerdas } = dataMap[factory];
+      const d = dataMap[factory];
+      const totalPlanejado = d.usinagemPlanejada + d.paradaCafePlanejada + d.limpezaPlanejada + d.apontamentoPlanejado + d.inspecaoPlanejada + d.setupPlanejado;
+      const totalRealizado = d.usinagem + d.setup + d.dds + d.outrasPerdas;
+      
       return {
           name: factory,
-          usinagemPlanejada,
-          perdaPlanejada,
-          usinado: usinagem + setup + dds + outrasPerdas,
-          usinagem,
-          setup,
-          dds,
-          outrasPerdas,
+          ...d,
+          totalPlanejado,
+          totalRealizado,
       }
-  }).sort((a, b) => (b.usinagemPlanejada + b.perdaPlanejada) - (a.usinagemPlanejada + a.perdaPlanejada));
+  }).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
 
   }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords]);
 

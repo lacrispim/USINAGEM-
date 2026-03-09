@@ -21,12 +21,18 @@ interface PlannedVsMachinedChartProps {
   data: { 
     name: string; 
     usinagemPlanejada: number;
-    perdaPlanejada: number;
+    paradaCafePlanejada: number;
+    limpezaPlanejada: number;
+    apontamentoPlanejado: number;
+    inspecaoPlanejada: number;
+    setupPlanejado: number;
+    totalPlanejado: number;
     usinado: number;
     usinagem: number;
     setup: number;
     dds: number;
     outrasPerdas: number;
+    totalRealizado: number;
   }[];
   loading: boolean;
 }
@@ -36,20 +42,36 @@ const chartConfig = {
     label: 'Usinagem Planejada',
     color: 'hsl(0 0% 35%)',
   },
-  perdaPlanejada: {
+  paradaCafePlanejada: {
+    label: 'Café Planejado',
+    color: '#eab308',
+  },
+  limpezaPlanejada: {
+    label: 'Limpeza Planejada',
+    color: '#22c55e',
+  },
+  apontamentoPlanejado: {
+    label: 'DDS/ADM Planejado',
+    color: '#f97316',
+  },
+  inspecaoPlanejada: {
+    label: 'Qualidade Planejada',
+    color: '#3b82f6',
+  },
+  setupPlanejado: {
     label: 'Setup Planejado',
-    color: '#633919',
+    color: '#ef4444',
   },
   usinagem: {
-    label: 'Usinagem',
+    label: 'Usinagem Realizada',
     color: 'hsl(var(--chart-1))',
   },
   setup: {
-    label: 'Setup',
+    label: 'Setup Realizado',
     color: 'hsl(36 94% 57%)',
   },
   dds: {
-    label: 'DDS/DDSHE',
+    label: 'DDS/DDSHE Realizado',
     color: 'hsl(90 80% 45%)',
   },
   outrasPerdas: {
@@ -64,22 +86,17 @@ export function PlannedVsMachinedChart({
 }: PlannedVsMachinedChartProps) {
 
   const totals = useMemo(() => {
-    const totalPlanejado = data.reduce((acc, curr) => acc + (curr.usinagemPlanejada || 0) + (curr.perdaPlanejada || 0), 0);
-    const totalRealizado = data.reduce((acc, curr) => acc + (curr.usinado || 0), 0);
+    const totalPlanejado = data.reduce((acc, curr) => acc + (curr.totalPlanejado || 0), 0);
+    const totalRealizado = data.reduce((acc, curr) => acc + (curr.totalRealizado || 0), 0);
     return { totalPlanejado, totalRealizado };
   }, [data]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const usinagemPlanejada = payload.find((p: any) => p.dataKey === 'usinagemPlanejada')?.value || 0;
-      const perdaPlanejada = payload.find((p: any) => p.dataKey === 'perdaPlanejada')?.value || 0;
-      const usinagem = payload.find((p: any) => p.dataKey === 'usinagem')?.value || 0;
-      const setup = payload.find((p: any) => p.dataKey === 'setup')?.value || 0;
-      const dds = payload.find((p: any) => p.dataKey === 'dds')?.value || 0;
-      const outrasPerdas = payload.find((p: any) => p.dataKey === 'outrasPerdas')?.value || 0;
-
-      const plannedTotal = usinagemPlanejada + perdaPlanejada;
-      const machinedTotal = usinagem + setup + dds + outrasPerdas;
+      const p = payload[0].payload;
+      
+      const plannedTotal = p.totalPlanejado || 0;
+      const machinedTotal = p.totalRealizado || 0;
       const difference = machinedTotal - plannedTotal;
 
       return (
@@ -95,18 +112,46 @@ export function PlannedVsMachinedChart({
                     <span className="font-bold">{plannedTotal.toFixed(1)}h</span>
                 </div>
                 <div className="pl-3 flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
+                    {p.usinagemPlanejada > 0 && <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.usinagemPlanejada.color }} />
                         <div className="flex justify-between flex-1">
-                            <span className="text-muted-foreground text-xs">Usinagem Planejada</span>
-                            <span className="font-bold text-xs">{usinagemPlanejada.toFixed(1)}h</span>
+                            <span className="text-muted-foreground text-xs">Usinagem</span>
+                            <span className="font-bold text-xs">{p.usinagemPlanejada.toFixed(1)}h</span>
                         </div>
-                    </div>
-                    {perdaPlanejada > 0 && <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.perdaPlanejada.color }} />
+                    </div>}
+                    {p.paradaCafePlanejada > 0 && <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.paradaCafePlanejada.color }} />
                         <div className="flex justify-between flex-1">
-                            <span className="text-muted-foreground text-xs">Setup Planejado</span>
-                            <span className="font-bold text-xs">{perdaPlanejada.toFixed(1)}h</span>
+                            <span className="text-muted-foreground text-xs">Parada para Café</span>
+                            <span className="font-bold text-xs">{p.paradaCafePlanejada.toFixed(1)}h</span>
+                        </div>
+                    </div>}
+                    {p.limpezaPlanejada > 0 && <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.limpezaPlanejada.color }} />
+                        <div className="flex justify-between flex-1">
+                            <span className="text-muted-foreground text-xs">Limpeza</span>
+                            <span className="font-bold text-xs">{p.limpezaPlanejada.toFixed(1)}h</span>
+                        </div>
+                    </div>}
+                    {p.apontamentoPlanejado > 0 && <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.apontamentoPlanejado.color }} />
+                        <div className="flex justify-between flex-1">
+                            <span className="text-muted-foreground text-xs">DDS/ADM</span>
+                            <span className="font-bold text-xs">{p.apontamentoPlanejado.toFixed(1)}h</span>
+                        </div>
+                    </div>}
+                    {p.inspecaoPlanejada > 0 && <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.inspecaoPlanejada.color }} />
+                        <div className="flex justify-between flex-1">
+                            <span className="text-muted-foreground text-xs">Inspecao/Qualidade</span>
+                            <span className="font-bold text-xs">{p.inspecaoPlanejada.toFixed(1)}h</span>
+                        </div>
+                    </div>}
+                    {p.setupPlanejado > 0 && <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.setupPlanejado.color }} />
+                        <div className="flex justify-between flex-1">
+                            <span className="text-muted-foreground text-xs">Setup</span>
+                            <span className="font-bold text-xs">{p.setupPlanejado.toFixed(1)}h</span>
                         </div>
                     </div>}
                 </div>
@@ -118,32 +163,32 @@ export function PlannedVsMachinedChart({
                     <span className="font-bold">{machinedTotal.toFixed(1)}h</span>
                 </div>
                 <div className="pl-3 flex flex-col gap-0.5">
-                    {usinagem > 0 && <div className="flex items-center gap-2">
+                    {p.usinagem > 0 && <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.usinagem.color }} />
                         <div className="flex justify-between flex-1">
-                            <span className="text-muted-foreground text-xs">Usinagem Realizada</span>
-                            <span className="font-bold text-xs">{usinagem.toFixed(1)}h</span>
+                            <span className="text-muted-foreground text-xs">Usinagem</span>
+                            <span className="font-bold text-xs">{p.usinagem.toFixed(1)}h</span>
                         </div>
                     </div>}
-                    {setup > 0 && <div className="flex items-center gap-2">
+                    {p.setup > 0 && <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.setup.color }} />
                         <div className="flex justify-between flex-1">
-                            <span className="text-muted-foreground text-xs">Setup Realizado</span>
-                            <span className="font-bold text-xs">{setup.toFixed(1)}h</span>
+                            <span className="text-muted-foreground text-xs">Setup</span>
+                            <span className="font-bold text-xs">{p.setup.toFixed(1)}h</span>
                         </div>
                     </div>}
-                    {dds > 0 && <div className="flex items-center gap-2">
+                    {p.dds > 0 && <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.dds.color }} />
                         <div className="flex justify-between flex-1">
                             <span className="text-muted-foreground text-xs">DDS/DDSHE</span>
-                            <span className="font-bold text-xs">{dds.toFixed(1)}h</span>
+                            <span className="font-bold text-xs">{p.dds.toFixed(1)}h</span>
                         </div>
                     </div>}
-                    {outrasPerdas > 0 && <div className="flex items-center gap-2">
+                    {p.outrasPerdas > 0 && <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.outrasPerdas.color }} />
                         <div className="flex justify-between flex-1">
                             <span className="text-muted-foreground text-xs">Outras Perdas</span>
-                            <span className="font-bold text-xs">{outrasPerdas.toFixed(1)}h</span>
+                            <span className="font-bold text-xs">{p.outrasPerdas.toFixed(1)}h</span>
                         </div>
                     </div>}
                 </div>
@@ -167,18 +212,34 @@ export function PlannedVsMachinedChart({
   
   const CustomLegend = () => {
     return (
-      <div className="flex items-center justify-center gap-6 mt-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm" style={{backgroundColor: chartConfig.usinagemPlanejada.color}} />
-          <span className="text-sm text-muted-foreground">Usinagem Planejada</span>
+      <div className="flex items-center justify-center gap-4 mt-4 flex-wrap max-w-5xl mx-auto">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: chartConfig.usinagemPlanejada.color}} />
+          <span className="text-[10px] text-muted-foreground">Usinagem</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm" style={{backgroundColor: chartConfig.perdaPlanejada.color}} />
-          <span className="text-sm text-muted-foreground">Setup Planejado</span>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: chartConfig.paradaCafePlanejada.color}} />
+          <span className="text-[10px] text-muted-foreground">Café</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm" style={{backgroundColor: chartConfig.usinagem.color}} />
-          <span className="text-sm text-muted-foreground">Realizado</span>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: chartConfig.limpezaPlanejada.color}} />
+          <span className="text-[10px] text-muted-foreground">Limpeza</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: chartConfig.apontamentoPlanejado.color}} />
+          <span className="text-[10px] text-muted-foreground">DDS/ADM</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: chartConfig.inspecaoPlanejada.color}} />
+          <span className="text-[10px] text-muted-foreground">Inspecao/Qualidade</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: chartConfig.setupPlanejado.color}} />
+          <span className="text-[10px] text-muted-foreground">Setup</span>
+        </div>
+        <div className="flex items-center gap-1.5 border-l pl-3">
+          <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: chartConfig.usinagem.color}} />
+          <span className="text-[10px] text-muted-foreground">Realizado</span>
         </div>
       </div>
     );
@@ -192,7 +253,7 @@ export function PlannedVsMachinedChart({
             <div>
                 <CardTitle>Planejado vs Realizado</CardTitle>
                 <CardDescription>
-                Comparativo visual: SETUP Planejado em marrom e Usinagem em cinza.
+                Comparativo visual detalhado entre o plano de produção e a execução real.
                 </CardDescription>
             </div>
              {loading ? (
@@ -243,9 +304,13 @@ export function PlannedVsMachinedChart({
                   <Legend content={<CustomLegend />} />
                   
                   <Bar dataKey="usinagemPlanejada" stackId="planejado" fill={chartConfig.usinagemPlanejada.color} />
-                  <Bar dataKey="perdaPlanejada" stackId="planejado" fill={chartConfig.perdaPlanejada.color} radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="paradaCafePlanejada" stackId="planejado" fill={chartConfig.paradaCafePlanejada.color} />
+                  <Bar dataKey="limpezaPlanejada" stackId="planejado" fill={chartConfig.limpezaPlanejada.color} />
+                  <Bar dataKey="apontamentoPlanejado" stackId="planejado" fill={chartConfig.apontamentoPlanejado.color} />
+                  <Bar dataKey="inspecaoPlanejada" stackId="planejado" fill={chartConfig.inspecaoPlanejada.color} />
+                  <Bar dataKey="setupPlanejado" stackId="planejado" fill={chartConfig.setupPlanejado.color} radius={[4, 4, 0, 0]}>
                      <LabelList
-                        dataKey={(entry: any) => (entry.usinagemPlanejada + entry.perdaPlanejada)}
+                        dataKey="totalPlanejado"
                         position="top"
                         offset={4}
                         className="fill-foreground text-xs"
@@ -258,7 +323,7 @@ export function PlannedVsMachinedChart({
                   <Bar dataKey="dds" stackId="usinado" fill={chartConfig.dds.color} />
                   <Bar dataKey="outrasPerdas" stackId="usinado" fill={chartConfig.outrasPerdas.color} radius={[4, 4, 0, 0]}>
                     <LabelList
-                        dataKey="usinado"
+                        dataKey="totalRealizado"
                         position="top"
                         offset={4}
                         className="fill-foreground text-xs"
