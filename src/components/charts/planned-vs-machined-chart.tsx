@@ -303,7 +303,29 @@ export function PlannedVsMachinedChart({
                   />
                   <Legend content={<CustomLegend />} />
                   
-                  <Bar dataKey="usinagemPlanejada" stackId="planejado" fill={chartConfig.usinagemPlanejada.color} />
+                  <Bar dataKey="usinagemPlanejada" stackId="planejado" fill={chartConfig.usinagemPlanejada.color}>
+                    <LabelList
+                      dataKey="usinagemPlanejada"
+                      position="center"
+                      content={(props: any) => {
+                        const { x, y, width, height } = props;
+                        if (height < 60) return null;
+                        return (
+                          <text
+                            x={x + width / 2}
+                            y={y + height / 2}
+                            fill="#fff"
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            transform={`rotate(-90, ${x + width / 2}, ${y + height / 2})`}
+                            className="text-[10px] font-bold uppercase pointer-events-none"
+                          >
+                            planejado
+                          </text>
+                        );
+                      }}
+                    />
+                  </Bar>
                   <Bar dataKey="paradaCafePlanejada" stackId="planejado" fill={chartConfig.paradaCafePlanejada.color} />
                   <Bar dataKey="limpezaPlanejada" stackId="planejado" fill={chartConfig.limpezaPlanejada.color} />
                   <Bar dataKey="apontamentoPlanejado" stackId="planejado" fill={chartConfig.apontamentoPlanejado.color} />
@@ -318,7 +340,29 @@ export function PlannedVsMachinedChart({
                       />
                   </Bar>
 
-                  <Bar dataKey="usinagem" stackId="usinado" fill={chartConfig.usinagem.color} />
+                  <Bar dataKey="usinagem" stackId="usinado" fill={chartConfig.usinagem.color}>
+                    <LabelList
+                        dataKey="usinagem"
+                        position="center"
+                        content={(props: any) => {
+                          const { x, y, width, height } = props;
+                          if (height < 60) return null;
+                          return (
+                            <text
+                              x={x + width / 2}
+                              y={y + height / 2}
+                              fill="#fff"
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                              transform={`rotate(-90, ${x + width / 2}, ${y + height / 2})`}
+                              className="text-[10px] font-bold uppercase pointer-events-none"
+                            >
+                              realizado
+                            </text>
+                          );
+                        }}
+                      />
+                  </Bar>
                   <Bar dataKey="setup" stackId="usinado" fill={chartConfig.setup.color} />
                   <Bar dataKey="dds" stackId="usinado" fill={chartConfig.dds.color} />
                   <Bar dataKey="outrasPerdas" stackId="usinado" fill={chartConfig.outrasPerdas.color} radius={[4, 4, 0, 0]}>
