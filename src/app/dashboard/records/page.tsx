@@ -33,8 +33,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { OperatorDailyTimeChart } from '@/components/charts/operator-daily-time-chart';
-import { OperatorDailyLossChart } from '@/components/charts/operator-daily-loss-chart';
 import { OperatorPerformanceChart } from '@/components/charts/operator-performance-chart';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -207,6 +205,14 @@ export default function RecordsPage() {
     return String(recordOp).includes(String(selectedOperator));
   };
   
+  const handleOperatorToggle = (op: string | null) => {
+    if (selectedOperator === op || op === 'all') {
+      setSelectedOperator('all');
+    } else {
+      setSelectedOperator(op);
+    }
+  };
+
   const filteredPlanejamentoData = useMemo(() => {
       const dateFilter = (recordDate: Date) => {
         if (selectedDate) return recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
@@ -494,15 +500,15 @@ export default function RecordsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Horas Trabalhadas por Técnico</CardTitle>
-          <CardDescription>Visualização do desempenho e horas totais por operador.</CardDescription>
+          <CardDescription>Visualização do desempenho e horas totais por operador. Clique na barra para filtrar.</CardDescription>
         </CardHeader>
         <CardContent>
           <OperatorPerformanceChart 
-            productionData={operatorFilteredProductionRecords}
-            lossData={operatorFilteredLossRecords}
+            productionData={productionRecords || []}
+            lossData={lossRecords || []}
             loading={isLoading}
             selectedOperator={selectedOperator}
-            onOperatorSelect={(op) => setSelectedOperator(op)}
+            onOperatorSelect={handleOperatorToggle}
           />
         </CardContent>
       </Card>

@@ -15,13 +15,6 @@ import {
   YAxis,
 } from 'recharts';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -52,24 +45,35 @@ export function OperatorPerformanceChart({
   selectedOperator,
   onOperatorSelect,
 }: OperatorPerformanceChartProps) {
+  
+  const normalizeOperatorName = (name: string) => {
+    const trimmed = String(name).trim();
+    if (trimmed === 'Gustavo') return 'Gustavo Gozzi';
+    return trimmed;
+  };
+
   const chartData = useMemo(() => {
     const operatorHours: { [key: string]: number } = {};
 
     productionData.forEach(record => {
-      if (record.operatorId && record.machiningTime) {
-        if (!operatorHours[record.operatorId]) {
-          operatorHours[record.operatorId] = 0;
+      const rawName = record.operatorId || record['Técnicos'];
+      if (rawName && record.machiningTime) {
+        const name = normalizeOperatorName(rawName);
+        if (!operatorHours[name]) {
+          operatorHours[name] = 0;
         }
-        operatorHours[record.operatorId] += Number(record.machiningTime) / 60;
+        operatorHours[name] += Number(record.machiningTime) / 60;
       }
     });
 
     lossData.forEach(record => {
-      if (record.operatorId && record.timeLost) {
-        if (!operatorHours[record.operatorId]) {
-          operatorHours[record.operatorId] = 0;
+      const rawName = record.operatorId || record['Técnicos'];
+      if (rawName && record.timeLost) {
+        const name = normalizeOperatorName(rawName);
+        if (!operatorHours[name]) {
+          operatorHours[name] = 0;
         }
-        operatorHours[record.operatorId] += Number(record.timeLost) / 60;
+        operatorHours[name] += Number(record.timeLost) / 60;
       }
     });
 
@@ -169,7 +173,7 @@ export function OperatorPerformanceChart({
                             cursor="pointer"
                             fill={entry.fill}
                             opacity={
-                                selectedOperator
+                                selectedOperator && selectedOperator !== 'all'
                                 ? selectedOperator === entry.name
                                     ? 1
                                     : 0.3
