@@ -84,9 +84,23 @@ export default function RecordsPage() {
   const normalizeFactoryName = (name: string | undefined): string | undefined => {
     if (!name) return undefined;
     const upperName = name.toUpperCase().trim();
-    if (upperName === 'AGUAI' || upperName === 'AGUAÍ') return 'AGUAÍ';
-    if (upperName === 'GARANHUS' || upperName === 'GARANHUNS') return 'GARANHUNS';
+    if (upperName.includes('AGUAI') || upperName.includes('AGUAÍ')) return 'AGUAÍ';
+    if (upperName.includes('GARANHUNS') || upperName.includes('GARANHUS')) return 'GARANHUNS';
+    if (upperName.includes('VINHEDO')) return 'VINHEDO';
+    if (upperName.includes('VALINHOS DOVE')) return 'VALINHOS DOVE';
+    if (upperName.includes('VALINHOS SABONETE')) return 'VALINHOS SABONETE';
     return upperName;
+  };
+
+  const normalizeOperatorName = (name: any) => {
+    if (!name) return '';
+    const n = String(name).trim();
+    if (n === 'Gustavo') return 'Gustavo Gozzi';
+    if (n === 'Daniel') return 'Daniel Solivo';
+    if (n === 'Rodrigo') return 'Rodrigo Cantano';
+    if (n === 'William') return 'William Martinucci';
+    if (n === 'Nathan') return 'Nathan Xavier';
+    return n;
   };
 
   useEffect(() => {
@@ -196,17 +210,15 @@ export default function RecordsPage() {
 
   const operatorFilter = (record: any) => {
     if (!selectedOperator || selectedOperator === 'all') return true;
-    let recordOp = record.operatorId || record['Técnicos'];
-    if (!recordOp) return false;
+    const rawOp = record.operatorId || record['Técnicos'] || record['Técnico'];
+    if (!rawOp) return false;
     
-    // Mapeamento "Gustavo" para "Gustavo Gozzi"
-    if (String(recordOp).trim() === "Gustavo") recordOp = "Gustavo Gozzi";
-    
-    return String(recordOp).includes(String(selectedOperator));
+    const normalizedOp = normalizeOperatorName(rawOp);
+    return normalizedOp === selectedOperator || normalizedOp.includes(selectedOperator);
   };
   
   const handleOperatorToggle = (op: string | null) => {
-    if (selectedOperator === op || op === 'all') {
+    if (selectedOperator === op) {
       setSelectedOperator('all');
     } else {
       setSelectedOperator(op);
@@ -227,11 +239,12 @@ export default function RecordsPage() {
       };
 
       return planejamentoData.filter(record => {
-          if (!record['Data Execução']) return false;
+          const dateStr = record['Data Execução'] || record['Data'];
+          if (!dateStr) return false;
           let recordDate;
           try {
-              recordDate = parse(record['Data Execução'], 'dd/MM/yyyy', new Date());
-              if (isNaN(recordDate.getTime())) recordDate = new Date(record['Data Execução']);
+              recordDate = parse(dateStr, 'dd/MM/yyyy', new Date());
+              if (isNaN(recordDate.getTime())) recordDate = new Date(dateStr);
               if (isNaN(recordDate.getTime())) return false;
           } catch { return false; }
           if (!dateFilter(recordDate)) return false;
@@ -499,13 +512,14 @@ export default function RecordsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Horas Trabalhadas por Técnico</CardTitle>
-          <CardDescription>Visualização do desempenho e horas totais por operador. Clique na barra para filtrar.</CardDescription>
+          <CardTitle>Planejado vs Realizado por Técnico</CardTitle>
+          <CardDescription>Comparativo de horas planejadas (Plan) e realizadas (Real) por operador. Clique na barra para filtrar.</CardDescription>
         </CardHeader>
         <CardContent>
           <OperatorPerformanceChart 
             productionData={productionRecords || []}
             lossData={lossRecords || []}
+            plannedData={filteredPlanejamentoData || []}
             loading={isLoading}
             selectedOperator={selectedOperator}
             onOperatorSelect={handleOperatorToggle}
