@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -53,7 +52,7 @@ const normalizeOperatorName = (name: any) => {
   return n.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
-const PLAN_BAR_COLOR = '#6b7280'; // Cinza médio sólido
+const PLAN_BAR_COLOR = '#6b7280'; // Cinza médio sólido (Gray 500)
 
 export function OperatorPerformanceChart({
   productionData,
@@ -101,7 +100,7 @@ export function OperatorPerformanceChart({
         name: operator,
         plan: operatorStats[operator].plan,
         real: operatorStats[operator].real,
-        fill: OPERATOR_COLORS[operator] || OPERATOR_COLORS['Outro'],
+        fillColor: OPERATOR_COLORS[operator] || OPERATOR_COLORS['Outro'],
       }))
       .sort((a, b) => (b.real + b.plan) - (a.real + a.plan));
   }, [productionData, lossData, plannedData]);
@@ -120,108 +119,111 @@ export function OperatorPerformanceChart({
   const xAxisDomainMax = Math.max(8, Math.ceil(maxVal) + 1);
 
   return (
-        loading ? (
-          <div className="flex h-[350px] w-full items-center justify-center">
-            <Loader className="h-8 w-8 animate-spin" />
-          </div>
-        ) : chartData.length > 0 ? (
-          <div className="h-[450px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <ChartContainer config={chartConfig} className="h-full w-full">
-                <BarChart 
-                    data={chartData} 
-                    layout="vertical" 
-                    barGap={4}
-                    margin={{ top: 20, right: 40, left: 40, bottom: 20 }}
-                    onClick={(e) => {
-                      if (e && e.activeLabel) {
-                        onOperatorSelect(e.activeLabel);
-                      }
-                    }}
-                >
-                  <CartesianGrid horizontal={false} />
-                   <YAxis
-                      dataKey="name"
-                      type="category"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={10}
-                      width={120}
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    />
-                  <XAxis
-                    type="number"
-                    domain={[0, xAxisDomainMax]}
-                    unit="h"
-                    tickLine={false}
-                    axisLine={false}
+    loading ? (
+      <div className="flex h-[350px] w-full items-center justify-center">
+        <Loader className="h-8 w-8 animate-spin" />
+      </div>
+    ) : chartData.length > 0 ? (
+      <div className="h-[450px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ChartContainer config={chartConfig} className="h-full w-full">
+            <BarChart 
+                data={chartData} 
+                layout="vertical" 
+                barGap={4}
+                margin={{ top: 20, right: 40, left: 40, bottom: 20 }}
+                onClick={(e) => {
+                  if (e && e.activeLabel) {
+                    onOperatorSelect(e.activeLabel);
+                  }
+                }}
+            >
+              <CartesianGrid horizontal={false} />
+               <YAxis
+                  dataKey="name"
+                  type="category"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={10}
+                  width={120}
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                />
+              <XAxis
+                type="number"
+                domain={[0, xAxisDomainMax]}
+                unit="h"
+                tickLine={false}
+                axisLine={false}
+              />
+              <ChartTooltip
+                cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
+                content={<ChartTooltipContent 
+                    indicator="dot"
+                />}
+              />
+              <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ paddingBottom: '20px' }} />
+              <ReferenceLine 
+                x={7} 
+                stroke="#ef4444"
+                strokeDasharray="3 3"
+                strokeWidth={2}
+              >
+                 <Label 
+                    value="Meta: 7h" 
+                    position="top"
+                    fill="#ef4444"
+                    fontSize={12}
                   />
-                  <ChartTooltip
-                    cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
-                    content={<ChartTooltipContent 
-                        indicator="dot"
-                    />}
+              </ReferenceLine>
+              
+              {/* Planejado Bar - Explicitly Grey */}
+              <Bar dataKey="plan" name="Planejado (Plan)" fill={PLAN_BAR_COLOR} radius={[0, 4, 4, 0]} barSize={15}>
+                 <LabelList
+                    dataKey="plan"
+                    position="right"
+                    offset={8}
+                    className="fill-muted-foreground text-[10px]"
+                    formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
                   />
-                  <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ paddingBottom: '20px' }} />
-                  <ReferenceLine 
-                    x={7} 
-                    stroke="#ef4444"
-                    strokeDasharray="3 3"
-                    strokeWidth={2}
-                  >
-                     <Label 
-                        value="Meta: 7h" 
-                        position="top"
-                        fill="#ef4444"
-                        fontSize={12}
-                      />
-                  </ReferenceLine>
-                  
-                  {/* Planejado Column - Consistent Medium Gray */}
-                  <Bar dataKey="plan" name="Planejado (Plan)" fill={PLAN_BAR_COLOR} radius={[0, 4, 4, 0]} barSize={15}>
-                     <LabelList
-                        dataKey="plan"
-                        position="right"
-                        offset={8}
-                        className="fill-muted-foreground text-[10px]"
-                        formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
-                      />
-                  </Bar>
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-plan-${index}`} fill={PLAN_BAR_COLOR} />
+                  ))}
+              </Bar>
 
-                  {/* Realizado Column - Technician Color */}
-                  <Bar dataKey="real" name="Realizado (Real)" barSize={15} radius={[0, 4, 4, 0]}>
-                       {chartData.map((entry, index) => (
-                        <Cell
-                            key={`cell-${index}`}
-                            cursor="pointer"
-                            fill={entry.fill}
-                            opacity={
-                                selectedOperator && selectedOperator !== 'all'
-                                ? selectedOperator === entry.name
-                                    ? 1
-                                    : 0.3
-                                : 1
-                            }
-                        />
-                        ))}
-                        <LabelList
-                        dataKey="real"
-                        position="right"
-                        offset={8}
-                        className="fill-foreground text-[10px] font-bold"
-                        formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
-                      />
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="flex h-[350px] w-full flex-col items-center justify-center">
-            <p className="text-sm text-muted-foreground">
-              Nenhum dado para exibir o desempenho dos técnicos.
-            </p>
-          </div>
-        )
+              {/* Realizado Bar - Technician Color */}
+              <Bar dataKey="real" name="Realizado (Real)" barSize={15} radius={[0, 4, 4, 0]}>
+                   {chartData.map((entry, index) => (
+                    <Cell
+                        key={`cell-real-${index}`}
+                        cursor="pointer"
+                        fill={entry.fillColor}
+                        opacity={
+                            selectedOperator && selectedOperator !== 'all'
+                            ? selectedOperator === entry.name
+                                ? 1
+                                : 0.3
+                            : 1
+                        }
+                    />
+                    ))}
+                    <LabelList
+                    dataKey="real"
+                    position="right"
+                    offset={8}
+                    className="fill-foreground text-[10px] font-bold"
+                    formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''}
+                  />
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        </ResponsiveContainer>
+      </div>
+    ) : (
+      <div className="flex h-[350px] w-full flex-col items-center justify-center">
+        <p className="text-sm text-muted-foreground">
+          Nenhum dado para exibir o desempenho dos técnicos.
+        </p>
+      </div>
+    )
   );
 }
