@@ -40,7 +40,7 @@ interface PlannedVsMachinedChartProps {
 const chartConfig = {
   usinagemPlanejada: {
     label: 'Usinagem Planejada',
-    color: '#444444', // Cinza escuro
+    color: '#ffffff', // Alterado para Branco conforme solicitado
   },
   paradaCafePlanejada: {
     label: 'Café Planejado',
