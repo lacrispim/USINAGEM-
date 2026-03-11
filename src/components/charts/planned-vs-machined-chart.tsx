@@ -40,7 +40,7 @@ interface PlannedVsMachinedChartProps {
 const chartConfig = {
   usinagemPlanejada: {
     label: 'Usinagem Planejada',
-    color: '#ffffff', // Alterado para Branco conforme solicitado
+    color: '#ffffff',
   },
   paradaCafePlanejada: {
     label: 'Café Planejado',
@@ -64,19 +64,19 @@ const chartConfig = {
   },
   usinagem: {
     label: 'Usinagem Realizada',
-    color: '#e2e8f0', // Cinza claro (fundo da barra realizada)
+    color: '#ffffff', // Alterado para Branco conforme solicitado
   },
   setup: {
     label: 'Setup Realizado',
-    color: '#ef4444', // Vermelho (Igual ao planejado para consistência)
+    color: '#ef4444',
   },
   dds: {
     label: 'DDS/DDSHE Realizado',
-    color: '#f97316', // Laranja (Igual ao planejado, resolvendo o conflito com Verde)
+    color: '#f97316',
   },
   outrasPerdas: {
     label: 'Outras Perdas',
-    color: '#3b82f6', // Azul
+    color: '#3b82f6',
   },
 };
 
