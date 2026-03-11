@@ -66,6 +66,17 @@ const operatorList = [
     "Nathan Xavier"
 ];
 
+const normalizeOperatorName = (name: any) => {
+  if (!name) return '';
+  const n = String(name).toLowerCase().trim();
+  if (n.includes('gustavo')) return 'Gustavo Gozzi';
+  if (n.includes('daniel')) return 'Daniel Solivo';
+  if (n.includes('rodrigo')) return 'Rodrigo Cantano';
+  if (n.includes('william')) return 'William Martinucci';
+  if (n.includes('nathan')) return 'Nathan Xavier';
+  return String(name).trim();
+};
+
 export default function RecordsPage() {
   const firestore = useFirestore();
   const database = useDatabase();
@@ -90,17 +101,6 @@ export default function RecordsPage() {
     if (upperName.includes('VALINHOS DOVE')) return 'VALINHOS DOVE';
     if (upperName.includes('VALINHOS SABONETE')) return 'VALINHOS SABONETE';
     return upperName;
-  };
-
-  const normalizeOperatorName = (name: any) => {
-    if (!name) return '';
-    const n = String(name).trim();
-    if (n === 'Gustavo') return 'Gustavo Gozzi';
-    if (n === 'Daniel') return 'Daniel Solivo';
-    if (n === 'Rodrigo') return 'Rodrigo Cantano';
-    if (n === 'William') return 'William Martinucci';
-    if (n === 'Nathan') return 'Nathan Xavier';
-    return n;
   };
 
   useEffect(() => {
@@ -456,7 +456,7 @@ export default function RecordsPage() {
       </div>
 
       <div className="flex flex-col sm:flex-row justify-start gap-2">
-          <div className="grid w-full sm:max-w-[120px] gap-1.5">
+          <div className="grid w-full sm:max-[120px] gap-1.5">
               <Label htmlFor="year-filter">Ano</Label>
               <Select value={selectedYear || 'all'} onValueChange={setSelectedYear}>
                   <SelectTrigger id="year-filter"><SelectValue /></SelectTrigger>
@@ -466,7 +466,7 @@ export default function RecordsPage() {
                   </SelectContent>
               </Select>
           </div>
-          <div className="grid w-full sm:max-w-[120px] gap-1.5">
+          <div className="grid w-full sm:max-[120px] gap-1.5">
               <Label htmlFor="month-filter">Mês</Label>
               <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={!selectedYear || selectedYear === 'all' || !!selectedDate || selectedWeek !== 'all'}>
                   <SelectTrigger id="month-filter"><SelectValue /></SelectTrigger>
@@ -476,7 +476,7 @@ export default function RecordsPage() {
                   </SelectContent>
               </Select>
           </div>
-          <div className="grid w-full sm:max-w-[150px] gap-1.5">
+          <div className="grid w-full sm:max-[150px] gap-1.5">
               <Label htmlFor="week-filter">Semana</Label>
               <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={!selectedYear || selectedYear === 'all' || !!selectedDate || selectedMonth !== 'all'}>
                   <SelectTrigger id="week-filter"><SelectValue /></SelectTrigger>
@@ -486,7 +486,7 @@ export default function RecordsPage() {
                   </SelectContent>
               </Select>
           </div>
-          <div className="grid w-full sm:max-w-[180px] gap-1.5">
+          <div className="grid w-full sm:max-[180px] gap-1.5">
               <Label htmlFor="date-filter">Dia</Label>
               <Popover>
                   <PopoverTrigger asChild>
@@ -498,7 +498,7 @@ export default function RecordsPage() {
                   <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus /></PopoverContent>
               </Popover>
           </div>
-          <div className="grid w-full sm:max-w-[200px] gap-1.5">
+          <div className="grid w-full sm:max-[200px] gap-1.5">
               <Label htmlFor="operator-filter">Técnico</Label>
               <Select value={selectedOperator || 'all'} onValueChange={setSelectedOperator}>
                   <SelectTrigger id="operator-filter"><SelectValue /></SelectTrigger>

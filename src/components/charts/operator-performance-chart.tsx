@@ -40,6 +40,19 @@ const OPERATOR_COLORS: { [key: string]: string } = {
   'Outro': 'hsl(var(--chart-6))',
 };
 
+const normalizeOperatorName = (name: any) => {
+  if (!name) return '';
+  const n = String(name).toLowerCase().trim();
+  if (n.includes('gustavo')) return 'Gustavo Gozzi';
+  if (n.includes('daniel')) return 'Daniel Solivo';
+  if (n.includes('rodrigo')) return 'Rodrigo Cantano';
+  if (n.includes('william')) return 'William Martinucci';
+  if (n.includes('nathan')) return 'Nathan Xavier';
+  
+  // Title case for others
+  return n.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+};
+
 export function OperatorPerformanceChart({
   productionData,
   lossData,
@@ -49,21 +62,10 @@ export function OperatorPerformanceChart({
   onOperatorSelect,
 }: OperatorPerformanceChartProps) {
   
-  const normalizeOperatorName = (name: any) => {
-    if (!name) return '';
-    const n = String(name).toLowerCase();
-    if (n.includes('gustavo')) return 'Gustavo Gozzi';
-    if (n.includes('daniel')) return 'Daniel Solivo';
-    if (n.includes('rodrigo')) return 'Rodrigo Cantano';
-    if (n.includes('william')) return 'William Martinucci';
-    if (n.includes('nathan')) return 'Nathan Xavier';
-    return String(name).trim();
-  };
-
   const chartData = useMemo(() => {
     const operatorStats: { [key: string]: { plan: number; real: number } } = {};
 
-    // Coletar dados reais (Firestore)
+    // Collect real data (Firestore)
     productionData.forEach(record => {
       const name = normalizeOperatorName(record.operatorId || record['Técnicos'] || record['Técnico']);
       if (name) {
@@ -80,7 +82,7 @@ export function OperatorPerformanceChart({
       }
     });
 
-    // Coletar dados planejados (Realtime DB)
+    // Collect planned data (Realtime DB)
     plannedData.forEach(record => {
       const name = normalizeOperatorName(record['Técnicos'] || record['Técnico'] || record.operatorId);
       if (name) {
@@ -105,7 +107,7 @@ export function OperatorPerformanceChart({
   const chartConfig = {
     plan: {
       label: 'Planejado (Plan)',
-      color: '#4b5563',
+      color: '#94a3b8', // Gray/Slate color
     },
     real: {
       label: 'Realizado (Real)',
@@ -173,8 +175,8 @@ export function OperatorPerformanceChart({
                       />
                   </ReferenceLine>
                   
-                  {/* Barra Planejado */}
-                  <Bar dataKey="plan" name="Planejado (Plan)" fill="#4b5563" radius={[0, 4, 4, 0]} barSize={15}>
+                  {/* Planejado Column - Consistent Gray */}
+                  <Bar dataKey="plan" name="Planejado (Plan)" fill="#94a3b8" radius={[0, 4, 4, 0]} barSize={15}>
                      <LabelList
                         dataKey="plan"
                         position="right"
@@ -184,7 +186,7 @@ export function OperatorPerformanceChart({
                       />
                   </Bar>
 
-                  {/* Barra Realizado */}
+                  {/* Realizado Column - Technician Color */}
                   <Bar dataKey="real" name="Realizado (Real)" barSize={15} radius={[0, 4, 4, 0]}>
                        {chartData.map((entry, index) => (
                         <Cell
