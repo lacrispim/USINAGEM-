@@ -53,6 +53,8 @@ const normalizeOperatorName = (name: any) => {
   return n.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
+const PLAN_BAR_COLOR = '#6b7280'; // Cinza médio sólido
+
 export function OperatorPerformanceChart({
   productionData,
   lossData,
@@ -107,7 +109,7 @@ export function OperatorPerformanceChart({
   const chartConfig = {
     plan: {
       label: 'Planejado (Plan)',
-      color: '#94a3b8', // Gray/Slate color
+      color: PLAN_BAR_COLOR,
     },
     real: {
       label: 'Realizado (Real)',
@@ -175,8 +177,8 @@ export function OperatorPerformanceChart({
                       />
                   </ReferenceLine>
                   
-                  {/* Planejado Column - Consistent Gray */}
-                  <Bar dataKey="plan" name="Planejado (Plan)" fill="#94a3b8" radius={[0, 4, 4, 0]} barSize={15}>
+                  {/* Planejado Column - Consistent Medium Gray */}
+                  <Bar dataKey="plan" name="Planejado (Plan)" fill={PLAN_BAR_COLOR} radius={[0, 4, 4, 0]} barSize={15}>
                      <LabelList
                         dataKey="plan"
                         position="right"
