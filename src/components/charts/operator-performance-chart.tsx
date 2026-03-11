@@ -51,13 +51,13 @@ export function OperatorPerformanceChart({
   
   const normalizeOperatorName = (name: any) => {
     if (!name) return '';
-    const trimmed = String(name).trim();
-    if (trimmed === 'Gustavo') return 'Gustavo Gozzi';
-    if (trimmed === 'Daniel') return 'Daniel Solivo';
-    if (trimmed === 'Rodrigo') return 'Rodrigo Cantano';
-    if (trimmed === 'William') return 'William Martinucci';
-    if (trimmed === 'Nathan') return 'Nathan Xavier';
-    return trimmed;
+    const n = String(name).toLowerCase();
+    if (n.includes('gustavo')) return 'Gustavo Gozzi';
+    if (n.includes('daniel')) return 'Daniel Solivo';
+    if (n.includes('rodrigo')) return 'Rodrigo Cantano';
+    if (n.includes('william')) return 'William Martinucci';
+    if (n.includes('nathan')) return 'Nathan Xavier';
+    return String(name).trim();
   };
 
   const chartData = useMemo(() => {
@@ -65,7 +65,7 @@ export function OperatorPerformanceChart({
 
     // Coletar dados reais (Firestore)
     productionData.forEach(record => {
-      const name = normalizeOperatorName(record.operatorId || record['Técnicos']);
+      const name = normalizeOperatorName(record.operatorId || record['Técnicos'] || record['Técnico']);
       if (name) {
         if (!operatorStats[name]) operatorStats[name] = { plan: 0, real: 0 };
         operatorStats[name].real += Number(record.machiningTime || 0) / 60;
@@ -73,7 +73,7 @@ export function OperatorPerformanceChart({
     });
 
     lossData.forEach(record => {
-      const name = normalizeOperatorName(record.operatorId || record['Técnicos']);
+      const name = normalizeOperatorName(record.operatorId || record['Técnicos'] || record['Técnico']);
       if (name) {
         if (!operatorStats[name]) operatorStats[name] = { plan: 0, real: 0 };
         operatorStats[name].real += Number(record.timeLost || 0) / 60;
@@ -105,7 +105,7 @@ export function OperatorPerformanceChart({
   const chartConfig = {
     plan: {
       label: 'Planejado (Plan)',
-      color: '#444444',
+      color: '#4b5563',
     },
     real: {
       label: 'Realizado (Real)',
@@ -129,7 +129,11 @@ export function OperatorPerformanceChart({
                     layout="vertical" 
                     barGap={4}
                     margin={{ top: 20, right: 40, left: 40, bottom: 20 }}
-                    onClick={(e) => onOperatorSelect(e?.activeLabel || null)}
+                    onClick={(e) => {
+                      if (e && e.activeLabel) {
+                        onOperatorSelect(e.activeLabel);
+                      }
+                    }}
                 >
                   <CartesianGrid horizontal={false} />
                    <YAxis
@@ -170,7 +174,7 @@ export function OperatorPerformanceChart({
                   </ReferenceLine>
                   
                   {/* Barra Planejado */}
-                  <Bar dataKey="plan" name="Planejado (Plan)" fill="#444444" radius={[0, 4, 4, 0]} barSize={15}>
+                  <Bar dataKey="plan" name="Planejado (Plan)" fill="#4b5563" radius={[0, 4, 4, 0]} barSize={15}>
                      <LabelList
                         dataKey="plan"
                         position="right"
