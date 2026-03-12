@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle } from 'lucide-react';
+import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -768,6 +768,7 @@ export default function ProductionRegistryPage() {
   
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [formsFilter, setFormsFilter] = useState<string>('');
 
   const productionRecordsQuery = useMemoFirebase(() => 
     firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc')) : null
@@ -788,9 +789,12 @@ export default function ProductionRegistryPage() {
         record.date.toDate() >= startOfDay(selectedDate) &&
         record.date.toDate() <= endOfDay(selectedDate));
 
-      return operatorMatch && dateMatch;
+      const formsMatch = !formsFilter || (record.formsNumber && 
+        record.formsNumber.toLowerCase().includes(formsFilter.toLowerCase()));
+
+      return operatorMatch && dateMatch && formsMatch;
     });
-  }, [productionRecords, selectedOperator, selectedDate]);
+  }, [productionRecords, selectedOperator, selectedDate, formsFilter]);
 
   const filteredLossRecords = useMemo(() => {
     if (!lossRecords) return [];
@@ -801,9 +805,12 @@ export default function ProductionRegistryPage() {
         record.date.toDate() >= startOfDay(selectedDate) &&
         record.date.toDate() <= endOfDay(selectedDate));
 
-      return operatorMatch && dateMatch;
+      const formsMatch = !formsFilter || (record.formsNumber && 
+        record.formsNumber.toLowerCase().includes(formsFilter.toLowerCase()));
+
+      return operatorMatch && dateMatch && formsMatch;
     });
-  }, [lossRecords, selectedOperator, selectedDate]);
+  }, [lossRecords, selectedOperator, selectedDate, formsFilter]);
 
   const handleDelete = async (collectionName: string, id: string) => {
     if (!firestore) return;
@@ -995,6 +1002,19 @@ export default function ProductionRegistryPage() {
           </div>
           <div className="mt-8 space-y-8">
              <div className="flex flex-col sm:flex-row justify-end gap-4">
+                <div className="grid w-full sm:max-w-xs gap-1.5">
+                    <Label htmlFor="forms-filter">Filtrar por Nº Forms</Label>
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            id="forms-filter"
+                            placeholder="Buscar n° do forms..."
+                            className="pl-8"
+                            value={formsFilter}
+                            onChange={(e) => setFormsFilter(e.target.value)}
+                        />
+                    </div>
+                </div>
                 <div className="grid w-full sm:max-w-xs gap-1.5">
                     <Label htmlFor="date-filter">Filtrar por Data</Label>
                     <Popover>
