@@ -8,9 +8,8 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
-  Tooltip,
-  Legend,
   LabelList,
+  Legend,
 } from 'recharts';
 import {
   Card,
@@ -19,8 +18,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ChartContainer } from '@/components/ui/chart';
+import {
+  ChartContainer,
+  ChartTooltip,
+} from '@/components/ui/chart';
 import { Loader } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface MonthlyOeeEvolutionChartProps {
   loading: boolean;
@@ -32,7 +35,7 @@ const chartConfig = {
     color: '#0072af',
   },
   capacity: {
-    label: 'Constrained Capacity Utilization',
+    label: 'Capacity Utilization',
     color: '#d35400',
   },
   oee: {
@@ -57,10 +60,63 @@ const mockData = [
 ];
 
 export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartProps) {
+  
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[12rem]">
+          <div className="grid gap-1.5">
+            <p className="font-semibold text-lg mb-2">{label}</p>
+            {payload.map((item: any, index: number) => (
+              <div key={index} className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.fill }} />
+                <div className="flex justify-between flex-1">
+                  <span className="text-muted-foreground text-xs">{item.name}</span>
+                  <span className="font-bold text-xs">{item.value}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const CustomLegend = () => (
+    <div className="flex items-center justify-center gap-6 mt-6 flex-wrap">
+      <div className="flex items-center gap-1.5">
+        <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: chartConfig.asset.color }} />
+        <span className="text-[10px] text-muted-foreground uppercase font-bold">Asset Utilization</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: chartConfig.capacity.color }} />
+        <span className="text-[10px] text-muted-foreground uppercase font-bold">Capacity Utilization</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: chartConfig.oee.color }} />
+        <span className="text-[10px] text-muted-foreground uppercase font-bold">OEE</span>
+      </div>
+    </div>
+  );
+
+  const currentOee = mockData[mockData.length - 1].oee;
+
   return (
     <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-xl font-bold">Evolução Mensal - MMPCODE</CardTitle>
+      <CardHeader>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle>Evolução Mensal - MMPCODE</CardTitle>
+                <CardDescription>
+                  Indicadores de utilização e eficiência global (OEE) por mês.
+                </CardDescription>
+            </div>
+            <div className="text-right">
+                <p className="text-2xl font-bold text-[#009e73]">{currentOee}%</p>
+                <p className="text-xs text-muted-foreground">OEE Atual</p>
+            </div>
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -75,55 +131,72 @@ export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartPr
                   data={mockData}
                   margin={{
                     top: 40,
-                    right: 30,
-                    left: 20,
+                    right: 20,
+                    left: 0,
                     bottom: 20,
                   }}
-                  barGap={0}
+                  barGap={8}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                  <CartesianGrid vertical={false} />
                   <XAxis 
                     dataKey="month" 
-                    axisLine={true}
                     tickLine={false}
-                    tick={{ fill: 'currentColor', fontSize: 14 }}
+                    axisLine={false}
+                    tickMargin={10}
+                    className="text-[10px] font-bold uppercase"
                   />
                   <YAxis 
                     unit="%" 
                     domain={[0, 110]}
-                    axisLine={true}
                     tickLine={false}
-                    tickFormatter={(value) => `${value}%`}
-                    label={{ value: 'Percentual (%)', angle: -90, position: 'insideLeft', offset: -10 }}
+                    axisLine={false}
                   />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                    formatter={(value: number) => [`${value}%`]}
+                  <ChartTooltip 
+                    cursor={{ fill: 'hsl(var(--accent))', radius: 4 }}
+                    content={<CustomTooltip />}
                   />
-                  <Legend verticalAlign="top" align="center" iconType="rect" wrapperStyle={{ paddingBottom: 20 }} />
+                  <Legend content={<CustomLegend />} />
                   
-                  <Bar dataKey="asset" name="Asset Utilization" fill={chartConfig.asset.color} barSize={120}>
+                  <Bar 
+                    dataKey="asset" 
+                    name="Asset Utilization" 
+                    fill={chartConfig.asset.color} 
+                    radius={[4, 4, 0, 0]}
+                  >
                     <LabelList 
                       dataKey="asset" 
                       position="top" 
+                      offset={10}
                       formatter={(val: number) => `${val}%`}
-                      className="fill-foreground text-xs font-semibold"
+                      className="fill-foreground text-xs font-bold"
                     />
                   </Bar>
-                  <Bar dataKey="capacity" name="Constrained Capacity Utilization" fill={chartConfig.capacity.color} barSize={120}>
+                  <Bar 
+                    dataKey="capacity" 
+                    name="Capacity Utilization" 
+                    fill={chartConfig.capacity.color} 
+                    radius={[4, 4, 0, 0]}
+                  >
                     <LabelList 
                       dataKey="capacity" 
                       position="top" 
+                      offset={10}
                       formatter={(val: number) => `${val}%`}
-                      className="fill-foreground text-xs font-semibold"
+                      className="fill-foreground text-xs font-bold"
                     />
                   </Bar>
-                  <Bar dataKey="oee" name="OEE" fill={chartConfig.oee.color} barSize={120}>
+                  <Bar 
+                    dataKey="oee" 
+                    name="OEE" 
+                    fill={chartConfig.oee.color} 
+                    radius={[4, 4, 0, 0]}
+                  >
                     <LabelList 
                       dataKey="oee" 
                       position="top" 
+                      offset={10}
                       formatter={(val: number) => `${val}%`}
-                      className="fill-foreground text-xs font-semibold"
+                      className="fill-foreground text-xs font-bold"
                     />
                   </Bar>
                 </BarChart>
