@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -39,6 +38,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Confetti } from '@/components/ui/confetti';
 import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
+import { MonthlyOeeEvolutionChart } from '@/components/charts/monthly-oee-evolution-chart';
 import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
 import { StatusByFormChart } from '@/components/charts/status-by-form-chart';
 import { DailyPdlMplLossChart } from '@/components/charts/daily-pdl-mpl-loss-chart';
@@ -529,6 +529,8 @@ export default function RecordsPage() {
 
       <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
       
+      <MonthlyOeeEvolutionChart loading={isLoading} />
+
       <OeeLossWaterfallChart 
         productionData={operatorFilteredProductionRecords}
         lossData={operatorFilteredLossRecords}
