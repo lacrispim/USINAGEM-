@@ -60,7 +60,7 @@ export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartPr
   return (
     <Card>
       <CardHeader className="text-center">
-        <CardTitle className="text-xl font-bold">Evolução Mensal — Gráfico em Barras</CardTitle>
+        <CardTitle className="text-xl font-bold">Evolução Mensal - MMPCODE</CardTitle>
       </CardHeader>
       <CardContent>
         {loading ? (
