@@ -529,13 +529,13 @@ export default function RecordsPage() {
 
       <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
       
-      <MonthlyOeeEvolutionChart loading={isLoading} />
-
       <OeeLossWaterfallChart 
         productionData={operatorFilteredProductionRecords}
         lossData={operatorFilteredLossRecords}
         loading={isLoading}
       />
+
+      <MonthlyOeeEvolutionChart loading={isLoading} />
 
       <DailyPdlMplLossChart lossData={operatorFilteredLossRecords} loading={isLoading} />
       <StatusByFormChart data={operatorFilteredProductionRecords} loading={isLoading} />
