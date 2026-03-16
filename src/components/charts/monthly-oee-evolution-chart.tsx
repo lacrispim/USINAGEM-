@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -22,8 +22,8 @@ import {
   ChartContainer,
   ChartTooltip,
 } from '@/components/ui/chart';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface MonthlyOeeEvolutionChartProps {
   loading: boolean;
@@ -44,23 +44,45 @@ const chartConfig = {
   },
 };
 
-const mockData = [
-  {
-    month: 'Janeiro',
-    asset: 39,
-    capacity: 100,
-    oee: 88,
-  },
-  {
-    month: 'Fevereiro',
-    asset: 44,
-    capacity: 100,
-    oee: 79,
-  },
-];
+// Estrutura preparada para receber os dados de ambas as máquinas
+const oeeDataByMachine: Record<string, any[]> = {
+  'CENTRO DE USINAGEM D600': [
+    {
+      month: 'Janeiro',
+      asset: 39,
+      capacity: 100,
+      oee: 88,
+    },
+    {
+      month: 'Fevereiro',
+      asset: 44,
+      capacity: 100,
+      oee: 79,
+    },
+  ],
+  'TORNO CNC CENTUR 30': [
+    {
+      month: 'Janeiro',
+      asset: 0, // Aguardando dados
+      capacity: 0, // Aguardando dados
+      oee: 0, // Aguardando dados
+    },
+    {
+      month: 'Fevereiro',
+      asset: 0, // Aguardando dados
+      capacity: 0, // Aguardando dados
+      oee: 0, // Aguardando dados
+    },
+  ],
+};
 
 export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartProps) {
-  
+  const [selectedMachine, setSelectedMachine] = useState('CENTRO DE USINAGEM D600');
+
+  const activeData = useMemo(() => {
+    return oeeDataByMachine[selectedMachine] || [];
+  }, [selectedMachine]);
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -103,13 +125,23 @@ export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartPr
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>
                 <CardTitle>Evolução Mensal - MMPCODE</CardTitle>
                 <CardDescription>
                   Indicadores de utilização e eficiência global (OEE) por mês.
                 </CardDescription>
             </div>
+            <Tabs 
+              value={selectedMachine} 
+              onValueChange={setSelectedMachine}
+              className="w-full sm:w-auto"
+            >
+              <TabsList className="grid grid-cols-2 w-full sm:w-[400px]">
+                <TabsTrigger value="CENTRO DE USINAGEM D600" className="text-[10px] uppercase font-bold">D600</TabsTrigger>
+                <TabsTrigger value="TORNO CNC CENTUR 30" className="text-[10px] uppercase font-bold">Centur 30</TabsTrigger>
+              </TabsList>
+            </Tabs>
         </div>
       </CardHeader>
       <CardContent>
@@ -122,7 +154,7 @@ export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartPr
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig}>
                 <BarChart
-                  data={mockData}
+                  data={activeData}
                   margin={{
                     top: 40,
                     right: 20,
