@@ -535,9 +535,10 @@ export default function RecordsPage() {
         loading={isLoading}
       />
 
-      <MonthlyOeeEvolutionChart loading={isLoading} />
-
       <DailyPdlMplLossChart lossData={operatorFilteredLossRecords} loading={isLoading} />
+
+      <MonthlyOeeEvolutionChart loading={isLoading} />
+      
       <StatusByFormChart data={operatorFilteredProductionRecords} loading={isLoading} />
       
       <Card>
