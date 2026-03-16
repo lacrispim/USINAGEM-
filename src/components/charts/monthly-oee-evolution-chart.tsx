@@ -44,7 +44,7 @@ const chartConfig = {
   },
 };
 
-// Estrutura preparada para receber os dados de ambas as máquinas
+// Estrutura de dados para ambas as máquinas
 const oeeDataByMachine: Record<string, any[]> = {
   'CENTRO DE USINAGEM D600': [
     {
@@ -63,15 +63,15 @@ const oeeDataByMachine: Record<string, any[]> = {
   'TORNO CNC CENTUR 30': [
     {
       month: 'Janeiro',
-      asset: 0, // Aguardando dados
-      capacity: 0, // Aguardando dados
-      oee: 0, // Aguardando dados
+      asset: 40,
+      capacity: 100,
+      oee: 89,
     },
     {
       month: 'Fevereiro',
-      asset: 0, // Aguardando dados
-      capacity: 0, // Aguardando dados
-      oee: 0, // Aguardando dados
+      asset: 0, // Aguardando dados de Fevereiro
+      capacity: 0,
+      oee: 0,
     },
   ],
 };
@@ -193,7 +193,7 @@ export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartPr
                       dataKey="asset" 
                       position="top" 
                       offset={10}
-                      formatter={(val: number) => `${val}%`}
+                      formatter={(val: number) => val > 0 ? `${val}%` : ''}
                       className="fill-foreground text-xs font-bold"
                     />
                   </Bar>
@@ -207,7 +207,7 @@ export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartPr
                       dataKey="capacity" 
                       position="top" 
                       offset={10}
-                      formatter={(val: number) => `${val}%`}
+                      formatter={(val: number) => val > 0 ? `${val}%` : ''}
                       className="fill-foreground text-xs font-bold"
                     />
                   </Bar>
@@ -221,7 +221,7 @@ export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartPr
                       dataKey="oee" 
                       position="top" 
                       offset={10}
-                      formatter={(val: number) => `${val}%`}
+                      formatter={(val: number) => val > 0 ? `${val}%` : ''}
                       className="fill-foreground text-xs font-bold"
                     />
                   </Bar>
