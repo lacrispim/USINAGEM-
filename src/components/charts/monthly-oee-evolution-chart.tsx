@@ -69,9 +69,9 @@ const oeeDataByMachine: Record<string, any[]> = {
     },
     {
       month: 'Fevereiro',
-      asset: 0, // Aguardando dados de Fevereiro
-      capacity: 0,
-      oee: 0,
+      asset: 43,
+      capacity: 100,
+      oee: 77,
     },
   ],
 };
