@@ -64,14 +64,14 @@ const chartConfig = {
   },
   usinagem: {
     label: 'Usinagem Realizada',
-    color: '#ffffff', // Alterado para Branco conforme solicitado
+    color: '#ffffff',
   },
   setup: {
     label: 'Setup Realizado',
     color: '#ef4444',
   },
   dds: {
-    label: 'DDS/DDSHE Realizado',
+    label: 'DDS/ADM Realizado',
     color: '#f97316',
   },
   outrasPerdas: {
@@ -180,7 +180,7 @@ export function PlannedVsMachinedChart({
                     {p.dds > 0 && <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: chartConfig.dds.color }} />
                         <div className="flex justify-between flex-1">
-                            <span className="text-muted-foreground text-xs">DDS/DDSHE</span>
+                            <span className="text-muted-foreground text-xs">DDS/ADM</span>
                             <span className="font-bold text-xs">{p.dds.toFixed(1)}h</span>
                         </div>
                     </div>}
