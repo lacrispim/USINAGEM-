@@ -100,8 +100,6 @@ export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartPr
     </div>
   );
 
-  const currentOee = mockData[mockData.length - 1].oee;
-
   return (
     <Card>
       <CardHeader>
@@ -111,10 +109,6 @@ export function MonthlyOeeEvolutionChart({ loading }: MonthlyOeeEvolutionChartPr
                 <CardDescription>
                   Indicadores de utilização e eficiência global (OEE) por mês.
                 </CardDescription>
-            </div>
-            <div className="text-right">
-                <p className="text-2xl font-bold text-[#009e73]">{currentOee}%</p>
-                <p className="text-xs text-muted-foreground">OEE Atual</p>
             </div>
         </div>
       </CardHeader>
