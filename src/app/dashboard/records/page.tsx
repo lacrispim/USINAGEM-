@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -77,6 +78,22 @@ const normalizeOperatorName = (name: any) => {
   return String(name).trim();
 };
 
+const normalizeFactoryName = (name: any): string => {
+  if (!name) return 'N/A';
+  const n = String(name).toUpperCase().trim();
+  if (n.includes('VINHEDO')) return 'VINHEDO';
+  if (n.includes('AGUAI') || n.includes('AGUAÍ')) return 'AGUAÍ';
+  if (n.includes('GARANHUNS') || n.includes('GARANHUS')) return 'GARANHUNS';
+  if (n.includes('VALINHOS DOVE')) return 'VALINHOS DOVE';
+  if (n.includes('VALINHOS SABONETE')) return 'VALINHOS SABONETE';
+  if (n.includes('POUSO ALEGRE')) return 'POUSO ALEGRE';
+  if (n.includes('INDAIATUBA')) return 'INDAIATUBA';
+  if (n.includes('SUAPE')) return 'SUAPE';
+  if (n.includes('IGARASSU')) return 'IGARASSU';
+  if (n.includes('TORRE')) return 'TORRE';
+  return n;
+};
+
 export default function RecordsPage() {
   const firestore = useFirestore();
   const database = useDatabase();
@@ -91,17 +108,6 @@ export default function RecordsPage() {
 
   const [planejamentoData, setPlanejamentoData] = useState<any[]>([]);
   const [loadingPlanejamento, setLoadingPlanejamento] = useState(true);
-
-  const normalizeFactoryName = (name: string | undefined): string | undefined => {
-    if (!name) return undefined;
-    const upperName = name.toUpperCase().trim();
-    if (upperName.includes('AGUAI') || upperName.includes('AGUAÍ')) return 'AGUAÍ';
-    if (upperName.includes('GARANHUNS') || upperName.includes('GARANHUS')) return 'GARANHUNS';
-    if (upperName.includes('VINHEDO')) return 'VINHEDO';
-    if (upperName.includes('VALINHOS DOVE')) return 'VALINHOS DOVE';
-    if (upperName.includes('VALINHOS SABONETE')) return 'VALINHOS SABONETE';
-    return upperName;
-  };
 
   useEffect(() => {
     setIsClient(true);
@@ -266,20 +272,9 @@ export default function RecordsPage() {
   }, [lossRecords, selectedOperator]);
 
   const plannedVsMachinedData = useMemo(() => {
-    const dataMap: { [factory: string]: { 
-        usinagemPlanejada: number; 
-        paradaCafePlanejada: number;
-        limpezaPlanejada: number;
-        apontamentoPlanejado: number;
-        inspecaoPlanejada: number;
-        setupPlanejado: number;
-        usinagem: number; 
-        setup: number; 
-        dds: number; 
-        outrasPerdas: number 
-    } } = {};
+    const dataMap: { [factory: string]: any } = {};
 
-    const initFactory = (factory: string) => {
+    const getOrCreate = (factory: string) => {
       if (!dataMap[factory]) {
         dataMap[factory] = { 
           usinagemPlanejada: 0, 
@@ -294,55 +289,55 @@ export default function RecordsPage() {
           outrasPerdas: 0 
         };
       }
+      return dataMap[factory];
     };
 
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record['Site']);
-      if (!factory) return;
-
       const machineHours = typeof record['Horas Máquina'] === 'string' 
         ? parseFloat(record['Horas Máquina'].replace(',', '.')) 
         : (Number(record['Horas Máquina']) || 0);
       
+      if (isNaN(machineHours)) return;
+
+      const d = getOrCreate(factory);
       const lossReason = String(record['Perdas planejadas'] || '').toUpperCase().trim();
 
-      initFactory(factory);
-
       if (lossReason === '') {
-        dataMap[factory].usinagemPlanejada += machineHours;
+        d.usinagemPlanejada += machineHours;
       } else if (lossReason.includes('CAFÉ') || lossReason.includes('CAFE')) {
-        dataMap[factory].paradaCafePlanejada += machineHours;
+        d.paradaCafePlanejada += machineHours;
       } else if (lossReason.includes('LIMPEZA')) {
-        dataMap[factory].limpezaPlanejada += machineHours;
-      } else if (lossReason.includes('APONTAMENTO') || lossReason.includes('TURNO') || lossReason.includes('DDS')) {
-        dataMap[factory].apontamentoPlanejado += machineHours;
+        d.limpezaPlanejada += machineHours;
+      } else if (lossReason.includes('APONTAMENTO') || n.includes('TURNO') || n.includes('DDS')) {
+        d.apontamentoPlanejado += machineHours;
       } else if (lossReason.includes('INSPEÇÃO') || lossReason.includes('INSPECAO') || lossReason.includes('QUALIDADE')) {
-        dataMap[factory].inspecaoPlanejada += machineHours;
+        d.inspecaoPlanejada += machineHours;
       } else if (lossReason.includes('SETUP')) {
-        dataMap[factory].setupPlanejado += machineHours;
+        d.setupPlanejado += machineHours;
       } else {
-        dataMap[factory].usinagemPlanejada += machineHours;
+        d.usinagemPlanejada += machineHours;
       }
     });
     
     operatorFilteredProductionRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.machiningTime) || 0) / 60;
-        if (factory && hours > 0) {
-            initFactory(factory);
-            dataMap[factory].usinagem += hours;
+        if (hours > 0) {
+            const d = getOrCreate(factory);
+            d.usinagem += hours;
         }
     });
 
     operatorFilteredLossRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.timeLost) || 0) / 60;
-        if (factory && hours > 0) {
-            initFactory(factory);
+        if (hours > 0) {
+            const d = getOrCreate(factory);
             const reason = record.lossReason?.toUpperCase() || '';
-            if (reason.includes('SETUP')) dataMap[factory].setup += hours;
-            else if (reason.includes('DDS')) dataMap[factory].dds += hours;
-            else dataMap[factory].outrasPerdas += hours;
+            if (reason.includes('SETUP')) d.setup += hours;
+            else if (reason.includes('DDS')) d.dds += hours;
+            else d.outrasPerdas += hours;
         }
     });
 
