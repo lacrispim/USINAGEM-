@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -309,7 +308,7 @@ export default function RecordsPage() {
         d.paradaCafePlanejada += machineHours;
       } else if (lossReason.includes('LIMPEZA')) {
         d.limpezaPlanejada += machineHours;
-      } else if (lossReason.includes('APONTAMENTO') || n.includes('TURNO') || n.includes('DDS')) {
+      } else if (lossReason.includes('APONTAMENTO') || lossReason.includes('TURNO') || lossReason.includes('DDS')) {
         d.apontamentoPlanejado += machineHours;
       } else if (lossReason.includes('INSPEÇÃO') || lossReason.includes('INSPECAO') || lossReason.includes('QUALIDADE')) {
         d.inspecaoPlanejada += machineHours;
