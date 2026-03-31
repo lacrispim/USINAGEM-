@@ -55,7 +55,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp, orderBy, query, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, orderBy, query, deleteDoc, doc, updateDoc, limit } from 'firebase/firestore';
 import { format, parse, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -771,44 +771,69 @@ export default function ProductionRegistryPage() {
   const [formsFilter, setFormsFilter] = useState<string>('');
 
   const productionRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'productionRecords'), orderBy('createdAt', 'desc')) : null
+    firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(500)) : null
   , [firestore]);
   const { data: productionRecords, isLoading: loadingProduction } = useCollection(productionRecordsQuery);
   
   const lossRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'lossRecords'), orderBy('createdAt', 'desc')) : null
+    firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(500)) : null
   , [firestore]);
   const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossRecordsQuery);
 
   const filteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
-    return productionRecords.filter(record => {
-      const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
-      
-      const dateMatch = !selectedDate || (record.date?.toDate && 
-        record.date.toDate() >= startOfDay(selectedDate) &&
-        record.date.toDate() <= endOfDay(selectedDate));
+    
+    // Data de corte padrão: 30 dias atrás
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startOfLimit = startOfDay(thirtyDaysAgo);
 
+    return productionRecords.filter(record => {
+      const recordDate = record.date?.toDate ? record.date.toDate() : null;
+      if (!recordDate) return false;
+
+      // Lógica de filtragem de data solicitada pelo usuário:
+      // Se houver um filtro de data específico, respeita ele (exibe tudo dessa data).
+      // Se NÃO houver filtro de data, aplica o limite de 30 dias por padrão.
+      if (selectedDate) {
+        const isSameDay = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
+        if (!isSameDay) return false;
+      } else {
+        if (recordDate < startOfLimit) return false;
+      }
+
+      const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
       const formsMatch = !formsFilter || (record.formsNumber && 
         record.formsNumber.toLowerCase().includes(formsFilter.toLowerCase()));
 
-      return operatorMatch && dateMatch && formsMatch;
+      return operatorMatch && formsMatch;
     });
   }, [productionRecords, selectedOperator, selectedDate, formsFilter]);
 
   const filteredLossRecords = useMemo(() => {
     if (!lossRecords) return [];
-     return lossRecords.filter(record => {
-      const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
-      
-      const dateMatch = !selectedDate || (record.date?.toDate && 
-        record.date.toDate() >= startOfDay(selectedDate) &&
-        record.date.toDate() <= endOfDay(selectedDate));
 
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startOfLimit = startOfDay(thirtyDaysAgo);
+
+     return lossRecords.filter(record => {
+      const recordDate = record.date?.toDate ? record.date.toDate() : null;
+      if (!recordDate) return false;
+
+      // Mesmo critério de exibição: data selecionada ganha prioridade sobre o limite de 30 dias.
+      if (selectedDate) {
+        const isSameDay = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
+        if (!isSameDay) return false;
+      } else {
+        if (recordDate < startOfLimit) return false;
+      }
+
+      const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
       const formsMatch = !formsFilter || (record.formsNumber && 
         record.formsNumber.toLowerCase().includes(formsFilter.toLowerCase()));
 
-      return operatorMatch && dateMatch && formsMatch;
+      return operatorMatch && formsMatch;
     });
   }, [lossRecords, selectedOperator, selectedDate, formsFilter]);
 
@@ -1066,7 +1091,7 @@ export default function ProductionRegistryPage() {
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>Registros de Produção Recentes</CardTitle>
-                        <CardDescription>Últimas entradas de produção bem-sucedida.</CardDescription>
+                        <CardDescription>Últimas entradas de produção (exibindo últimos 30 dias por padrão).</CardDescription>
                     </div>
                     <Button onClick={() => exportToExcel(filteredProductionRecords, 'Registros_Producao')}>
                         <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -1223,7 +1248,7 @@ export default function ProductionRegistryPage() {
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>Registros de Perdas Recentes</CardTitle>
-                        <CardDescription>Entradas de perdas de produção.</CardDescription>
+                        <CardDescription>Entradas de perdas de produção (exibindo últimos 30 dias por padrão).</CardDescription>
                     </div>
                     <Button onClick={() => exportToExcel(filteredLossRecords, 'Registros_Perdas')}>
                         <FileSpreadsheet className="mr-2 h-4 w-4" />
