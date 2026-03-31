@@ -78,6 +78,8 @@ export function DailyPdlMplLossChart({
 
     let pdlTotal = 0;
     let mplTotal = 0;
+    const pdlBreakdown: Record<string, number> = {};
+    const mplBreakdown: Record<string, number> = {};
 
     lossData.forEach(record => {
       if (record.lossReason && record.timeLost) {
@@ -86,19 +88,22 @@ export function DailyPdlMplLossChart({
 
         if (pdlReasons.includes(reason)) {
           pdlTotal += timeInHours;
+          pdlBreakdown[reason] = (pdlBreakdown[reason] || 0) + timeInHours;
         } else if (mplReasons.includes(reason)) {
           mplTotal += timeInHours;
+          mplBreakdown[reason] = (mplBreakdown[reason] || 0) + timeInHours;
         }
       }
     });
 
-    const waterfallData: {name: string, start: number, value: number, color: string}[] = [];
+    const waterfallData: {name: string, start: number, value: number, color: string, breakdown: any}[] = [];
     
     waterfallData.push({
       name: 'PDL',
       start: 0,
       value: pdlTotal,
       color: chartConfig.pdl.color,
+      breakdown: pdlBreakdown
     });
     
     waterfallData.push({
@@ -106,6 +111,7 @@ export function DailyPdlMplLossChart({
       start: pdlTotal,
       value: mplTotal,
       color: chartConfig.mpl.color,
+      breakdown: mplBreakdown
     });
 
     waterfallData.push({
@@ -113,6 +119,7 @@ export function DailyPdlMplLossChart({
       start: 0,
       value: pdlTotal + mplTotal,
       color: chartConfig.total.color,
+      breakdown: { ...pdlBreakdown, ...mplBreakdown }
     });
 
     return { chartData: waterfallData, totalPdlHours: pdlTotal, totalMplHours: mplTotal };
@@ -121,23 +128,46 @@ export function DailyPdlMplLossChart({
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const value = payload.find((p: any) => p.dataKey === 'value')?.value || 0;
+      const p = payload.find((item: any) => item.dataKey === 'value')?.payload;
+      if (!p) return null;
+
+      const value = p.value || 0;
+      const breakdown = p.breakdown || {};
+      const sortedBreakdown = Object.entries(breakdown)
+        .sort(([, a]: any, [, b]: any) => b - a)
+        .filter(([, v]: any) => v > 0);
+
       let description = '';
       if(label === 'PDL') description = 'Perda por Parada Planejada';
       if(label === 'MPL') description = 'Perda do Processo de Manufatura';
-      if(label === 'Total') description = 'Perda Total';
+      if(label === 'Total') description = 'Perda Total acumulada';
 
       return (
-        <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[12rem]">
+        <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[14rem]">
           <div className="grid gap-1.5">
             <p className="font-semibold">{label}</p>
-            {description && <p className="text-xs text-muted-foreground">{description}</p>}
-            <div className="flex items-center gap-2 mt-1">
-                <div className="flex justify-between flex-1">
-                    <span className="text-muted-foreground">Horas</span>
-                    <span className="font-bold">{value.toFixed(1)}h</span>
-                </div>
+            {description && <p className="text-[10px] text-muted-foreground uppercase font-bold">{description}</p>}
+            
+            <div className="flex justify-between items-center border-b pb-1 mb-1 mt-1">
+              <span className="text-xs text-muted-foreground">Horas Totais</span>
+              <span className="text-xs font-bold">{value.toFixed(1)}h</span>
             </div>
+
+            {sortedBreakdown.length > 0 && (
+              <div className="grid gap-1">
+                {sortedBreakdown.map(([reason, hours]: any) => (
+                  <div key={reason} className="flex justify-between items-center text-[10px]">
+                    <div className="flex items-center gap-1.5 max-w-[150px]">
+                        <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: p.color }} />
+                        <span className="text-muted-foreground truncate" title={reason}>
+                        {reason}
+                        </span>
+                    </div>
+                    <span className="font-medium tabular-nums">{hours.toFixed(1)}h</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       );
@@ -154,13 +184,13 @@ export function DailyPdlMplLossChart({
         <div className="flex justify-between items-start">
             <div>
                 <CardTitle>Análise de Perdas em Cascata (PDL vs MPL)</CardTitle>
-                <CardDescription>Análise em cascata das perdas planejadas e não planejadas.</CardDescription>
+                <CardDescription>Análise detalhada das perdas planejadas e não planejadas.</CardDescription>
             </div>
             <div className="text-right">
                 <p className="text-sm font-bold" style={{color: chartConfig.pdl.color}}>{totalPdlHours.toFixed(1)}h</p>
-                <p className="text-xs text-muted-foreground">Perda Planejada (PDL)</p>
+                <p className="text-xs text-muted-foreground uppercase font-bold">PDL</p>
                 <p className="text-sm font-bold mt-1" style={{color: chartConfig.mpl.color}}>{totalMplHours.toFixed(1)}h</p>
-                <p className="text-xs text-muted-foreground">Perda Não Planejada (MPL)</p>
+                <p className="text-xs text-muted-foreground uppercase font-bold">MPL</p>
             </div>
         </div>
       </CardHeader>
@@ -188,6 +218,7 @@ export function DailyPdlMplLossChart({
                     interval={0}
                     height={40}
                     tick={{fontSize: 12}}
+                    className="text-[10px] font-bold uppercase"
                   />
                   <YAxis 
                     unit="h" 
@@ -205,7 +236,7 @@ export function DailyPdlMplLossChart({
                         dataKey="value" 
                         position="top"
                         formatter={(value: number) => value > 0.05 ? `${value.toFixed(1)}h` : ''}
-                        className="text-xs fill-muted-foreground"
+                        className="text-xs fill-foreground font-bold"
                     />
                      {chartData.map((entry, index) => {
                         return <Cell key={`cell-${index}`} fill={entry.color} />;
