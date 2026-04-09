@@ -59,6 +59,12 @@ const oeeDataByMachine: Record<string, any[]> = {
       capacity: 100,
       oee: 79,
     },
+    {
+      month: 'Março',
+      asset: 45,
+      capacity: 100,
+      oee: 77.6,
+    },
   ],
   'TORNO CNC CENTUR 30': [
     {
