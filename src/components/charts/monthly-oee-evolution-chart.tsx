@@ -79,6 +79,12 @@ const oeeDataByMachine: Record<string, any[]> = {
       capacity: 100,
       oee: 77,
     },
+    {
+      month: 'Março',
+      asset: 44,
+      capacity: 100,
+      oee: 76,
+    },
   ],
 };
 
