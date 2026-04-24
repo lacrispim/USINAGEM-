@@ -36,6 +36,8 @@ const OPERATOR_COLORS: { [key: string]: string } = {
   'Gustavo Gozzi': 'hsl(var(--chart-3))',
   'William Martinucci': 'hsl(var(--chart-4))',
   'Nathan Xavier': 'hsl(var(--chart-5))',
+  'Jair Melo': 'hsl(var(--chart-7))',
+  'Marcos Barbosa': 'hsl(var(--chart-8))',
   'Outro': 'hsl(var(--chart-6))',
 };
 
@@ -47,6 +49,8 @@ const normalizeOperatorName = (name: any) => {
   if (n.includes('rodrigo')) return 'Rodrigo Cantano';
   if (n.includes('william')) return 'William Martinucci';
   if (n.includes('nathan')) return 'Nathan Xavier';
+  if (n.includes('jair')) return 'Jair Melo';
+  if (n.includes('marcos')) return 'Marcos Barbosa';
   
   // Title case for others
   return n.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');

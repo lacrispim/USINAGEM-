@@ -86,7 +86,9 @@ const operatorList = [
     "Rodrigo Cantano",
     "Gustavo Gozzi",
     "William Martinucci",
-    "Nathan Xavier"
+    "Nathan Xavier",
+    "Jair Melo",
+    "Marcos Barbosa"
 ];
 
 const factoryList = [

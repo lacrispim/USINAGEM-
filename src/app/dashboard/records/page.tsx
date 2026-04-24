@@ -63,7 +63,9 @@ const operatorList = [
     "Rodrigo Cantano",
     "Gustavo Gozzi",
     "William Martinucci",
-    "Nathan Xavier"
+    "Nathan Xavier",
+    "Jair Melo",
+    "Marcos Barbosa"
 ];
 
 const normalizeOperatorName = (name: any) => {
@@ -74,6 +76,8 @@ const normalizeOperatorName = (name: any) => {
   if (n.includes('rodrigo')) return 'Rodrigo Cantano';
   if (n.includes('william')) return 'William Martinucci';
   if (n.includes('nathan')) return 'Nathan Xavier';
+  if (n.includes('jair')) return 'Jair Melo';
+  if (n.includes('marcos')) return 'Marcos Barbosa';
   return String(name).trim();
 };
 
