@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useDatabase } from '@/firebase';
 import { ref, onValue, push, set, update, remove } from 'firebase/database';
 import {
@@ -21,8 +20,7 @@ import {
   User,
   Info,
   Plus,
-  Trash2,
-  BarChart3
+  Trash2
 } from 'lucide-react';
 import { 
   format, 
@@ -88,20 +86,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  Bar,
-  ComposedChart,
-  Line,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts';
-import {
-  ChartContainer,
-  ChartTooltip,
-} from '@/components/ui/chart';
 
 interface PlanejamentoItem {
   id: string;
@@ -161,25 +145,6 @@ const planningFormSchema = z.object({
 });
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
-
-const chartConfig = {
-  'd600': {
-    label: 'Centro D600 (h)',
-    color: 'hsl(var(--chart-2))',
-  },
-  'centur30': {
-    label: 'Torno Centur 30 (h)',
-    color: 'hsl(var(--chart-1))',
-  },
-  'outros': {
-      label: 'Outros (h)',
-      color: 'hsl(var(--muted))',
-  },
-  'totalQuantity': {
-    label: 'Total de Peças',
-    color: 'hsl(var(--chart-3))',
-  }
-};
 
 export default function ProgrammingPage() {
   const database = useDatabase();
@@ -263,41 +228,6 @@ export default function ProgrammingPage() {
       }
     });
   };
-
-  const chartData = useMemo(() => {
-    const monthsMap: { [key: string]: { name: string, date: Date, totalQuantity: number, d600: number, centur30: number, outros: number } } = {};
-    
-    planejamentoData.forEach(item => {
-      const dateStr = item['Data Execução'];
-      if (!dateStr) return;
-      try {
-        const date = parse(dateStr, 'dd/MM/yyyy', new Date());
-        if (isNaN(date.getTime())) return;
-        
-        const key = format(date, 'yyyy-MM');
-        const monthLabel = format(date, 'MMM/yy', { locale: ptBR });
-        const hours = typeof item['Horas Máquina'] === 'string' 
-          ? parseFloat(item['Horas Máquina'].replace(',', '.')) 
-          : (Number(item['Horas Máquina']) || 0);
-        
-        const qty = Number(item.Quantidade) || 0;
-        const machineRaw = String(item.EQUIPAMENTO || '').toUpperCase();
-        
-        let machineKey: 'd600' | 'centur30' | 'outros' = 'outros';
-        if (machineRaw.includes('D600')) machineKey = 'd600';
-        else if (machineRaw.includes('CENTUR 30') || machineRaw.includes('C30')) machineKey = 'centur30';
-        
-        if (!monthsMap[key]) {
-          monthsMap[key] = { name: monthLabel, date: startOfMonth(date), totalQuantity: 0, d600: 0, centur30: 0, outros: 0 };
-        }
-        monthsMap[key][machineKey] += hours;
-        monthsMap[key].totalQuantity += qty;
-      } catch (e) {}
-    });
-
-    return Object.values(monthsMap)
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [planejamentoData]);
 
   const handleShiftClick = (day: Date, turnoId: string) => {
     setEditingId(null);
@@ -578,105 +508,6 @@ export default function ProgrammingPage() {
             </div>
           ))}
         </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-6">
-          <Card>
-              <CardHeader>
-                  <div className="flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-primary" />
-                      <CardTitle>Consolidado Mensal de Planejamento</CardTitle>
-                  </div>
-                  <CardDescription>
-                      Horas planejadas por equipamento (Colunas separadas) e quantidade total de peças (Linha).
-                  </CardDescription>
-              </CardHeader>
-              <CardContent>
-                  {!loading && chartData.length > 0 ? (
-                      <div className="h-[400px] w-full mt-4">
-                          <ChartContainer config={chartConfig} className="h-full w-full">
-                              <ComposedChart 
-                                data={chartData} 
-                                margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
-                                barGap={8}
-                              >
-                                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                                  <XAxis 
-                                      dataKey="name" 
-                                      tickLine={false}
-                                      axisLine={false}
-                                      tickMargin={10}
-                                      className="text-xs font-bold uppercase"
-                                  />
-                                  <YAxis 
-                                      yAxisId="left"
-                                      unit="h"
-                                      tickLine={false}
-                                      axisLine={false}
-                                      className="text-xs"
-                                  />
-                                  <YAxis 
-                                      yAxisId="right"
-                                      orientation="right"
-                                      unit=" un"
-                                      tickLine={false}
-                                      axisLine={false}
-                                      className="text-xs"
-                                  />
-                                  <ChartTooltip 
-                                      cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
-                                  />
-                                  <Legend verticalAlign="top" align="right" className="text-xs" />
-                                  
-                                  {/* Coluna 1: D600 */}
-                                  <Bar 
-                                      yAxisId="left"
-                                      dataKey="d600" 
-                                      name="Centro D600 (h)" 
-                                      fill="hsl(var(--chart-2))" 
-                                      radius={[4, 4, 0, 0]} 
-                                      barSize={40}
-                                  />
-                                  {/* Coluna 2: Centur 30 */}
-                                  <Bar 
-                                      yAxisId="left"
-                                      dataKey="centur30" 
-                                      name="Torno Centur 30 (h)" 
-                                      fill="hsl(var(--chart-1))" 
-                                      radius={[4, 4, 0, 0]} 
-                                      barSize={40}
-                                  />
-                                  {/* Coluna 3: Outros */}
-                                  <Bar 
-                                      yAxisId="left"
-                                      dataKey="outros" 
-                                      name="Outros (h)" 
-                                      fill="hsl(var(--muted))" 
-                                      radius={[4, 4, 0, 0]} 
-                                      barSize={40}
-                                  />
-                                  
-                                  {/* Linha: Total de Peças */}
-                                  <Line 
-                                      yAxisId="right"
-                                      type="monotone" 
-                                      dataKey="totalQuantity" 
-                                      name="Total Peças" 
-                                      stroke="hsl(var(--chart-3))" 
-                                      strokeWidth={3}
-                                      dot={{ r: 4, fill: "hsl(var(--chart-3))" }}
-                                      activeDot={{ r: 6 }}
-                                  />
-                              </ComposedChart>
-                          </ChartContainer>
-                      </div>
-                  ) : (
-                      <div className="flex h-[350px] items-center justify-center text-muted-foreground italic border rounded-lg border-dashed">
-                          {loading ? "Carregando dados..." : "Nenhum dado planejado para exibir no gráfico."}
-                      </div>
-                  )}
-              </CardContent>
-          </Card>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
