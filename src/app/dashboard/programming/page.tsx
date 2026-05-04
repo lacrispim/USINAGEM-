@@ -170,7 +170,11 @@ const planningFormSchema = z.object({
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
 const PlanningChart = ({ data, title, color }: { data: any[], title: string, color: string }) => {
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) return (
+    <Card className="mt-6 flex h-[200px] items-center justify-center border-dashed">
+      <p className="text-muted-foreground text-sm uppercase font-bold tracking-widest">{title}: Sem dados</p>
+    </Card>
+  );
   
   return (
     <Card className="mt-6">
@@ -324,6 +328,7 @@ export default function ProgrammingPage() {
 
   const chartData = useMemo(() => {
     const centurMap: Record<string, { monthKey: string, month: string, horas: number, quantidade: number }> = {};
+    const centroMap: Record<string, { monthKey: string, month: string, horas: number, quantidade: number }> = {};
 
     planejamentoData.forEach(item => {
       const dateStr = item['Data Execução'] || item.dataExecucao;
@@ -356,13 +361,18 @@ export default function ProgrammingPage() {
         if (!centurMap[monthKey]) centurMap[monthKey] = { monthKey, month: monthLabel, horas: 0, quantidade: 0 };
         centurMap[monthKey].horas += horas;
         centurMap[monthKey].quantidade += qtd;
+      } else if (equip.includes('CENTRO') || equip.includes('D600')) {
+        if (!centroMap[monthKey]) centroMap[monthKey] = { monthKey, month: monthLabel, horas: 0, quantidade: 0 };
+        centroMap[monthKey].horas += horas;
+        centroMap[monthKey].quantidade += qtd;
       }
     });
 
     const sortFn = (a: any, b: any) => a.monthKey.localeCompare(b.monthKey);
 
     return {
-      centur: Object.values(centurMap).sort(sortFn)
+      centur: Object.values(centurMap).sort(sortFn),
+      centro: Object.values(centroMap).sort(sortFn)
     };
   }, [planejamentoData]);
 
@@ -574,7 +584,7 @@ export default function ProgrammingPage() {
         <CardContent className="p-0">
           {loading ? (
             <div className="flex h-[600px] items-center justify-center gap-2 bg-card rounded-lg border">
-              <Loader className="h-8 w-8 animate-spin text-primary" />
+              <Loader className="h-8 w-8 animate-spin" />
               <span className="font-medium">Carregando planejamento...</span>
             </div>
           ) : (
@@ -658,11 +668,16 @@ export default function ProgrammingPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <PlanningChart 
           data={chartData.centur} 
           title="Consolidado Torno Centur 30" 
           color="#f59e0b" 
+        />
+        <PlanningChart 
+          data={chartData.centro} 
+          title="Consolidado Centro D600" 
+          color="#3b82f6" 
         />
       </div>
 
