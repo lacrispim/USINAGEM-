@@ -329,7 +329,7 @@ export default function ProgrammingPage() {
 
     form.reset({
       dataExecucao: item['Data Execução'] || '',
-      turno: String(item.Turno || '1'),
+      turno: item.Turno ? String(item.Turno) : '1',
       equipamento: item.EQUIPAMENTO || '',
       requisicao: item['Requisição'] || '',
       nomeDaPeca: item['Nome da Peça'] || '',
@@ -583,7 +583,7 @@ export default function ProgrammingPage() {
                       <CardTitle>Consolidado Mensal de Planejamento</CardTitle>
                   </div>
                   <CardDescription>
-                      Horas totais por equipamento (Barras) e quantidade de peças programadas (Linha).
+                      Horas totais por equipamento (Barras separadas) e quantidade de peças programadas (Linha).
                   </CardDescription>
               </CardHeader>
               <CardContent>
@@ -624,14 +624,13 @@ export default function ProgrammingPage() {
                                       dataKey="CENTRO DE USINAGEM D600" 
                                       name="D600 (h)" 
                                       fill="hsl(var(--chart-2))" 
-                                      stackId="a" 
+                                      radius={[4, 4, 0, 0]} 
                                   />
                                   <Bar 
                                       yAxisId="left"
                                       dataKey="TORNO CNC CENTUR 30" 
                                       name="Centur 30 (h)" 
                                       fill="hsl(var(--chart-1))" 
-                                      stackId="a" 
                                       radius={[4, 4, 0, 0]} 
                                   />
                                   <Bar 
@@ -639,7 +638,6 @@ export default function ProgrammingPage() {
                                       dataKey="Outros" 
                                       name="Outros (h)" 
                                       fill="hsl(var(--muted))" 
-                                      stackId="a" 
                                       radius={[4, 4, 0, 0]} 
                                   />
                                   
