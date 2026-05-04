@@ -320,7 +320,6 @@ export default function ProgrammingPage() {
   };
 
   const chartData = useMemo(() => {
-    const d600Map: Record<string, { monthKey: string, month: string, horas: number, quantidade: number }> = {};
     const centurMap: Record<string, { monthKey: string, month: string, horas: number, quantidade: number }> = {};
 
     planejamentoData.forEach(item => {
@@ -340,7 +339,6 @@ export default function ProgrammingPage() {
       const monthKey = format(date, 'yyyy-MM');
       const equip = String(item.EQUIPAMENTO || item.equipamento || '').toUpperCase();
       
-      // Lógica robusta para extração de horas (pode vir como string com vírgula ou número)
       let horas = 0;
       const rawHoras = item['Horas Máquina'] !== undefined ? item['Horas Máquina'] : item.horasPlanejadas;
       if (typeof rawHoras === 'string') {
@@ -349,14 +347,9 @@ export default function ProgrammingPage() {
         horas = Number(rawHoras) || 0;
       }
 
-      // Lógica robusta para extração de quantidade
       const qtd = Number(item.Quantidade !== undefined ? item.Quantidade : item.quantidade) || 0;
 
-      if (equip.includes('D600') || equip.includes('CENTRO')) {
-        if (!d600Map[monthKey]) d600Map[monthKey] = { monthKey, month: monthLabel, horas: 0, quantidade: 0 };
-        d600Map[monthKey].horas += horas;
-        d600Map[monthKey].quantidade += qtd;
-      } else if (equip.includes('CENTUR') || equip.includes('TORNO')) {
+      if (equip.includes('CENTUR') || equip.includes('TORNO')) {
         if (!centurMap[monthKey]) centurMap[monthKey] = { monthKey, month: monthLabel, horas: 0, quantidade: 0 };
         centurMap[monthKey].horas += horas;
         centurMap[monthKey].quantidade += qtd;
@@ -366,7 +359,6 @@ export default function ProgrammingPage() {
     const sortFn = (a: any, b: any) => a.monthKey.localeCompare(b.monthKey);
 
     return {
-      d600: Object.values(d600Map).sort(sortFn),
       centur: Object.values(centurMap).sort(sortFn)
     };
   }, [planejamentoData]);
@@ -663,12 +655,7 @@ export default function ProgrammingPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PlanningChart 
-          data={chartData.d600} 
-          title="Consolidado Centro D600" 
-          color="#0ea5e9" 
-        />
+      <div className="grid grid-cols-1 gap-6">
         <PlanningChart 
           data={chartData.centur} 
           title="Consolidado Torno Centur 30" 
