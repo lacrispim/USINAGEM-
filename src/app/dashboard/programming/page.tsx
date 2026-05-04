@@ -21,7 +21,8 @@ import {
   Info,
   Plus,
   Trash2,
-  Edit2
+  Edit2,
+  BarChart3
 } from 'lucide-react';
 import { 
   format, 
@@ -87,6 +88,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+} from '@/components/ui/chart';
 
 interface PlanejamentoItem {
   id: string;
@@ -146,6 +160,21 @@ const planningFormSchema = z.object({
 });
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
+
+const chartConfig = {
+  'TORNO CNC CENTUR 30': {
+    label: 'Centur 30',
+    color: 'hsl(var(--chart-1))',
+  },
+  'CENTRO DE USINAGEM D600': {
+    label: 'D600',
+    color: 'hsl(var(--chart-2))',
+  },
+  'Outros': {
+      label: 'Outros',
+      color: 'hsl(var(--muted))',
+  }
+};
 
 export default function ProgrammingPage() {
   const database = useDatabase();
@@ -229,6 +258,34 @@ export default function ProgrammingPage() {
       }
     });
   };
+
+  const chartData = useMemo(() => {
+    const monthsMap: { [key: string]: { name: string, date: Date, [machine: string]: any } } = {};
+    
+    planejamentoData.forEach(item => {
+      const dateStr = item['Data Execução'];
+      if (!dateStr) return;
+      try {
+        const date = parse(dateStr, 'dd/MM/yyyy', new Date());
+        if (isNaN(date.getTime())) return;
+        
+        const key = format(date, 'yyyy-MM');
+        const monthLabel = format(date, 'MMM/yy', { locale: ptBR });
+        const hours = typeof item['Horas Máquina'] === 'string' 
+          ? parseFloat(item['Horas Máquina'].replace(',', '.')) 
+          : (Number(item['Horas Máquina']) || 0);
+        const machine = item.EQUIPAMENTO || 'Outros';
+        
+        if (!monthsMap[key]) {
+          monthsMap[key] = { name: monthLabel, date: startOfMonth(date) };
+        }
+        monthsMap[key][machine] = (monthsMap[key][machine] || 0) + hours;
+      } catch (e) {}
+    });
+
+    return Object.values(monthsMap)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [planejamentoData]);
 
   const handleShiftClick = (day: Date, turnoId: string) => {
     setEditingId(null);
@@ -510,6 +567,73 @@ export default function ProgrammingPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-6">
+          <Card>
+              <CardHeader>
+                  <div className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-primary" />
+                      <CardTitle>Consolidado Mensal de Planejamento</CardTitle>
+                  </div>
+                  <CardDescription>
+                      Distribuição de horas totais planejadas por mês e equipamento.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  {!loading && chartData.length > 0 ? (
+                      <div className="h-[350px] w-full mt-4">
+                          <ChartContainer config={chartConfig} className="h-full w-full">
+                              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                                  <XAxis 
+                                      dataKey="name" 
+                                      tickLine={false}
+                                      axisLine={false}
+                                      tickMargin={10}
+                                      className="text-xs font-bold uppercase"
+                                  />
+                                  <YAxis 
+                                      unit="h"
+                                      tickLine={false}
+                                      axisLine={false}
+                                      className="text-xs"
+                                  />
+                                  <ChartTooltip 
+                                      cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
+                                  />
+                                  <Legend verticalAlign="top" align="right" className="text-xs" />
+                                  <Bar 
+                                      dataKey="CENTRO DE USINAGEM D600" 
+                                      name="D600" 
+                                      fill="hsl(var(--chart-2))" 
+                                      stackId="a" 
+                                      radius={[0, 0, 0, 0]} 
+                                  />
+                                  <Bar 
+                                      dataKey="TORNO CNC CENTUR 30" 
+                                      name="Centur 30" 
+                                      fill="hsl(var(--chart-1))" 
+                                      stackId="a" 
+                                      radius={[4, 4, 0, 0]} 
+                                  />
+                                  <Bar 
+                                      dataKey="Outros" 
+                                      name="Outros" 
+                                      fill="hsl(var(--muted))" 
+                                      stackId="a" 
+                                      radius={[4, 4, 0, 0]} 
+                                  />
+                              </BarChart>
+                          </ChartContainer>
+                      </div>
+                  ) : (
+                      <div className="flex h-[350px] items-center justify-center text-muted-foreground italic border rounded-lg border-dashed">
+                          {loading ? "Carregando dados..." : "Nenhum dado planejado para exibir no gráfico."}
+                      </div>
+                  )}
+              </CardContent>
+          </Card>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
