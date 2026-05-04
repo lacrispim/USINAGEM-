@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useDatabase } from '@/firebase';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, push, set } from 'firebase/database';
 import {
   Card,
   CardContent,
@@ -18,7 +19,8 @@ import {
   Calendar as CalendarIcon,
   Factory,
   User,
-  Info
+  Info,
+  Plus
 } from 'lucide-react';
 import { 
   format, 
@@ -39,11 +41,39 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
-  TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  TooltipContent
 } from "@/components/ui/tooltip";
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import { useToast } from '@/hooks/use-toast';
 
 interface PlanejamentoItem {
   id: string;
@@ -57,7 +87,7 @@ interface PlanejamentoItem {
   Técnicos?: string;
   Observação?: string;
   EQUIPAMENTO?: string;
-  Turno?: string | number; // Adicionado suporte a campo de turno se disponível
+  Turno?: string | number;
 }
 
 const turnos = [
@@ -66,11 +96,68 @@ const turnos = [
   { id: '3', label: '3º Turno', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
 ];
 
+const operatorList = [
+    "Daniel Solivo",
+    "Rodrigo Cantano",
+    "Gustavo Gozzi",
+    "William Martinucci",
+    "Nathan Xavier",
+    "Jair Melo",
+    "Marcos Barbosa"
+];
+
+const factoryList = [
+    "VALINHOS DOVE",
+    "VALINHOS SABONETE",
+    "VINHEDO",
+    "POUSO ALEGRE",
+    "INDAIATUBA",
+    "AGUAÍ",
+    "SUAPE",
+    "IGARASSU",
+    "GARANHUNS",
+    "TORRE"
+];
+
+const planningFormSchema = z.object({
+  dataExecucao: z.string().min(1, 'Data é obrigatória.'),
+  equipamento: z.string().min(1, 'Equipamento é obrigatório.'),
+  requisicao: z.string().min(1, 'Nº da Requisição é obrigatório.'),
+  nomeDaPeca: z.string().min(1, 'Nome da peça é obrigatório.'),
+  quantidade: z.coerce.number().min(1, 'Quantidade deve ser maior que zero.'),
+  tecnico: z.string().min(1, 'Técnico é obrigatório.'),
+  horasPlanejadas: z.coerce.number().min(0.1, 'Horas planejadas deve ser maior que zero.'),
+  turno: z.string(),
+  site: z.string().min(1, 'Site é obrigatório.'),
+});
+
+type PlanningFormValues = z.infer<typeof planningFormSchema>;
+
 export default function ProgrammingPage() {
   const database = useDatabase();
+  const { toast } = useToast();
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedTurno, setSelectedTurno] = useState<string>('1');
+
+  const form = useForm<PlanningFormValues>({
+    resolver: zodResolver(planningFormSchema),
+    defaultValues: {
+      dataExecucao: '',
+      equipamento: '',
+      requisicao: '',
+      nomeDaPeca: '',
+      quantidade: 0,
+      tecnico: '',
+      horasPlanejadas: 0,
+      turno: '1',
+      site: 'VALINHOS DOVE',
+    },
+  });
 
   useEffect(() => {
     if (!database) {
@@ -126,6 +213,59 @@ export default function ProgrammingPage() {
       }
     });
   };
+
+  const handleShiftClick = (day: Date, turnoId: string) => {
+    setSelectedDay(day);
+    setSelectedTurno(turnoId);
+    form.reset({
+      dataExecucao: format(day, 'dd/MM/yyyy'),
+      turno: turnoId,
+      equipamento: '',
+      requisicao: '',
+      nomeDaPeca: '',
+      quantidade: 0,
+      tecnico: '',
+      horasPlanejadas: 0,
+      site: 'VALINHOS DOVE',
+    });
+    setIsDialogOpen(true);
+  };
+
+  async function onSubmit(values: PlanningFormValues) {
+    if (!database) return;
+    
+    try {
+      const dbRef = ref(database, '/Planejamento S');
+      const newItemRef = push(dbRef);
+      
+      const newItem = {
+        'Data Execução': values.dataExecucao,
+        'EQUIPAMENTO': values.equipamento,
+        'Requisição': values.requisicao,
+        'Nome da Peça': values.nomeDaPeca,
+        'Quantidade': values.quantidade,
+        'Técnicos': values.tecnico,
+        'Horas Máquina': values.horasPlanejadas,
+        'Turno': values.turno,
+        'Site': values.site,
+      };
+
+      await set(newItemRef, newItem);
+      
+      toast({
+        title: "Planejamento Salvo",
+        description: "A nova ordem de produção foi adicionada ao plano.",
+      });
+      setIsDialogOpen(false);
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        title: "Erro ao Salvar",
+        description: "Não foi possível salvar o planejamento.",
+        variant: "destructive",
+      });
+    }
+  }
 
   const renderEvent = (item: PlanejamentoItem) => (
     <TooltipProvider key={item.id}>
@@ -205,14 +345,12 @@ export default function ProgrammingPage() {
             </div>
           ) : (
             <div className="grid grid-cols-7 gap-px bg-border overflow-hidden rounded-lg border shadow-lg">
-              {/* Cabeçalho da Semana */}
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
                 <div key={day} className="bg-muted/50 p-2 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   {day}
                 </div>
               ))}
 
-              {/* Dias do Calendário */}
               {calendarDays.map((day, dayIdx) => {
                 const dayItems = getItemsForDay(day);
                 const isCurrentMonth = isSameMonth(day, monthStart);
@@ -234,31 +372,28 @@ export default function ProgrammingPage() {
                       )}>
                         {format(day, 'd')}
                       </span>
-                      {dayItems.length > 0 && (
-                        <span className="text-[10px] font-bold text-muted-foreground bg-muted px-1.5 rounded-full">
-                          {dayItems.length}
-                        </span>
-                      )}
                     </div>
 
-                    <div className="flex-1 space-y-2 overflow-y-auto max-h-[150px] scrollbar-hide">
+                    <div className="flex-1 space-y-2 overflow-y-auto max-h-[180px] scrollbar-hide pb-2">
                       {turnos.map(turno => {
-                        // Se o item tiver um campo 'Turno' que corresponda, filtramos aqui. 
-                        // Caso contrário, mostramos no 1º turno por padrão ou distribuímos.
                         const itemsInTurno = dayItems.filter(item => {
-                          if (!item.Turno) return turno.id === '1'; // Default para 1º turno
+                          if (!item.Turno) return turno.id === '1';
                           return String(item.Turno) === turno.id;
                         });
 
                         return (
-                          <div key={turno.id} className="space-y-1">
-                            <div className={cn(
-                              "text-[8px] px-1 py-0.5 rounded border font-bold uppercase tracking-tighter",
-                              turno.color
-                            )}>
+                          <div key={turno.id} className="group/turno relative">
+                            <div 
+                              onClick={() => handleShiftClick(day, turno.id)}
+                              className={cn(
+                                "text-[8px] px-1 py-0.5 rounded border font-bold uppercase tracking-tighter cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-between",
+                                turno.color
+                              )}
+                            >
                               {turno.label}
+                              <Plus className="h-2 w-2 opacity-0 group-hover/turno:opacity-100 transition-opacity" />
                             </div>
-                            <div className="min-h-[10px]">
+                            <div className="min-h-[10px] mt-1 px-1">
                               {itemsInTurno.map(item => renderEvent(item))}
                             </div>
                           </div>
@@ -273,11 +408,10 @@ export default function ProgrammingPage() {
         </CardContent>
       </Card>
 
-      {/* Legenda e Dicas */}
       <div className="flex flex-wrap gap-4 items-center p-4 bg-muted/30 rounded-lg border border-dashed">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <Info className="h-4 w-4" />
-          <span>Dica: Passe o mouse sobre uma ordem de produção para ver os detalhes completos.</span>
+          <span>Dica: Clique no nome do turno para adicionar um planejamento.</span>
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-4">
@@ -289,6 +423,164 @@ export default function ProgrammingPage() {
           ))}
         </div>
       </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Planejamento - {selectedTurno}º Turno</DialogTitle>
+            <DialogDescription>
+              Preencha os dados da ordem de produção para {selectedDay && format(selectedDay, "dd/MM/yyyy")}.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="dataExecucao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data</FormLabel>
+                      <FormControl>
+                        <Input disabled {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="site"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Site/Fábrica</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="equipamento"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Equipamento</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a máquina" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="TORNO CNC CENTUR 30">TORNO CNC CENTUR 30</SelectItem>
+                        <SelectItem value="CENTRO DE USINAGEM D600">CENTRO DE USINAGEM D600</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="requisicao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nº Requisição / Formulário</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: F-1024" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="nomeDaPeca"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome da Peça</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Eixo do Motor" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="quantidade"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantidade</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="horasPlanejadas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Horas Planejadas</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.1" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="tecnico"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Técnico Responsável</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o técnico" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Salvar Planejamento</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
