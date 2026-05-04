@@ -22,7 +22,8 @@ import {
   Plus,
   Trash2,
   Cpu,
-  Settings2
+  Settings2,
+  Filter
 } from 'lucide-react';
 import { 
   format, 
@@ -36,7 +37,8 @@ import {
   isSameMonth, 
   isSameDay, 
   parse, 
-  isToday 
+  isToday,
+  getISOWeek
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -171,16 +173,16 @@ type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
 const PlanningChart = ({ data, title, color }: { data: any[], title: string, color: string }) => {
   if (!data || data.length === 0) return (
-    <Card className="mt-6 flex h-[200px] items-center justify-center border-dashed">
-      <p className="text-muted-foreground text-sm uppercase font-bold tracking-widest">{title}: Sem dados</p>
+    <Card className="flex h-[300px] items-center justify-center border-dashed">
+      <p className="text-muted-foreground text-xs uppercase font-bold tracking-widest">{title}: Sem dados</p>
     </Card>
   );
   
   return (
-    <Card className="mt-6">
-      <CardHeader>
+    <Card>
+      <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold uppercase tracking-tight">{title}</CardTitle>
-        <CardDescription>Horas Planejadas e Quantidade de Peças por Mês</CardDescription>
+        <CardDescription className="text-[10px]">Horas Planejadas e Quantidade de Peças</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">
@@ -188,7 +190,7 @@ const PlanningChart = ({ data, title, color }: { data: any[], title: string, col
             <ComposedChart data={data}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
               <XAxis 
-                dataKey="month" 
+                dataKey="label" 
                 className="text-[10px] font-bold uppercase" 
                 tick={{ fill: 'hsl(var(--muted-foreground))' }}
                 axisLine={false}
@@ -223,7 +225,7 @@ const PlanningChart = ({ data, title, color }: { data: any[], title: string, col
                 name="Horas Planejadas" 
                 fill={color} 
                 radius={[4, 4, 0, 0]} 
-                barSize={40} 
+                barSize={30} 
               />
               <Line 
                 yAxisId="right" 
@@ -255,21 +257,8 @@ export default function ProgrammingPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
 
-  const form = useForm<PlanningFormValues>({
-    resolver: zodResolver(planningFormSchema),
-    defaultValues: {
-      dataExecucao: '',
-      equipamento: '',
-      requisicao: '',
-      nomeDaPeca: '',
-      quantidade: 0,
-      tecnico: '',
-      horasPlanejadas: 0,
-      turno: '1',
-      site: 'VALINHOS DOVE',
-      observacao: '',
-    },
-  });
+  // Filtro de semana
+  const [selectedWeekFilter, setSelectedWeekFilter] = useState<string>('all');
 
   useEffect(() => {
     if (!database) {
@@ -327,8 +316,8 @@ export default function ProgrammingPage() {
   };
 
   const chartData = useMemo(() => {
-    const centurMap: Record<string, { monthKey: string, month: string, horas: number, quantidade: number }> = {};
-    const centroMap: Record<string, { monthKey: string, month: string, horas: number, quantidade: number }> = {};
+    const centurMap: Record<string, { key: string, label: string, horas: number, quantidade: number }> = {};
+    const centroMap: Record<string, { key: string, label: string, horas: number, quantidade: number }> = {};
 
     planejamentoData.forEach(item => {
       const dateStr = item['Data Execução'] || item.dataExecucao;
@@ -342,9 +331,23 @@ export default function ProgrammingPage() {
       }
       
       if (isNaN(date.getTime())) return;
+
+      // Aplicar filtro de semana
+      if (selectedWeekFilter !== 'all') {
+        const itemWeek = getISOWeek(date);
+        if (itemWeek !== parseInt(selectedWeekFilter)) return;
+      }
       
-      const monthLabel = format(date, 'MMM yy', { locale: ptBR });
-      const monthKey = format(date, 'yyyy-MM');
+      // Chave e label dependem do nível de filtro
+      let key, label;
+      if (selectedWeekFilter === 'all') {
+        key = format(date, 'yyyy-MM');
+        label = format(date, 'MMM yy', { locale: ptBR });
+      } else {
+        key = format(date, 'yyyy-MM-dd');
+        label = format(date, 'dd/MM', { locale: ptBR });
+      }
+
       const equip = String(item.EQUIPAMENTO || item.equipamento || '').toUpperCase();
       
       let horas = 0;
@@ -358,23 +361,23 @@ export default function ProgrammingPage() {
       const qtd = Number(item.Quantidade !== undefined ? item.Quantidade : item.quantidade) || 0;
 
       if (equip.includes('CENTUR') || equip.includes('TORNO')) {
-        if (!centurMap[monthKey]) centurMap[monthKey] = { monthKey, month: monthLabel, horas: 0, quantidade: 0 };
-        centurMap[monthKey].horas += horas;
-        centurMap[monthKey].quantidade += qtd;
+        if (!centurMap[key]) centurMap[key] = { key, label, horas: 0, quantidade: 0 };
+        centurMap[key].horas += horas;
+        centurMap[key].quantidade += qtd;
       } else if (equip.includes('CENTRO') || equip.includes('D600')) {
-        if (!centroMap[monthKey]) centroMap[monthKey] = { monthKey, month: monthLabel, horas: 0, quantidade: 0 };
-        centroMap[monthKey].horas += horas;
-        centroMap[monthKey].quantidade += qtd;
+        if (!centroMap[key]) centroMap[key] = { key, label, horas: 0, quantidade: 0 };
+        centroMap[key].horas += horas;
+        centroMap[key].quantidade += qtd;
       }
     });
 
-    const sortFn = (a: any, b: any) => a.monthKey.localeCompare(b.monthKey);
+    const sortFn = (a: any, b: any) => a.key.localeCompare(b.key);
 
     return {
       centur: Object.values(centurMap).sort(sortFn),
       centro: Object.values(centroMap).sort(sortFn)
     };
-  }, [planejamentoData]);
+  }, [planejamentoData, selectedWeekFilter]);
 
   const handleShiftClick = (day: Date, turnoId: string) => {
     setEditingId(null);
@@ -665,6 +668,30 @@ export default function ProgrammingPage() {
               <span className="text-muted-foreground">{t.label}</span>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-8">
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold tracking-tight">Gráficos de Consolidado</h2>
+          <p className="text-sm text-muted-foreground">Analise o planejamento mensal ou filtre por uma semana específica.</p>
+        </div>
+        <div className="flex items-center gap-3 bg-card p-3 rounded-lg border shadow-sm w-full sm:w-auto">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Filter className="h-4 w-4" />
+            <Label htmlFor="week-filter" className="text-xs font-bold uppercase tracking-wider whitespace-nowrap">Semana do Ano:</Label>
+          </div>
+          <Select value={selectedWeekFilter} onValueChange={setSelectedWeekFilter}>
+            <SelectTrigger id="week-filter" className="w-[180px] h-9">
+              <SelectValue placeholder="Selecione a semana" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Semanas</SelectItem>
+              {Array.from({ length: 53 }, (_, i) => i + 1).map(week => (
+                <SelectItem key={week} value={String(week)}>Semana {week}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
