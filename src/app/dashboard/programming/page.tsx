@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useDatabase } from '@/firebase';
 import { ref, onValue, push, set, update, remove } from 'firebase/database';
 import {
@@ -86,6 +86,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { 
+  ResponsiveContainer, 
+  ComposedChart, 
+  Bar, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  Legend 
+} from 'recharts';
 
 interface PlanejamentoItem {
   id: string;
@@ -145,6 +156,76 @@ const planningFormSchema = z.object({
 });
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
+
+const PlanningChart = ({ data, title, color }: { data: any[], title: string, color: string }) => {
+  if (!data || data.length === 0) return null;
+  
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="text-sm font-bold uppercase tracking-tight">{title}</CardTitle>
+        <CardDescription>Horas Planejadas e Quantidade de Peças por Mês</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
+              <XAxis 
+                dataKey="month" 
+                className="text-[10px] font-bold uppercase" 
+                tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis 
+                yAxisId="left" 
+                orientation="left" 
+                stroke={color} 
+                className="text-[10px]" 
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(val) => `${val}h`}
+              />
+              <YAxis 
+                yAxisId="right" 
+                orientation="right" 
+                stroke="#a855f7" 
+                className="text-[10px]" 
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(val) => `${val}p`}
+              />
+              <RechartsTooltip 
+                contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                itemStyle={{ fontSize: '12px' }}
+              />
+              <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }} />
+              <Bar 
+                yAxisId="left" 
+                dataKey="horas" 
+                name="Horas Planejadas" 
+                fill={color} 
+                radius={[4, 4, 0, 0]} 
+                barSize={40} 
+              />
+              <Line 
+                yAxisId="right" 
+                type="monotone" 
+                dataKey="quantidade" 
+                name="Qtd. Peças" 
+                stroke="#a855f7" 
+                strokeWidth={3} 
+                dot={{ r: 4, fill: '#a855f7' }} 
+                activeDot={{ r: 6 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function ProgrammingPage() {
   const database = useDatabase();
@@ -228,6 +309,50 @@ export default function ProgrammingPage() {
       }
     });
   };
+
+  const chartData = useMemo(() => {
+    const d600Map: Record<string, { month: string, horas: number, quantidade: number }> = {};
+    const centurMap: Record<string, { month: string, horas: number, quantidade: number }> = {};
+
+    planejamentoData.forEach(item => {
+      const dateStr = item['Data Execução'];
+      if (!dateStr) return;
+      
+      let date;
+      try {
+        date = parse(dateStr, 'dd/MM/yyyy', new Date());
+      } catch {
+        date = new Date(dateStr);
+      }
+      
+      if (isNaN(date.getTime())) return;
+      
+      const monthLabel = format(date, 'MMM yy', { locale: ptBR });
+      const monthKey = format(date, 'yyyy-MM');
+      const equip = String(item.EQUIPAMENTO || '').toUpperCase();
+      const horas = typeof item['Horas Máquina'] === 'string' 
+        ? parseFloat(item['Horas Máquina'].replace(',', '.')) 
+        : (Number(item['Horas Máquina']) || 0);
+      const qtd = Number(item.Quantidade) || 0;
+
+      if (equip.includes('D600') || equip.includes('CENTRO')) {
+        if (!d600Map[monthKey]) d600Map[monthKey] = { month: monthLabel, horas: 0, quantidade: 0 };
+        d600Map[monthKey].horas += horas;
+        d600Map[monthKey].quantidade += qtd;
+      } else if (equip.includes('CENTUR') || equip.includes('TORNO')) {
+        if (!centurMap[monthKey]) centurMap[monthKey] = { month: monthLabel, horas: 0, quantidade: 0 };
+        centurMap[monthKey].horas += horas;
+        centurMap[monthKey].quantidade += qtd;
+      }
+    });
+
+    const sortFn = (a: any, b: any) => a.month.localeCompare(b.month);
+
+    return {
+      d600: Object.values(d600Map).sort(sortFn),
+      centur: Object.values(centurMap).sort(sortFn)
+    };
+  }, [planejamentoData]);
 
   const handleShiftClick = (day: Date, turnoId: string) => {
     setEditingId(null);
@@ -508,6 +633,19 @@ export default function ProgrammingPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PlanningChart 
+          data={chartData.d600} 
+          title="Consolidado Centro D600" 
+          color="#0ea5e9" 
+        />
+        <PlanningChart 
+          data={chartData.centur} 
+          title="Consolidado Torno Centur 30" 
+          color="#f59e0b" 
+        />
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
