@@ -583,14 +583,18 @@ export default function ProgrammingPage() {
                       <CardTitle>Consolidado Mensal de Planejamento</CardTitle>
                   </div>
                   <CardDescription>
-                      Horas totais por equipamento (Barras separadas) e quantidade de peças programadas (Linha).
+                      Horas planejadas por equipamento (Colunas separadas) e quantidade total de peças (Linha).
                   </CardDescription>
               </CardHeader>
               <CardContent>
                   {!loading && chartData.length > 0 ? (
                       <div className="h-[400px] w-full mt-4">
                           <ChartContainer config={chartConfig} className="h-full w-full">
-                              <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                              <ComposedChart 
+                                data={chartData} 
+                                margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+                                barGap={8}
+                              >
                                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                                   <XAxis 
                                       dataKey="name" 
@@ -619,28 +623,35 @@ export default function ProgrammingPage() {
                                   />
                                   <Legend verticalAlign="top" align="right" className="text-xs" />
                                   
+                                  {/* Coluna 1: D600 */}
                                   <Bar 
                                       yAxisId="left"
                                       dataKey="CENTRO DE USINAGEM D600" 
                                       name="D600 (h)" 
                                       fill="hsl(var(--chart-2))" 
                                       radius={[4, 4, 0, 0]} 
+                                      barSize={40}
                                   />
+                                  {/* Coluna 2: Centur 30 */}
                                   <Bar 
                                       yAxisId="left"
                                       dataKey="TORNO CNC CENTUR 30" 
                                       name="Centur 30 (h)" 
                                       fill="hsl(var(--chart-1))" 
                                       radius={[4, 4, 0, 0]} 
+                                      barSize={40}
                                   />
+                                  {/* Coluna 3: Outros (se existir) */}
                                   <Bar 
                                       yAxisId="left"
                                       dataKey="Outros" 
                                       name="Outros (h)" 
                                       fill="hsl(var(--muted))" 
                                       radius={[4, 4, 0, 0]} 
+                                      barSize={40}
                                   />
                                   
+                                  {/* Linha: Total de Peças */}
                                   <Line 
                                       yAxisId="right"
                                       type="monotone" 
