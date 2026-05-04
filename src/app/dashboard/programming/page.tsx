@@ -20,7 +20,9 @@ import {
   User,
   Info,
   Plus,
-  Trash2
+  Trash2,
+  Cpu,
+  Settings2
 } from 'lucide-react';
 import { 
   format, 
@@ -53,7 +55,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter
-} from "@/components/ui/dialog";
+} from "@/dialog";
 import {
   Form,
   FormControl,
@@ -97,6 +99,7 @@ import {
   Tooltip as RechartsTooltip, 
   Legend 
 } from 'recharts';
+import { Label } from '@/components/ui/label';
 
 interface PlanejamentoItem {
   id: string;
@@ -664,9 +667,9 @@ export default function ProgrammingPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-2xl">
                 {editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}
             </DialogTitle>
             <DialogDescription>
@@ -676,7 +679,46 @@ export default function ProgrammingPage() {
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="equipamento"
+                render={({ field }) => (
+                  <FormItem className="space-y-4">
+                    <FormLabel className="text-base font-bold text-primary uppercase tracking-wider">
+                      Selecione o Equipamento (Obrigatório)
+                    </FormLabel>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button
+                        type="button"
+                        variant={field.value === 'TORNO CNC CENTUR 30' ? 'default' : 'outline'}
+                        className={cn(
+                          "h-24 flex flex-col gap-2 transition-all border-2",
+                          field.value === 'TORNO CNC CENTUR 30' ? "border-primary ring-2 ring-primary/20" : "border-muted"
+                        )}
+                        onClick={() => field.onChange('TORNO CNC CENTUR 30')}
+                      >
+                        <Settings2 className={cn("h-8 w-8", field.value === 'TORNO CNC CENTUR 30' ? "text-primary-foreground" : "text-muted-foreground")} />
+                        <span className="font-bold text-sm">TORNO CENTUR 30</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={field.value === 'CENTRO DE USINAGEM D600' ? 'default' : 'outline'}
+                        className={cn(
+                          "h-24 flex flex-col gap-2 transition-all border-2",
+                          field.value === 'CENTRO DE USINAGEM D600' ? "border-primary ring-2 ring-primary/20" : "border-muted"
+                        )}
+                        onClick={() => field.onChange('CENTRO DE USINAGEM D600')}
+                      >
+                        <Cpu className={cn("h-8 w-8", field.value === 'CENTRO DE USINAGEM D600' ? "text-primary-foreground" : "text-muted-foreground")} />
+                        <span className="font-bold text-sm">CENTRO D600</span>
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -685,7 +727,7 @@ export default function ProgrammingPage() {
                     <FormItem>
                       <FormLabel>Data</FormLabel>
                       <FormControl>
-                        <Input disabled {...field} />
+                        <Input disabled {...field} className="bg-muted" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -713,35 +755,13 @@ export default function ProgrammingPage() {
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="equipamento"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Equipamento</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a máquina" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="TORNO CNC CENTUR 30">TORNO CNC CENTUR 30</SelectItem>
-                        <SelectItem value="CENTRO DE USINAGEM D600">CENTRO DE USINAGEM D600</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="requisicao"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nº Requisição</FormLabel>
+                      <FormLabel>Nº Requisição (Forms)</FormLabel>
                       <FormControl>
                         <Input placeholder="Ex: F-1024" {...field} />
                       </FormControl>
@@ -770,7 +790,7 @@ export default function ProgrammingPage() {
                   name="quantidade"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Quantidade</FormLabel>
+                      <FormLabel>Quantidade de Peças</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>
@@ -821,7 +841,7 @@ export default function ProgrammingPage() {
                   <FormItem>
                     <FormLabel>Observações</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Notas adicionais..." {...field} />
+                      <Textarea placeholder="Notas adicionais sobre o processo..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
