@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useDatabase } from '@/firebase';
-import { ref, onValue, push, set } from 'firebase/database';
+import { ref, onValue, push, set, update, remove } from 'firebase/database';
 import {
   Card,
   CardContent,
@@ -20,7 +20,9 @@ import {
   Factory,
   User,
   Info,
-  Plus
+  Plus,
+  Trash2,
+  Edit2
 } from 'lucide-react';
 import { 
   format, 
@@ -53,7 +55,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter
-} from "@/components/ui/dialog";
+} from "@/Dialog";
 import {
   Form,
   FormControl,
@@ -70,10 +72,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface PlanejamentoItem {
   id: string;
@@ -129,6 +143,7 @@ const planningFormSchema = z.object({
   horasPlanejadas: z.coerce.number().min(0.1, 'Horas planejadas deve ser maior que zero.'),
   turno: z.string(),
   site: z.string().min(1, 'Site é obrigatório.'),
+  observacao: z.string().optional(),
 });
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
@@ -141,6 +156,7 @@ export default function ProgrammingPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
 
@@ -156,6 +172,7 @@ export default function ProgrammingPage() {
       horasPlanejadas: 0,
       turno: '1',
       site: 'VALINHOS DOVE',
+      observacao: '',
     },
   });
 
@@ -215,6 +232,7 @@ export default function ProgrammingPage() {
   };
 
   const handleShiftClick = (day: Date, turnoId: string) => {
+    setEditingId(null);
     setSelectedDay(day);
     setSelectedTurno(turnoId);
     form.reset({
@@ -227,18 +245,68 @@ export default function ProgrammingPage() {
       tecnico: '',
       horasPlanejadas: 0,
       site: 'VALINHOS DOVE',
+      observacao: '',
     });
     setIsDialogOpen(true);
+  };
+
+  const handleItemClick = (item: PlanejamentoItem) => {
+    setEditingId(item.id);
+    setSelectedTurno(String(item.Turno || '1'));
+    
+    // Parse date for display
+    let itemDate = new Date();
+    if (item['Data Execução']) {
+        try {
+            itemDate = parse(item['Data Execução'], 'dd/MM/yyyy', new Date());
+        } catch {
+            itemDate = new Date(item['Data Execução']);
+        }
+    }
+    setSelectedDay(itemDate);
+
+    form.reset({
+      dataExecucao: item['Data Execução'] || '',
+      turno: String(item.Turno || '1'),
+      equipamento: item.EQUIPAMENTO || '',
+      requisicao: item['Requisição'] || '',
+      nomeDaPeca: item['Nome da Peça'] || '',
+      quantidade: Number(item.Quantidade) || 0,
+      tecnico: item.Técnicos || '',
+      horasPlanejadas: typeof item['Horas Máquina'] === 'string' 
+        ? parseFloat(item['Horas Máquina'].replace(',', '.')) 
+        : (Number(item['Horas Máquina']) || 0),
+      site: item.Site || 'VALINHOS DOVE',
+      observacao: item.Observação || '',
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDeleteItem = async () => {
+    if (!database || !editingId) return;
+    try {
+      const itemRef = ref(database, `/Planejamento S/${editingId}`);
+      await remove(itemRef);
+      toast({
+        title: "Planejamento Excluído",
+        description: "O planejamento foi removido com sucesso.",
+      });
+      setIsDialogOpen(false);
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        title: "Erro ao Excluir",
+        description: "Não foi possível remover o planejamento.",
+        variant: "destructive",
+      });
+    }
   };
 
   async function onSubmit(values: PlanningFormValues) {
     if (!database) return;
     
     try {
-      const dbRef = ref(database, '/Planejamento S');
-      const newItemRef = push(dbRef);
-      
-      const newItem = {
+      const payload = {
         'Data Execução': values.dataExecucao,
         'EQUIPAMENTO': values.equipamento,
         'Requisição': values.requisicao,
@@ -248,14 +316,26 @@ export default function ProgrammingPage() {
         'Horas Máquina': values.horasPlanejadas,
         'Turno': values.turno,
         'Site': values.site,
+        'Observação': values.observacao || '',
       };
 
-      await set(newItemRef, newItem);
+      if (editingId) {
+        const itemRef = ref(database, `/Planejamento S/${editingId}`);
+        await update(itemRef, payload);
+        toast({
+          title: "Planejamento Atualizado",
+          description: "As alterações foram salvas com sucesso.",
+        });
+      } else {
+        const dbRef = ref(database, '/Planejamento S');
+        const newItemRef = push(dbRef);
+        await set(newItemRef, payload);
+        toast({
+          title: "Planejamento Salvo",
+          description: "A nova ordem de produção foi adicionada ao plano.",
+        });
+      }
       
-      toast({
-        title: "Planejamento Salvo",
-        description: "A nova ordem de produção foi adicionada ao plano.",
-      });
       setIsDialogOpen(false);
     } catch (error: any) {
       console.error(error);
@@ -271,7 +351,13 @@ export default function ProgrammingPage() {
     <TooltipProvider key={item.id}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="mb-1 cursor-help truncate rounded border border-border bg-card p-1 text-[10px] leading-tight shadow-sm hover:border-primary/50 transition-colors">
+          <div 
+            onClick={(e) => {
+                e.stopPropagation();
+                handleItemClick(item);
+            }}
+            className="mb-1 cursor-pointer truncate rounded border border-border bg-card p-1 text-[10px] leading-tight shadow-sm hover:border-primary transition-all hover:scale-[1.02] active:scale-95"
+          >
             <span className="font-bold text-primary mr-1">{item['Requisição']}</span>
             <span>{item['Nome da Peça']}</span>
           </div>
@@ -306,6 +392,9 @@ export default function ProgrammingPage() {
                 "{item['Observação']}"
               </div>
             )}
+            <div className="mt-2 text-[8px] text-center text-primary font-bold uppercase tracking-widest animate-pulse">
+                Clique para editar
+            </div>
           </div>
         </TooltipContent>
       </Tooltip>
@@ -411,7 +500,7 @@ export default function ProgrammingPage() {
       <div className="flex flex-wrap gap-4 items-center p-4 bg-muted/30 rounded-lg border border-dashed">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <Info className="h-4 w-4" />
-          <span>Dica: Clique no nome do turno para adicionar um planejamento.</span>
+          <span>Dica: Clique no nome do turno para adicionar ou em uma barra para editar/ver detalhes.</span>
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-4">
@@ -425,11 +514,15 @@ export default function ProgrammingPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Planejamento - {selectedTurno}º Turno</DialogTitle>
+            <DialogTitle>
+                {editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}
+            </DialogTitle>
             <DialogDescription>
-              Preencha os dados da ordem de produção para {selectedDay && format(selectedDay, "dd/MM/yyyy")}.
+              {editingId 
+                ? 'Atualize as informações desta ordem de produção.' 
+                : `Preencha os dados da ordem de produção para ${selectedDay && format(selectedDay, "dd/MM/yyyy")}.`}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -454,7 +547,7 @@ export default function ProgrammingPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Site/Fábrica</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione" />
@@ -476,7 +569,7 @@ export default function ProgrammingPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Equipamento</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione a máquina" />
@@ -498,7 +591,7 @@ export default function ProgrammingPage() {
                   name="requisicao"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nº Requisição / Formulário</FormLabel>
+                      <FormLabel>Nº Requisição</FormLabel>
                       <FormControl>
                         <Input placeholder="Ex: F-1024" {...field} />
                       </FormControl>
@@ -556,7 +649,7 @@ export default function ProgrammingPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Técnico Responsável</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o técnico" />
@@ -571,11 +664,51 @@ export default function ProgrammingPage() {
                 )}
               />
 
-              <DialogFooter>
+              <FormField
+                control={form.control}
+                name="observacao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Observações</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Notas adicionais..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                {editingId && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button type="button" variant="destructive" className="sm:mr-auto">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação não pode ser desfeita. O planejamento será removido permanentemente.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteItem} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Confirmar Exclusão
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit">Salvar Planejamento</Button>
+                <Button type="submit">
+                  {editingId ? 'Salvar Alterações' : 'Salvar Planejamento'}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
