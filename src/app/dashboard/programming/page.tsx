@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -55,7 +54,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter
-} from "@/Dialog";
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
