@@ -21,7 +21,6 @@ import {
   Info,
   Plus,
   Trash2,
-  Edit2,
   BarChart3
 } from 'lucide-react';
 import { 
@@ -90,7 +89,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Bar,
-  BarChart,
+  ComposedChart,
+  Line,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -163,16 +163,20 @@ type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
 const chartConfig = {
   'TORNO CNC CENTUR 30': {
-    label: 'Centur 30',
+    label: 'Centur 30 (h)',
     color: 'hsl(var(--chart-1))',
   },
   'CENTRO DE USINAGEM D600': {
-    label: 'D600',
+    label: 'D600 (h)',
     color: 'hsl(var(--chart-2))',
   },
   'Outros': {
-      label: 'Outros',
+      label: 'Outros (h)',
       color: 'hsl(var(--muted))',
+  },
+  'totalQuantity': {
+    label: 'Total de Peças',
+    color: 'hsl(var(--chart-3))',
   }
 };
 
@@ -260,7 +264,7 @@ export default function ProgrammingPage() {
   };
 
   const chartData = useMemo(() => {
-    const monthsMap: { [key: string]: { name: string, date: Date, [machine: string]: any } } = {};
+    const monthsMap: { [key: string]: { name: string, date: Date, totalQuantity: number, [machine: string]: any } } = {};
     
     planejamentoData.forEach(item => {
       const dateStr = item['Data Execução'];
@@ -274,12 +278,15 @@ export default function ProgrammingPage() {
         const hours = typeof item['Horas Máquina'] === 'string' 
           ? parseFloat(item['Horas Máquina'].replace(',', '.')) 
           : (Number(item['Horas Máquina']) || 0);
+        
+        const qty = Number(item.Quantidade) || 0;
         const machine = item.EQUIPAMENTO || 'Outros';
         
         if (!monthsMap[key]) {
-          monthsMap[key] = { name: monthLabel, date: startOfMonth(date) };
+          monthsMap[key] = { name: monthLabel, date: startOfMonth(date), totalQuantity: 0 };
         }
         monthsMap[key][machine] = (monthsMap[key][machine] || 0) + hours;
+        monthsMap[key].totalQuantity += qty;
       } catch (e) {}
     });
 
@@ -310,7 +317,6 @@ export default function ProgrammingPage() {
     setEditingId(item.id);
     setSelectedTurno(String(item.Turno || '1'));
     
-    // Parse date for display
     let itemDate = new Date();
     if (item['Data Execução']) {
         try {
@@ -577,14 +583,14 @@ export default function ProgrammingPage() {
                       <CardTitle>Consolidado Mensal de Planejamento</CardTitle>
                   </div>
                   <CardDescription>
-                      Distribuição de horas totais planejadas por mês e equipamento.
+                      Horas totais por equipamento (Barras) e quantidade de peças programadas (Linha).
                   </CardDescription>
               </CardHeader>
               <CardContent>
                   {!loading && chartData.length > 0 ? (
-                      <div className="h-[350px] w-full mt-4">
+                      <div className="h-[400px] w-full mt-4">
                           <ChartContainer config={chartConfig} className="h-full w-full">
-                              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                              <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                                   <XAxis 
                                       dataKey="name" 
@@ -594,7 +600,16 @@ export default function ProgrammingPage() {
                                       className="text-xs font-bold uppercase"
                                   />
                                   <YAxis 
+                                      yAxisId="left"
                                       unit="h"
+                                      tickLine={false}
+                                      axisLine={false}
+                                      className="text-xs"
+                                  />
+                                  <YAxis 
+                                      yAxisId="right"
+                                      orientation="right"
+                                      unit=" un"
                                       tickLine={false}
                                       axisLine={false}
                                       className="text-xs"
@@ -603,28 +618,42 @@ export default function ProgrammingPage() {
                                       cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
                                   />
                                   <Legend verticalAlign="top" align="right" className="text-xs" />
+                                  
                                   <Bar 
+                                      yAxisId="left"
                                       dataKey="CENTRO DE USINAGEM D600" 
-                                      name="D600" 
+                                      name="D600 (h)" 
                                       fill="hsl(var(--chart-2))" 
                                       stackId="a" 
-                                      radius={[0, 0, 0, 0]} 
                                   />
                                   <Bar 
+                                      yAxisId="left"
                                       dataKey="TORNO CNC CENTUR 30" 
-                                      name="Centur 30" 
+                                      name="Centur 30 (h)" 
                                       fill="hsl(var(--chart-1))" 
                                       stackId="a" 
                                       radius={[4, 4, 0, 0]} 
                                   />
                                   <Bar 
+                                      yAxisId="left"
                                       dataKey="Outros" 
-                                      name="Outros" 
+                                      name="Outros (h)" 
                                       fill="hsl(var(--muted))" 
                                       stackId="a" 
                                       radius={[4, 4, 0, 0]} 
                                   />
-                              </BarChart>
+                                  
+                                  <Line 
+                                      yAxisId="right"
+                                      type="monotone" 
+                                      dataKey="totalQuantity" 
+                                      name="Total Peças" 
+                                      stroke="hsl(var(--chart-3))" 
+                                      strokeWidth={3}
+                                      dot={{ r: 4, fill: "hsl(var(--chart-3))" }}
+                                      activeDot={{ r: 6 }}
+                                  />
+                              </ComposedChart>
                           </ChartContainer>
                       </div>
                   ) : (
