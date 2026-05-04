@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -162,15 +163,15 @@ const planningFormSchema = z.object({
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
 const chartConfig = {
-  'TORNO CNC CENTUR 30': {
-    label: 'Centur 30 (h)',
-    color: 'hsl(var(--chart-1))',
-  },
-  'CENTRO DE USINAGEM D600': {
-    label: 'D600 (h)',
+  'd600': {
+    label: 'Centro D600 (h)',
     color: 'hsl(var(--chart-2))',
   },
-  'Outros': {
+  'centur30': {
+    label: 'Torno Centur 30 (h)',
+    color: 'hsl(var(--chart-1))',
+  },
+  'outros': {
       label: 'Outros (h)',
       color: 'hsl(var(--muted))',
   },
@@ -264,7 +265,7 @@ export default function ProgrammingPage() {
   };
 
   const chartData = useMemo(() => {
-    const monthsMap: { [key: string]: { name: string, date: Date, totalQuantity: number, [machine: string]: any } } = {};
+    const monthsMap: { [key: string]: { name: string, date: Date, totalQuantity: number, d600: number, centur30: number, outros: number } } = {};
     
     planejamentoData.forEach(item => {
       const dateStr = item['Data Execução'];
@@ -280,12 +281,16 @@ export default function ProgrammingPage() {
           : (Number(item['Horas Máquina']) || 0);
         
         const qty = Number(item.Quantidade) || 0;
-        const machine = item.EQUIPAMENTO || 'Outros';
+        const machineRaw = String(item.EQUIPAMENTO || '').toUpperCase();
+        
+        let machineKey: 'd600' | 'centur30' | 'outros' = 'outros';
+        if (machineRaw.includes('D600')) machineKey = 'd600';
+        else if (machineRaw.includes('CENTUR 30') || machineRaw.includes('C30')) machineKey = 'centur30';
         
         if (!monthsMap[key]) {
-          monthsMap[key] = { name: monthLabel, date: startOfMonth(date), totalQuantity: 0 };
+          monthsMap[key] = { name: monthLabel, date: startOfMonth(date), totalQuantity: 0, d600: 0, centur30: 0, outros: 0 };
         }
-        monthsMap[key][machine] = (monthsMap[key][machine] || 0) + hours;
+        monthsMap[key][machineKey] += hours;
         monthsMap[key].totalQuantity += qty;
       } catch (e) {}
     });
@@ -626,8 +631,8 @@ export default function ProgrammingPage() {
                                   {/* Coluna 1: D600 */}
                                   <Bar 
                                       yAxisId="left"
-                                      dataKey="CENTRO DE USINAGEM D600" 
-                                      name="D600 (h)" 
+                                      dataKey="d600" 
+                                      name="Centro D600 (h)" 
                                       fill="hsl(var(--chart-2))" 
                                       radius={[4, 4, 0, 0]} 
                                       barSize={40}
@@ -635,16 +640,16 @@ export default function ProgrammingPage() {
                                   {/* Coluna 2: Centur 30 */}
                                   <Bar 
                                       yAxisId="left"
-                                      dataKey="TORNO CNC CENTUR 30" 
-                                      name="Centur 30 (h)" 
+                                      dataKey="centur30" 
+                                      name="Torno Centur 30 (h)" 
                                       fill="hsl(var(--chart-1))" 
                                       radius={[4, 4, 0, 0]} 
                                       barSize={40}
                                   />
-                                  {/* Coluna 3: Outros (se existir) */}
+                                  {/* Coluna 3: Outros */}
                                   <Bar 
                                       yAxisId="left"
-                                      dataKey="Outros" 
+                                      dataKey="outros" 
                                       name="Outros (h)" 
                                       fill="hsl(var(--muted))" 
                                       radius={[4, 4, 0, 0]} 
