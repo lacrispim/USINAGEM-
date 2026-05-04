@@ -257,8 +257,23 @@ export default function ProgrammingPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
 
-  // Filtro de semana
   const [selectedWeekFilter, setSelectedWeekFilter] = useState<string>('all');
+
+  const form = useForm<PlanningFormValues>({
+    resolver: zodResolver(planningFormSchema),
+    defaultValues: {
+      dataExecucao: '',
+      equipamento: '',
+      requisicao: '',
+      nomeDaPeca: '',
+      quantidade: 0,
+      tecnico: '',
+      horasPlanejadas: 0,
+      turno: '1',
+      site: 'VALINHOS DOVE',
+      observacao: '',
+    },
+  });
 
   useEffect(() => {
     if (!database) {
@@ -332,13 +347,11 @@ export default function ProgrammingPage() {
       
       if (isNaN(date.getTime())) return;
 
-      // Aplicar filtro de semana
       if (selectedWeekFilter !== 'all') {
         const itemWeek = getISOWeek(date);
         if (itemWeek !== parseInt(selectedWeekFilter)) return;
       }
       
-      // Chave e label dependem do nível de filtro
       let key, label;
       if (selectedWeekFilter === 'all') {
         key = format(date, 'yyyy-MM');
@@ -598,7 +611,7 @@ export default function ProgrammingPage() {
                 </div>
               ))}
 
-              {calendarDays.map((day, dayIdx) => {
+              {calendarDays.map((day) => {
                 const dayItems = getItemsForDay(day);
                 const isCurrentMonth = isSameMonth(day, monthStart);
                 const isTodayDate = isToday(day);
