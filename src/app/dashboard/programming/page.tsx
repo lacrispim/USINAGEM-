@@ -101,15 +101,24 @@ import {
 interface PlanejamentoItem {
   id: string;
   'Data Execução'?: string;
+  dataExecucao?: string;
   Site?: string;
-  Requisição?: string;
+  site?: string;
+  'Requisição'?: string;
+  requisicao?: string;
   'Nome da Peça'?: string;
+  nomeDaPeca?: string;
   Quantidade?: number;
+  quantidade?: number;
   'Perdas planejadas'?: string;
   'Horas Máquina'?: number | string;
+  horasPlanejadas?: number | string;
   Técnicos?: string;
+  tecnico?: string;
   Observação?: string;
+  observacao?: string;
   EQUIPAMENTO?: string;
+  equipamento?: string;
   Turno?: string | number;
 }
 
@@ -298,7 +307,7 @@ export default function ProgrammingPage() {
 
   const getItemsForDay = (day: Date) => {
     return planejamentoData.filter(item => {
-      const dateStr = item['Data Execução'];
+      const dateStr = item['Data Execução'] || item.dataExecucao;
       if (!dateStr) return false;
       try {
         const parsedDate = parse(dateStr, 'dd/MM/yyyy', new Date());
@@ -311,11 +320,11 @@ export default function ProgrammingPage() {
   };
 
   const chartData = useMemo(() => {
-    const d600Map: Record<string, { month: string, horas: number, quantidade: number }> = {};
-    const centurMap: Record<string, { month: string, horas: number, quantidade: number }> = {};
+    const d600Map: Record<string, { monthKey: string, month: string, horas: number, quantidade: number }> = {};
+    const centurMap: Record<string, { monthKey: string, month: string, horas: number, quantidade: number }> = {};
 
     planejamentoData.forEach(item => {
-      const dateStr = item['Data Execução'];
+      const dateStr = item['Data Execução'] || item.dataExecucao;
       if (!dateStr) return;
       
       let date;
@@ -329,24 +338,32 @@ export default function ProgrammingPage() {
       
       const monthLabel = format(date, 'MMM yy', { locale: ptBR });
       const monthKey = format(date, 'yyyy-MM');
-      const equip = String(item.EQUIPAMENTO || '').toUpperCase();
-      const horas = typeof item['Horas Máquina'] === 'string' 
-        ? parseFloat(item['Horas Máquina'].replace(',', '.')) 
-        : (Number(item['Horas Máquina']) || 0);
-      const qtd = Number(item.Quantidade) || 0;
+      const equip = String(item.EQUIPAMENTO || item.equipamento || '').toUpperCase();
+      
+      // Lógica robusta para extração de horas (pode vir como string com vírgula ou número)
+      let horas = 0;
+      const rawHoras = item['Horas Máquina'] !== undefined ? item['Horas Máquina'] : item.horasPlanejadas;
+      if (typeof rawHoras === 'string') {
+        horas = parseFloat(rawHoras.replace(',', '.'));
+      } else {
+        horas = Number(rawHoras) || 0;
+      }
+
+      // Lógica robusta para extração de quantidade
+      const qtd = Number(item.Quantidade !== undefined ? item.Quantidade : item.quantidade) || 0;
 
       if (equip.includes('D600') || equip.includes('CENTRO')) {
-        if (!d600Map[monthKey]) d600Map[monthKey] = { month: monthLabel, horas: 0, quantidade: 0 };
+        if (!d600Map[monthKey]) d600Map[monthKey] = { monthKey, month: monthLabel, horas: 0, quantidade: 0 };
         d600Map[monthKey].horas += horas;
         d600Map[monthKey].quantidade += qtd;
       } else if (equip.includes('CENTUR') || equip.includes('TORNO')) {
-        if (!centurMap[monthKey]) centurMap[monthKey] = { month: monthLabel, horas: 0, quantidade: 0 };
+        if (!centurMap[monthKey]) centurMap[monthKey] = { monthKey, month: monthLabel, horas: 0, quantidade: 0 };
         centurMap[monthKey].horas += horas;
         centurMap[monthKey].quantidade += qtd;
       }
     });
 
-    const sortFn = (a: any, b: any) => a.month.localeCompare(b.month);
+    const sortFn = (a: any, b: any) => a.monthKey.localeCompare(b.monthKey);
 
     return {
       d600: Object.values(d600Map).sort(sortFn),
@@ -378,28 +395,29 @@ export default function ProgrammingPage() {
     setSelectedTurno(String(item.Turno || '1'));
     
     let itemDate = new Date();
-    if (item['Data Execução']) {
+    const dateStr = item['Data Execução'] || item.dataExecucao;
+    if (dateStr) {
         try {
-            itemDate = parse(item['Data Execução'], 'dd/MM/yyyy', new Date());
+            itemDate = parse(dateStr, 'dd/MM/yyyy', new Date());
         } catch {
-            itemDate = new Date(item['Data Execução']);
+            itemDate = new Date(dateStr);
         }
     }
     setSelectedDay(itemDate);
 
     form.reset({
-      dataExecucao: item['Data Execução'] || '',
+      dataExecucao: dateStr || '',
       turno: item.Turno ? String(item.Turno) : '1',
-      equipamento: item.EQUIPAMENTO || '',
-      requisicao: item['Requisição'] || '',
-      nomeDaPeca: item['Nome da Peça'] || '',
-      quantidade: Number(item.Quantidade) || 0,
-      tecnico: item.Técnicos || '',
-      horasPlanejadas: typeof item['Horas Máquina'] === 'string' 
-        ? parseFloat(item['Horas Máquina'].replace(',', '.')) 
-        : (Number(item['Horas Máquina']) || 0),
-      site: item.Site || 'VALINHOS DOVE',
-      observacao: item.Observação || '',
+      equipamento: item.EQUIPAMENTO || item.equipamento || '',
+      requisicao: item['Requisição'] || item.requisicao || '',
+      nomeDaPeca: item['Nome da Peça'] || item.nomeDaPeca || '',
+      quantidade: Number(item.Quantidade !== undefined ? item.Quantidade : item.quantidade) || 0,
+      tecnico: item.Técnicos || item.tecnico || '',
+      horasPlanejadas: typeof (item['Horas Máquina'] || item.horasPlanejadas) === 'string' 
+        ? parseFloat(String(item['Horas Máquina'] || item.horasPlanejadas).replace(',', '.')) 
+        : (Number(item['Horas Máquina'] || item.horasPlanejadas) || 0),
+      site: item.Site || item.site || 'VALINHOS DOVE',
+      observacao: item.Observação || item.observacao || '',
     });
     setIsDialogOpen(true);
   };
@@ -469,59 +487,69 @@ export default function ProgrammingPage() {
     }
   }
 
-  const renderEvent = (item: PlanejamentoItem) => (
-    <TooltipProvider key={item.id}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div 
-            onClick={(e) => {
-                e.stopPropagation();
-                handleItemClick(item);
-            }}
-            className="mb-1 cursor-pointer truncate rounded border border-border bg-card p-1 text-[10px] leading-tight shadow-sm hover:border-primary transition-all hover:scale-[1.02] active:scale-95"
-          >
-            <span className="font-bold text-primary mr-1">{item['Requisição']}</span>
-            <span>{item['Nome da Peça']}</span>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent className="w-64 p-3" side="right">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between border-b pb-1">
-              <span className="font-bold text-sm">Req: {item['Requisição']}</span>
-              <Badge variant="outline" className="text-[10px]">{item['Site']}</Badge>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Factory className="h-3 w-3" />
-                <span>Equip:</span>
-              </div>
-              <span className="font-medium text-right">{item['EQUIPAMENTO'] || 'N/A'}</span>
-              
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                <span>Horas:</span>
-              </div>
-              <span className="font-medium text-right">{item['Horas Máquina'] || '0'}h</span>
+  const renderEvent = (item: PlanejamentoItem) => {
+    const requisicao = item['Requisição'] || item.requisicao;
+    const nomeDaPeca = item['Nome da Peça'] || item.nomeDaPeca;
+    const site = item.Site || item.site;
+    const equipamento = item.EQUIPAMENTO || item.equipamento;
+    const horas = item['Horas Máquina'] || item.horasPlanejadas;
+    const tecnico = item.Técnicos || item.tecnico;
+    const observacao = item.Observação || item.observacao;
 
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <User className="h-3 w-3" />
-                <span>Técnico:</span>
-              </div>
-              <span className="font-medium text-right truncate">{item['Técnicos'] || 'Não definido'}</span>
+    return (
+      <TooltipProvider key={item.id}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div 
+              onClick={(e) => {
+                  e.stopPropagation();
+                  handleItemClick(item);
+              }}
+              className="mb-1 cursor-pointer truncate rounded border border-border bg-card p-1 text-[10px] leading-tight shadow-sm hover:border-primary transition-all hover:scale-[1.02] active:scale-95"
+            >
+              <span className="font-bold text-primary mr-1">{requisicao}</span>
+              <span>{nomeDaPeca}</span>
             </div>
-            {item['Observação'] && (
-              <div className="mt-2 pt-2 border-t text-[10px] text-muted-foreground italic">
-                "{item['Observação']}"
+          </TooltipTrigger>
+          <TooltipContent className="w-64 p-3" side="right">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between border-b pb-1">
+                <span className="font-bold text-sm">Req: {requisicao}</span>
+                <Badge variant="outline" className="text-[10px]">{site}</Badge>
               </div>
-            )}
-            <div className="mt-2 text-[8px] text-center text-primary font-bold uppercase tracking-widest animate-pulse">
-                Clique para editar
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Factory className="h-3 w-3" />
+                  <span>Equip:</span>
+                </div>
+                <span className="font-medium text-right">{equipamento || 'N/A'}</span>
+                
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>Horas:</span>
+                </div>
+                <span className="font-medium text-right">{horas || '0'}h</span>
+
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <User className="h-3 w-3" />
+                  <span>Técnico:</span>
+                </div>
+                <span className="font-medium text-right truncate">{tecnico || 'Não definido'}</span>
+              </div>
+              {observacao && (
+                <div className="mt-2 pt-2 border-t text-[10px] text-muted-foreground italic">
+                  "{observacao}"
+                </div>
+              )}
+              <div className="mt-2 text-[8px] text-center text-primary font-bold uppercase tracking-widest animate-pulse">
+                  Clique para editar
+              </div>
             </div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-6">
