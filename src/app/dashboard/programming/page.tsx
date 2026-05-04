@@ -43,9 +43,9 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
+  TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-  TooltipContent
 } from "@/components/ui/tooltip";
 import { Badge } from '@/components/ui/badge';
 import {
@@ -55,7 +55,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter
-} from "@/dialog";
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
