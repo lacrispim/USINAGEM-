@@ -15,7 +15,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Loader, 
-  Clock, 
   Calendar as CalendarIcon,
   Factory,
   User,
@@ -176,6 +175,34 @@ const planningFormSchema = z.object({
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
+const CustomLegend = (props: any) => {
+  const { payload } = props;
+  if (!payload) return null;
+
+  return (
+    <div className="flex flex-col gap-2 mb-6">
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 items-center">
+        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2">Planejado:</span>
+        {payload.filter((p: any) => p.dataKey.startsWith('plan')).map((entry: any, index: number) => (
+          <div key={`item-plan-${index}`} className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-[9px] font-bold uppercase">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 items-center">
+        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2">Realizado:</span>
+        {payload.filter((p: any) => p.dataKey.startsWith('real')).map((entry: any, index: number) => (
+          <div key={`item-real-${index}`} className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-[9px] font-bold uppercase">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
   if (!data || data.length === 0) return (
     <Card className="flex h-[300px] items-center justify-center border-dashed">
@@ -190,9 +217,9 @@ const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
         <CardDescription className="text-[10px]">Peças: Divisão por Turnos (Escuro = 3º Turno)</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[400px] w-full">
+        <div className="h-[450px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barGap={8}>
+            <BarChart data={data} barGap={8} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
               <XAxis 
                 dataKey="label" 
@@ -212,28 +239,28 @@ const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
                 contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
                 itemStyle={{ fontSize: '12px' }}
               />
-              <Legend verticalAlign="top" height={60} iconType="circle" wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', fontWeight: 'bold' }} />
+              <Legend content={<CustomLegend />} verticalAlign="top" />
               
-              {/* Stacked Bars for Planejado */}
-              <Bar dataKey="plan_t1" stackId="planejado" name="Plan 1º T" fill="#c084fc" />
-              <Bar dataKey="plan_t2" stackId="planejado" name="Plan 2º T" fill="#a855f7" />
-              <Bar dataKey="plan_t3" stackId="planejado" name="Plan 3º T" fill="#7e22ce" radius={[4, 4, 0, 0]}>
+              {/* Stacked Bars for Planejado (Purple) */}
+              <Bar dataKey="plan_t1" stackId="planejado" name="1º T" fill="#c084fc" />
+              <Bar dataKey="plan_t2" stackId="planejado" name="2º T" fill="#a855f7" />
+              <Bar dataKey="plan_t3" stackId="planejado" name="3º T" fill="#7e22ce" radius={[4, 4, 0, 0]}>
                 <LabelList 
                     dataKey="quantidade" 
                     position="top" 
-                    className="fill-foreground text-[10px] font-bold"
+                    className="fill-foreground text-[10px] font-black"
                     formatter={(val: number) => val > 0 ? `${val}p` : ''}
                 />
               </Bar>
               
-              {/* Stacked Bars for Realizado */}
-              <Bar dataKey="real_t1" stackId="realizado" name="Real 1º T" fill="#86efac" />
-              <Bar dataKey="real_t2" stackId="realizado" name="Real 2º T" fill="#22c55e" />
-              <Bar dataKey="real_t3" stackId="realizado" name="Real 3º T" fill="#15803d" radius={[4, 4, 0, 0]}>
+              {/* Stacked Bars for Realizado (Green) */}
+              <Bar dataKey="real_t1" stackId="realizado" name="1º T" fill="#86efac" />
+              <Bar dataKey="real_t2" stackId="realizado" name="2º T" fill="#22c55e" />
+              <Bar dataKey="real_t3" stackId="realizado" name="3º T" fill="#15803d" radius={[4, 4, 0, 0]}>
                  <LabelList 
                     dataKey="quantidadeRealizada" 
                     position="top" 
-                    className="fill-green-500 text-[10px] font-bold"
+                    className="fill-green-500 text-[10px] font-black"
                     formatter={(val: number) => val > 0 ? `${val}p` : ''}
                 />
               </Bar>
@@ -521,7 +548,6 @@ export default function ProgrammingPage() {
     const nomeDaPeca = item['Nome da Peça'] || item.nomeDaPeca;
     const site = item.Site || item.site;
     const equipamento = item.EQUIPAMENTO || item.equipamento;
-    const horas = item['Horas Máquina'] || item.horasPlanejadas;
     const tecnico = item.Técnicos || item.tecnico;
     const observacao = item.Observação || item.observacao;
     const qtdPlan = Number(item.Quantidade !== undefined ? item.Quantidade : item.quantidade) || 0;
