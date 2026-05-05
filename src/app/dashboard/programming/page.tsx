@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -92,9 +93,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { 
   ResponsiveContainer, 
-  ComposedChart, 
+  BarChart,
   Bar, 
-  Line, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -171,7 +171,7 @@ const planningFormSchema = z.object({
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
-const PlanningChart = ({ data, title, color }: { data: any[], title: string, color: string }) => {
+const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
   if (!data || data.length === 0) return (
     <Card className="flex h-[300px] items-center justify-center border-dashed">
       <p className="text-muted-foreground text-xs uppercase font-bold tracking-widest">{title}: Sem dados</p>
@@ -182,12 +182,12 @@ const PlanningChart = ({ data, title, color }: { data: any[], title: string, col
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold uppercase tracking-tight">{title}</CardTitle>
-        <CardDescription className="text-[10px]">Horas Planejadas e Quantidade de Peças</CardDescription>
+        <CardDescription className="text-[10px]">Quantidade Total de Peças Planejadas</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data}>
+            <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
               <XAxis 
                 dataKey="label" 
@@ -197,17 +197,6 @@ const PlanningChart = ({ data, title, color }: { data: any[], title: string, col
                 tickLine={false}
               />
               <YAxis 
-                yAxisId="left" 
-                orientation="left" 
-                stroke={color} 
-                className="text-[10px]" 
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(val) => `${val}h`}
-              />
-              <YAxis 
-                yAxisId="right" 
-                orientation="right" 
                 stroke="#a855f7" 
                 className="text-[10px]" 
                 axisLine={false}
@@ -220,24 +209,13 @@ const PlanningChart = ({ data, title, color }: { data: any[], title: string, col
               />
               <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }} />
               <Bar 
-                yAxisId="left" 
-                dataKey="horas" 
-                name="Horas Planejadas" 
-                fill={color} 
-                radius={[4, 4, 0, 0]} 
-                barSize={30} 
-              />
-              <Line 
-                yAxisId="right" 
-                type="monotone" 
                 dataKey="quantidade" 
                 name="Qtd. Peças" 
-                stroke="#a855f7" 
-                strokeWidth={3} 
-                dot={{ r: 4, fill: '#a855f7' }} 
-                activeDot={{ r: 6 }}
+                fill="#a855f7" 
+                radius={[4, 4, 0, 0]} 
+                barSize={40} 
               />
-            </ComposedChart>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </CardContent>
@@ -712,12 +690,10 @@ export default function ProgrammingPage() {
         <PlanningChart 
           data={chartData.centur} 
           title="Consolidado Torno Centur 30" 
-          color="#f59e0b" 
         />
         <PlanningChart 
           data={chartData.centro} 
           title="Consolidado Centro D600" 
-          color="#3b82f6" 
         />
       </div>
 
