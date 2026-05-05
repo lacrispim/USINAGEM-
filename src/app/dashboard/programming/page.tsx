@@ -100,7 +100,8 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip as RechartsTooltip, 
-  Legend 
+  Legend,
+  LabelList
 } from 'recharts';
 import { Label } from '@/components/ui/label';
 
@@ -186,12 +187,12 @@ const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold uppercase tracking-tight">{title}</CardTitle>
-        <CardDescription className="text-[10px]">Comparativo: Peças Planejadas vs Realizadas</CardDescription>
+        <CardDescription className="text-[10px]">Peças: Divisão por Turnos (Escuro = 3º Turno)</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] w-full">
+        <div className="h-[400px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barGap={4}>
+            <BarChart data={data} barGap={8}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
               <XAxis 
                 dataKey="label" 
@@ -211,19 +212,31 @@ const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
                 contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
                 itemStyle={{ fontSize: '12px' }}
               />
-              <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }} />
-              <Bar 
-                dataKey="quantidade" 
-                name="Planejado" 
-                fill="#a855f7" 
-                radius={[4, 4, 0, 0]} 
-              />
-              <Bar 
-                dataKey="quantidadeRealizada" 
-                name="Realizado" 
-                fill="#22c55e" 
-                radius={[4, 4, 0, 0]} 
-              />
+              <Legend verticalAlign="top" height={60} iconType="circle" wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', fontWeight: 'bold' }} />
+              
+              {/* Stacked Bars for Planejado */}
+              <Bar dataKey="plan_t1" stackId="planejado" name="Plan 1º T" fill="#c084fc" />
+              <Bar dataKey="plan_t2" stackId="planejado" name="Plan 2º T" fill="#a855f7" />
+              <Bar dataKey="plan_t3" stackId="planejado" name="Plan 3º T" fill="#7e22ce" radius={[4, 4, 0, 0]}>
+                <LabelList 
+                    dataKey="quantidade" 
+                    position="top" 
+                    className="fill-foreground text-[10px] font-bold"
+                    formatter={(val: number) => val > 0 ? `${val}p` : ''}
+                />
+              </Bar>
+              
+              {/* Stacked Bars for Realizado */}
+              <Bar dataKey="real_t1" stackId="realizado" name="Real 1º T" fill="#86efac" />
+              <Bar dataKey="real_t2" stackId="realizado" name="Real 2º T" fill="#22c55e" />
+              <Bar dataKey="real_t3" stackId="realizado" name="Real 3º T" fill="#15803d" radius={[4, 4, 0, 0]}>
+                 <LabelList 
+                    dataKey="quantidadeRealizada" 
+                    position="top" 
+                    className="fill-green-500 text-[10px] font-bold"
+                    formatter={(val: number) => val > 0 ? `${val}p` : ''}
+                />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -319,8 +332,8 @@ export default function ProgrammingPage() {
   };
 
   const chartData = useMemo(() => {
-    const centurMap: Record<string, { key: string, label: string, quantidade: number, quantidadeRealizada: number }> = {};
-    const centroMap: Record<string, { key: string, label: string, quantidade: number, quantidadeRealizada: number }> = {};
+    const centurMap: Record<string, any> = {};
+    const centroMap: Record<string, any> = {};
 
     planejamentoData.forEach(item => {
       const dateStr = item['Data Execução'] || item.dataExecucao;
@@ -350,17 +363,29 @@ export default function ProgrammingPage() {
       }
 
       const equip = String(item.EQUIPAMENTO || item.equipamento || '').toUpperCase();
+      const turno = String(item.Turno || '1');
       const qtd = Number(item.Quantidade !== undefined ? item.Quantidade : item.quantidade) || 0;
       const qtdReal = Number(item['Quantidade Realizada'] !== undefined ? item['Quantidade Realizada'] : item.quantidadeRealizada) || 0;
 
-      if (equip.includes('CENTUR') || equip.includes('TORNO')) {
-        if (!centurMap[key]) centurMap[key] = { key, label, quantidade: 0, quantidadeRealizada: 0 };
-        centurMap[key].quantidade += qtd;
-        centurMap[key].quantidadeRealizada += qtdReal;
-      } else if (equip.includes('CENTRO') || equip.includes('D600')) {
-        if (!centroMap[key]) centroMap[key] = { key, label, quantidade: 0, quantidadeRealizada: 0 };
-        centroMap[key].quantidade += qtd;
-        centroMap[key].quantidadeRealizada += qtdReal;
+      const targetMap = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurMap : 
+                         (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
+
+      if (targetMap) {
+        if (!targetMap[key]) {
+          targetMap[key] = { 
+            key, label, 
+            quantidade: 0, 
+            quantidadeRealizada: 0,
+            plan_t1: 0, plan_t2: 0, plan_t3: 0,
+            real_t1: 0, real_t2: 0, real_t3: 0
+          };
+        }
+        targetMap[key].quantidade += qtd;
+        targetMap[key].quantidadeRealizada += qtdReal;
+
+        if (turno === '1') { targetMap[key].plan_t1 += qtd; targetMap[key].real_t1 += qtdReal; }
+        else if (turno === '2') { targetMap[key].plan_t2 += qtd; targetMap[key].real_t2 += qtdReal; }
+        else if (turno === '3') { targetMap[key].plan_t3 += qtd; targetMap[key].real_t3 += qtdReal; }
       }
     });
 
@@ -681,7 +706,7 @@ export default function ProgrammingPage() {
       <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-8">
         <div className="space-y-1">
           <h2 className="text-xl font-bold tracking-tight">Gráficos de Consolidado</h2>
-          <p className="text-sm text-muted-foreground">Comparativo de peças planejadas vs realizadas.</p>
+          <p className="text-sm text-muted-foreground">Comparativo de peças planejadas vs realizadas por turno.</p>
         </div>
         <div className="flex items-center gap-3 bg-card p-3 rounded-lg border shadow-sm w-full sm:w-auto">
           <div className="flex items-center gap-2 text-muted-foreground">
