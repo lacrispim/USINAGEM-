@@ -24,7 +24,8 @@ import {
   Trash2,
   Cpu,
   Settings2,
-  Filter
+  Filter,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   format, 
@@ -115,6 +116,8 @@ interface PlanejamentoItem {
   nomeDaPeca?: string;
   Quantidade?: number;
   quantidade?: number;
+  'Quantidade Realizada'?: number;
+  quantidadeRealizada?: number;
   'Perdas planejadas'?: string;
   'Horas Máquina'?: number | string;
   horasPlanejadas?: number | string;
@@ -162,6 +165,7 @@ const planningFormSchema = z.object({
   requisicao: z.string().min(1, 'Nº da Requisição é obrigatório.'),
   nomeDaPeca: z.string().min(1, 'Nome da peça é obrigatório.'),
   quantidade: z.coerce.number().min(1, 'Quantidade deve ser maior que zero.'),
+  quantidadeRealizada: z.coerce.number().default(0),
   tecnico: z.string().min(1, 'Técnico é obrigatório.'),
   horasPlanejadas: z.coerce.number().min(0.1, 'Horas planejadas deve ser maior que zero.'),
   turno: z.string(),
@@ -182,12 +186,12 @@ const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold uppercase tracking-tight">{title}</CardTitle>
-        <CardDescription className="text-[10px]">Quantidade Total de Peças Planejadas</CardDescription>
+        <CardDescription className="text-[10px]">Comparativo: Peças Planejadas vs Realizadas</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
+            <BarChart data={data} barGap={4}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
               <XAxis 
                 dataKey="label" 
@@ -197,7 +201,7 @@ const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
                 tickLine={false}
               />
               <YAxis 
-                stroke="#a855f7" 
+                stroke="hsl(var(--muted-foreground))" 
                 className="text-[10px]" 
                 axisLine={false}
                 tickLine={false}
@@ -210,10 +214,15 @@ const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
               <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }} />
               <Bar 
                 dataKey="quantidade" 
-                name="Qtd. Peças" 
+                name="Planejado" 
                 fill="#a855f7" 
                 radius={[4, 4, 0, 0]} 
-                barSize={40} 
+              />
+              <Bar 
+                dataKey="quantidadeRealizada" 
+                name="Realizado" 
+                fill="#22c55e" 
+                radius={[4, 4, 0, 0]} 
               />
             </BarChart>
           </ResponsiveContainer>
@@ -245,6 +254,7 @@ export default function ProgrammingPage() {
       requisicao: '',
       nomeDaPeca: '',
       quantidade: 0,
+      quantidadeRealizada: 0,
       tecnico: '',
       horasPlanejadas: 0,
       turno: '1',
@@ -309,8 +319,8 @@ export default function ProgrammingPage() {
   };
 
   const chartData = useMemo(() => {
-    const centurMap: Record<string, { key: string, label: string, horas: number, quantidade: number }> = {};
-    const centroMap: Record<string, { key: string, label: string, horas: number, quantidade: number }> = {};
+    const centurMap: Record<string, { key: string, label: string, quantidade: number, quantidadeRealizada: number }> = {};
+    const centroMap: Record<string, { key: string, label: string, quantidade: number, quantidadeRealizada: number }> = {};
 
     planejamentoData.forEach(item => {
       const dateStr = item['Data Execução'] || item.dataExecucao;
@@ -340,25 +350,17 @@ export default function ProgrammingPage() {
       }
 
       const equip = String(item.EQUIPAMENTO || item.equipamento || '').toUpperCase();
-      
-      let horas = 0;
-      const rawHoras = item['Horas Máquina'] !== undefined ? item['Horas Máquina'] : item.horasPlanejadas;
-      if (typeof rawHoras === 'string') {
-        horas = parseFloat(rawHoras.replace(',', '.'));
-      } else {
-        horas = Number(rawHoras) || 0;
-      }
-
       const qtd = Number(item.Quantidade !== undefined ? item.Quantidade : item.quantidade) || 0;
+      const qtdReal = Number(item['Quantidade Realizada'] !== undefined ? item['Quantidade Realizada'] : item.quantidadeRealizada) || 0;
 
       if (equip.includes('CENTUR') || equip.includes('TORNO')) {
-        if (!centurMap[key]) centurMap[key] = { key, label, horas: 0, quantidade: 0 };
-        centurMap[key].horas += horas;
+        if (!centurMap[key]) centurMap[key] = { key, label, quantidade: 0, quantidadeRealizada: 0 };
         centurMap[key].quantidade += qtd;
+        centurMap[key].quantidadeRealizada += qtdReal;
       } else if (equip.includes('CENTRO') || equip.includes('D600')) {
-        if (!centroMap[key]) centroMap[key] = { key, label, horas: 0, quantidade: 0 };
-        centroMap[key].horas += horas;
+        if (!centroMap[key]) centroMap[key] = { key, label, quantidade: 0, quantidadeRealizada: 0 };
         centroMap[key].quantidade += qtd;
+        centroMap[key].quantidadeRealizada += qtdReal;
       }
     });
 
@@ -381,6 +383,7 @@ export default function ProgrammingPage() {
       requisicao: '',
       nomeDaPeca: '',
       quantidade: 0,
+      quantidadeRealizada: 0,
       tecnico: '',
       horasPlanejadas: 0,
       site: 'VALINHOS DOVE',
@@ -411,6 +414,7 @@ export default function ProgrammingPage() {
       requisicao: item['Requisição'] || item.requisicao || '',
       nomeDaPeca: item['Nome da Peça'] || item.nomeDaPeca || '',
       quantidade: Number(item.Quantidade !== undefined ? item.Quantidade : item.quantidade) || 0,
+      quantidadeRealizada: Number(item['Quantidade Realizada'] !== undefined ? item['Quantidade Realizada'] : item.quantidadeRealizada) || 0,
       tecnico: item.Técnicos || item.tecnico || '',
       horasPlanejadas: typeof (item['Horas Máquina'] || item.horasPlanejadas) === 'string' 
         ? parseFloat(String(item['Horas Máquina'] || item.horasPlanejadas).replace(',', '.')) 
@@ -451,6 +455,7 @@ export default function ProgrammingPage() {
         'Requisição': values.requisicao,
         'Nome da Peça': values.nomeDaPeca,
         'Quantidade': values.quantidade,
+        'Quantidade Realizada': values.quantidadeRealizada,
         'Técnicos': values.tecnico,
         'Horas Máquina': values.horasPlanejadas,
         'Turno': values.turno,
@@ -494,6 +499,9 @@ export default function ProgrammingPage() {
     const horas = item['Horas Máquina'] || item.horasPlanejadas;
     const tecnico = item.Técnicos || item.tecnico;
     const observacao = item.Observação || item.observacao;
+    const qtdPlan = Number(item.Quantidade !== undefined ? item.Quantidade : item.quantidade) || 0;
+    const qtdReal = Number(item['Quantidade Realizada'] !== undefined ? item['Quantidade Realizada'] : item.quantidadeRealizada) || 0;
+    const isCompleted = qtdReal >= qtdPlan && qtdPlan > 0;
 
     return (
       <TooltipProvider key={item.id}>
@@ -504,17 +512,23 @@ export default function ProgrammingPage() {
                   e.stopPropagation();
                   handleItemClick(item);
               }}
-              className="mb-1 cursor-pointer truncate rounded border border-border bg-card p-1 text-[10px] leading-tight shadow-sm hover:border-primary transition-all hover:scale-[1.02] active:scale-95"
+              className={cn(
+                "mb-1 cursor-pointer truncate rounded border p-1 text-[10px] leading-tight shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-1",
+                isCompleted ? "border-green-500/50 bg-green-500/5" : "border-border bg-card hover:border-primary"
+              )}
             >
+              {isCompleted && <CheckCircle2 className="h-2 w-2 text-green-500 shrink-0" />}
               <span className="font-bold text-primary mr-1">{requisicao}</span>
-              <span>{nomeDaPeca}</span>
+              <span className="truncate">{nomeDaPeca}</span>
             </div>
           </TooltipTrigger>
           <TooltipContent className="w-64 p-3" side="right">
             <div className="space-y-2">
               <div className="flex items-center justify-between border-b pb-1">
                 <span className="font-bold text-sm">Req: {requisicao}</span>
-                <Badge variant="outline" className="text-[10px]">{site}</Badge>
+                <Badge variant={isCompleted ? "default" : "outline"} className={cn("text-[10px]", isCompleted && "bg-green-500 hover:bg-green-600")}>
+                    {isCompleted ? 'Finalizado' : site}
+                </Badge>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -524,10 +538,12 @@ export default function ProgrammingPage() {
                 <span className="font-medium text-right">{equipamento || 'N/A'}</span>
                 
                 <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>Horas:</span>
+                  <CheckCircle2 className="h-3 w-3" />
+                  <span>Produção:</span>
                 </div>
-                <span className="font-medium text-right">{horas || '0'}h</span>
+                <span className="font-medium text-right">
+                    {qtdReal} / {qtdPlan} pçs
+                </span>
 
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <User className="h-3 w-3" />
@@ -665,7 +681,7 @@ export default function ProgrammingPage() {
       <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-8">
         <div className="space-y-1">
           <h2 className="text-xl font-bold tracking-tight">Gráficos de Consolidado</h2>
-          <p className="text-sm text-muted-foreground">Analise o planejamento mensal ou filtre por uma semana específica.</p>
+          <p className="text-sm text-muted-foreground">Comparativo de peças planejadas vs realizadas.</p>
         </div>
         <div className="flex items-center gap-3 bg-card p-3 rounded-lg border shadow-sm w-full sm:w-auto">
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -705,7 +721,7 @@ export default function ProgrammingPage() {
             </DialogTitle>
             <DialogDescription>
               {editingId 
-                ? 'Atualize as informações desta ordem de produção.' 
+                ? 'Atualize as informações e o status de conclusão desta ordem.' 
                 : `Preencha os dados da ordem de produção para ${selectedDay && format(selectedDay, "dd/MM/yyyy")}.`}
             </DialogDescription>
           </DialogHeader>
@@ -815,13 +831,13 @@ export default function ProgrammingPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg border border-primary/20">
                 <FormField
                   control={form.control}
                   name="quantidade"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Quantidade de Peças</FormLabel>
+                      <FormLabel className="text-primary font-bold">Qtd. Planejada</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>
@@ -829,6 +845,22 @@ export default function ProgrammingPage() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="quantidadeRealizada"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-green-500 font-bold">Qtd. Realizada</FormLabel>
+                      <FormControl>
+                        <Input type="number" className="border-green-500/50 focus-visible:ring-green-500" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="horasPlanejadas"
@@ -842,28 +874,27 @@ export default function ProgrammingPage() {
                     </FormItem>
                   )}
                 />
+                 <FormField
+                    control={form.control}
+                    name="tecnico"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Técnico Responsável</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Selecione o técnico" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
               </div>
-
-              <FormField
-                control={form.control}
-                name="tecnico"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Técnico Responsável</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o técnico" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <FormField
                 control={form.control}
