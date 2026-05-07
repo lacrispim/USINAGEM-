@@ -24,7 +24,8 @@ import {
   Cpu,
   Settings2,
   Filter,
-  CheckCircle2
+  CheckCircle2,
+  X
 } from 'lucide-react';
 import { 
   format, 
@@ -103,6 +104,8 @@ import {
   LabelList
 } from 'recharts';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 interface PlanejamentoItem {
   id: string;
@@ -285,6 +288,7 @@ export default function ProgrammingPage() {
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
 
   const [selectedWeekFilter, setSelectedWeekFilter] = useState<string>('all');
+  const [selectedDateFilter, setSelectedDateFilter] = useState<Date | undefined>(undefined);
 
   const form = useForm<PlanningFormValues>({
     resolver: zodResolver(planningFormSchema),
@@ -375,18 +379,24 @@ export default function ProgrammingPage() {
       
       if (isNaN(date.getTime())) return;
 
-      if (selectedWeekFilter !== 'all') {
+      // Prioridade: Filtro de Dia
+      if (selectedDateFilter) {
+        if (!isSameDay(date, selectedDateFilter)) return;
+      } else if (selectedWeekFilter !== 'all') {
         const itemWeek = getISOWeek(date);
         if (itemWeek !== parseInt(selectedWeekFilter)) return;
       }
       
       let key, label;
-      if (selectedWeekFilter === 'all') {
-        key = format(date, 'yyyy-MM');
-        label = format(date, 'MMM yy', { locale: ptBR });
-      } else {
+      if (selectedDateFilter) {
+        key = format(date, 'yyyy-MM-dd');
+        label = format(date, 'dd/MM/yy');
+      } else if (selectedWeekFilter !== 'all') {
         key = format(date, 'yyyy-MM-dd');
         label = format(date, 'dd/MM', { locale: ptBR });
+      } else {
+        key = format(date, 'yyyy-MM');
+        label = format(date, 'MMM yy', { locale: ptBR });
       }
 
       const equip = String(item.EQUIPAMENTO || item.equipamento || '').toUpperCase();
@@ -422,7 +432,7 @@ export default function ProgrammingPage() {
       centur: Object.values(centurMap).sort(sortFn),
       centro: Object.values(centroMap).sort(sortFn)
     };
-  }, [planejamentoData, selectedWeekFilter]);
+  }, [planejamentoData, selectedWeekFilter, selectedDateFilter]);
 
   const handleShiftClick = (day: Date, turnoId: string) => {
     setEditingId(null);
@@ -617,6 +627,11 @@ export default function ProgrammingPage() {
     );
   };
 
+  const clearFilters = () => {
+    setSelectedDateFilter(undefined);
+    setSelectedWeekFilter('all');
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -734,22 +749,69 @@ export default function ProgrammingPage() {
           <h2 className="text-xl font-bold tracking-tight">Gráficos de Consolidado</h2>
           <p className="text-sm text-muted-foreground">Comparativo de peças planejadas vs realizadas por turno.</p>
         </div>
-        <div className="flex items-center gap-3 bg-card p-3 rounded-lg border shadow-sm w-full sm:w-auto">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Filter className="h-4 w-4" />
-            <Label htmlFor="week-filter" className="text-xs font-bold uppercase tracking-wider whitespace-nowrap">Semana do Ano:</Label>
+        
+        <div className="flex flex-wrap items-center gap-3 bg-card p-3 rounded-lg border shadow-sm w-full sm:w-auto">
+          {/* Filtro de Dia */}
+          <div className="flex items-center gap-2">
+            <Label htmlFor="date-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar Dia:</Label>
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button 
+                      id="date-filter" 
+                      variant="outline" 
+                      size="sm" 
+                      className={cn("h-8 text-xs font-bold", !selectedDateFilter && "text-muted-foreground")}
+                    >
+                        <CalendarIcon className="mr-2 h-3 w-3" />
+                        {selectedDateFilter ? format(selectedDateFilter, "dd/MM/yyyy") : "Selecionar dia"}
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar 
+                      mode="single" 
+                      selected={selectedDateFilter} 
+                      onSelect={(date) => {
+                          setSelectedDateFilter(date);
+                          if (date) setSelectedWeekFilter('all');
+                      }} 
+                      initialFocus 
+                    />
+                </PopoverContent>
+            </Popover>
           </div>
-          <Select value={selectedWeekFilter} onValueChange={setSelectedWeekFilter}>
-            <SelectTrigger id="week-filter" className="w-[180px] h-9">
-              <SelectValue placeholder="Selecione a semana" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as Semanas</SelectItem>
-              {Array.from({ length: 53 }, (_, i) => i + 1).map(week => (
-                <SelectItem key={week} value={String(week)}>Semana {week}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+          <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
+
+          {/* Filtro de Semana */}
+          <div className="flex items-center gap-2">
+            <Label htmlFor="week-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Semana:</Label>
+            <Select 
+              value={selectedWeekFilter} 
+              onValueChange={(val) => {
+                  setSelectedWeekFilter(val);
+                  if (val !== 'all') setSelectedDateFilter(undefined);
+              }}
+            >
+              <SelectTrigger id="week-filter" className="w-[140px] h-8 text-xs font-bold">
+                <SelectValue placeholder="Semana" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {Array.from({ length: 53 }, (_, i) => i + 1).map(week => (
+                  <SelectItem key={week} value={String(week)}>Semana {week}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {(selectedDateFilter || selectedWeekFilter !== 'all') && (
+            <>
+              <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
+                <X className="mr-1 h-3 w-3" /> Limpar
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
