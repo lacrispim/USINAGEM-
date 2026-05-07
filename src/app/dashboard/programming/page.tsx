@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -179,8 +178,23 @@ const planningFormSchema = z.object({
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
 const CustomLegend = (props: any) => {
-  const { payload } = props;
+  const { payload, isDayView } = props;
   if (!payload) return null;
+
+  if (isDayView) {
+    return (
+      <div className="flex justify-center gap-8 mb-6">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#a855f7' }} />
+          <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Planejado</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#22c55e' }} />
+          <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Realizado</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2 mb-6">
@@ -206,7 +220,7 @@ const CustomLegend = (props: any) => {
   );
 };
 
-const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
+const PlanningChart = ({ data, title, isDayView }: { data: any[], title: string, isDayView: boolean }) => {
   if (!data || data.length === 0) return (
     <Card className="flex h-[300px] items-center justify-center border-dashed">
       <p className="text-muted-foreground text-xs uppercase font-bold tracking-widest">{title}: Sem dados</p>
@@ -217,12 +231,14 @@ const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold uppercase tracking-tight">{title}</CardTitle>
-        <CardDescription className="text-[10px]">Peças: Divisão por Turnos (Escuro = 3º Turno)</CardDescription>
+        <CardDescription className="text-[10px]">
+          {isDayView ? "Visão por Turno (Colunas Separadas)" : "Peças: Divisão por Turnos (Barras Empilhadas)"}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-[450px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barGap={8} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
+            <BarChart data={data} barGap={isDayView ? 12 : 8} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
               <XAxis 
                 dataKey="label" 
@@ -234,7 +250,7 @@ const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
               <YAxis 
                 stroke="hsl(var(--muted-foreground))" 
                 className="text-[10px]" 
-                axisLine={false}
+                axisLine={false} 
                 tickLine={false}
                 tickFormatter={(val) => `${val}p`}
               />
@@ -242,31 +258,54 @@ const PlanningChart = ({ data, title }: { data: any[], title: string }) => {
                 contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
                 itemStyle={{ fontSize: '12px' }}
               />
-              <Legend content={<CustomLegend />} verticalAlign="top" />
+              <Legend content={<CustomLegend isDayView={isDayView} />} verticalAlign="top" />
               
-              {/* Stacked Bars for Planejado (Purple) */}
-              <Bar dataKey="plan_t1" stackId="planejado" name="1º T" fill="#c084fc" />
-              <Bar dataKey="plan_t2" stackId="planejado" name="2º T" fill="#a855f7" />
-              <Bar dataKey="plan_t3" stackId="planejado" name="3º T" fill="#7e22ce" radius={[4, 4, 0, 0]}>
-                <LabelList 
-                    dataKey="quantidade" 
-                    position="top" 
-                    className="fill-foreground text-[10px] font-black"
-                    formatter={(val: number) => val > 0 ? `${val}p` : ''}
-                />
-              </Bar>
-              
-              {/* Stacked Bars for Realizado (Green) */}
-              <Bar dataKey="real_t1" stackId="realizado" name="1º T" fill="#86efac" />
-              <Bar dataKey="real_t2" stackId="realizado" name="2º T" fill="#22c55e" />
-              <Bar dataKey="real_t3" stackId="realizado" name="3º T" fill="#15803d" radius={[4, 4, 0, 0]}>
-                 <LabelList 
-                    dataKey="quantidadeRealizada" 
-                    position="top" 
-                    className="fill-green-500 text-[10px] font-black"
-                    formatter={(val: number) => val > 0 ? `${val}p` : ''}
-                />
-              </Bar>
+              {isDayView ? (
+                <>
+                  <Bar dataKey="planejado" name="Planejado" fill="#a855f7" radius={[4, 4, 0, 0]}>
+                    <LabelList 
+                        dataKey="planejado" 
+                        position="top" 
+                        className="fill-foreground text-[10px] font-black"
+                        formatter={(val: number) => val > 0 ? `${val}p` : ''}
+                    />
+                  </Bar>
+                  <Bar dataKey="realizado" name="Realizado" fill="#22c55e" radius={[4, 4, 0, 0]}>
+                    <LabelList 
+                        dataKey="realizado" 
+                        position="top" 
+                        className="fill-green-500 text-[10px] font-black"
+                        formatter={(val: number) => val > 0 ? `${val}p` : ''}
+                    />
+                  </Bar>
+                </>
+              ) : (
+                <>
+                  {/* Stacked Bars for Planejado (Purple shades) */}
+                  <Bar dataKey="plan_t1" stackId="planejado" name="1º T" fill="#c084fc" />
+                  <Bar dataKey="plan_t2" stackId="planejado" name="2º T" fill="#a855f7" />
+                  <Bar dataKey="plan_t3" stackId="planejado" name="3º T" fill="#7e22ce" radius={[4, 4, 0, 0]}>
+                    <LabelList 
+                        dataKey="quantidade" 
+                        position="top" 
+                        className="fill-foreground text-[10px] font-black"
+                        formatter={(val: number) => val > 0 ? `${val}p` : ''}
+                    />
+                  </Bar>
+                  
+                  {/* Stacked Bars for Realizado (Green shades) */}
+                  <Bar dataKey="real_t1" stackId="realizado" name="1º T" fill="#86efac" />
+                  <Bar dataKey="real_t2" stackId="realizado" name="2º T" fill="#22c55e" />
+                  <Bar dataKey="real_t3" stackId="realizado" name="3º T" fill="#15803d" radius={[4, 4, 0, 0]}>
+                    <LabelList 
+                        dataKey="quantidadeRealizada" 
+                        position="top" 
+                        className="fill-green-500 text-[10px] font-black"
+                        formatter={(val: number) => val > 0 ? `${val}p` : ''}
+                    />
+                  </Bar>
+                </>
+              )}
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -362,7 +401,46 @@ export default function ProgrammingPage() {
     });
   };
 
-  const chartData = useMemo(() => {
+  const { chartData, isDayView } = useMemo(() => {
+    const isDayView = !!selectedDateFilter;
+
+    if (isDayView) {
+      const centurTurns = [
+        { label: '1º Turno', planejado: 0, realizado: 0 },
+        { label: '2º Turno', planejado: 0, realizado: 0 },
+        { label: '3º Turno', planejado: 0, realizado: 0 }
+      ];
+      const centroTurns = [
+        { label: '1º Turno', planejado: 0, realizado: 0 },
+        { label: '2º Turno', planejado: 0, realizado: 0 },
+        { label: '3º Turno', planejado: 0, realizado: 0 }
+      ];
+
+      planejamentoData.forEach(item => {
+        const dateStr = item['Data Execução'] || item.dataExecucao;
+        if (!dateStr) return;
+        
+        let date;
+        try { date = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { date = new Date(dateStr); }
+        if (isNaN(date.getTime()) || !isSameDay(date, selectedDateFilter!)) return;
+
+        const equip = String(item.EQUIPAMENTO || item.equipamento || '').toUpperCase();
+        const turnoIndex = (parseInt(String(item.Turno || '1')) || 1) - 1;
+        const qtd = Number(item.Quantidade !== undefined ? item.Quantidade : item.quantidade) || 0;
+        const qtdReal = Number(item['Quantidade Realizada'] !== undefined ? item['Quantidade Realizada'] : item.quantidadeRealizada) || 0;
+
+        const targetArr = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurTurns : 
+                           (equip.includes('CENTRO') || equip.includes('D600')) ? centroTurns : null;
+
+        if (targetArr && turnoIndex >= 0 && turnoIndex < 3) {
+          targetArr[turnoIndex].planejado += qtd;
+          targetArr[turnoIndex].realizado += qtdReal;
+        }
+      });
+
+      return { chartData: { centur: centurTurns, centro: centroTurns }, isDayView: true };
+    }
+
     const centurMap: Record<string, any> = {};
     const centroMap: Record<string, any> = {};
 
@@ -371,27 +449,16 @@ export default function ProgrammingPage() {
       if (!dateStr) return;
       
       let date;
-      try {
-        date = parse(dateStr, 'dd/MM/yyyy', new Date());
-      } catch {
-        date = new Date(dateStr);
-      }
-      
+      try { date = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { date = new Date(dateStr); }
       if (isNaN(date.getTime())) return;
 
-      // Prioridade: Filtro de Dia
-      if (selectedDateFilter) {
-        if (!isSameDay(date, selectedDateFilter)) return;
-      } else if (selectedWeekFilter !== 'all') {
+      if (selectedWeekFilter !== 'all') {
         const itemWeek = getISOWeek(date);
         if (itemWeek !== parseInt(selectedWeekFilter)) return;
       }
       
       let key, label;
-      if (selectedDateFilter) {
-        key = format(date, 'yyyy-MM-dd');
-        label = format(date, 'dd/MM/yy');
-      } else if (selectedWeekFilter !== 'all') {
+      if (selectedWeekFilter !== 'all') {
         key = format(date, 'yyyy-MM-dd');
         label = format(date, 'dd/MM', { locale: ptBR });
       } else {
@@ -429,8 +496,11 @@ export default function ProgrammingPage() {
     const sortFn = (a: any, b: any) => a.key.localeCompare(b.key);
 
     return {
-      centur: Object.values(centurMap).sort(sortFn),
-      centro: Object.values(centroMap).sort(sortFn)
+      chartData: {
+        centur: Object.values(centurMap).sort(sortFn),
+        centro: Object.values(centroMap).sort(sortFn)
+      },
+      isDayView: false
     };
   }, [planejamentoData, selectedWeekFilter, selectedDateFilter]);
 
@@ -461,11 +531,7 @@ export default function ProgrammingPage() {
     let itemDate = new Date();
     const dateStr = item['Data Execução'] || item.dataExecucao;
     if (dateStr) {
-        try {
-            itemDate = parse(dateStr, 'dd/MM/yyyy', new Date());
-        } catch {
-            itemDate = new Date(dateStr);
-        }
+        try { itemDate = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { itemDate = new Date(dateStr); }
     }
     setSelectedDay(itemDate);
 
@@ -492,24 +558,16 @@ export default function ProgrammingPage() {
     try {
       const itemRef = ref(database, `/Planejamento S/${editingId}`);
       await remove(itemRef);
-      toast({
-        title: "Planejamento Excluído",
-        description: "O planejamento foi removido com sucesso.",
-      });
+      toast({ title: "Planejamento Excluído", description: "O planejamento foi removido com sucesso." });
       setIsDialogOpen(false);
     } catch (error: any) {
       console.error(error);
-      toast({
-        title: "Erro ao Excluir",
-        description: "Não foi possível remover o planejamento.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao Excluir", description: "Não foi possível remover o planejamento.", variant: "destructive" });
     }
   };
 
   async function onSubmit(values: PlanningFormValues) {
     if (!database) return;
-    
     try {
       const payload = {
         'Data Execução': values.dataExecucao,
@@ -528,28 +586,17 @@ export default function ProgrammingPage() {
       if (editingId) {
         const itemRef = ref(database, `/Planejamento S/${editingId}`);
         await update(itemRef, payload);
-        toast({
-          title: "Planejamento Atualizado",
-          description: "As alterações foram salvas com sucesso.",
-        });
+        toast({ title: "Planejamento Atualizado", description: "As alterações foram salvas com sucesso." });
       } else {
         const dbRef = ref(database, '/Planejamento S');
         const newItemRef = push(dbRef);
         await set(newItemRef, payload);
-        toast({
-          title: "Planejamento Salvo",
-          description: "A nova ordem de produção foi adicionada ao plano.",
-        });
+        toast({ title: "Planejamento Salvo", description: "A nova ordem de produção foi adicionada ao plano." });
       }
-      
       setIsDialogOpen(false);
     } catch (error: any) {
       console.error(error);
-      toast({
-        title: "Erro ao Salvar",
-        description: "Não foi possível salvar o planejamento.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao Salvar", description: "Não foi possível salvar o planejamento.", variant: "destructive" });
     }
   }
 
@@ -569,10 +616,7 @@ export default function ProgrammingPage() {
         <Tooltip>
           <TooltipTrigger asChild>
             <div 
-              onClick={(e) => {
-                  e.stopPropagation();
-                  handleItemClick(item);
-              }}
+              onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}
               className={cn(
                 "mb-1 cursor-pointer truncate rounded border p-1 text-[10px] leading-tight shadow-sm transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-1",
                 isCompleted ? "border-green-500/50 bg-green-500/5" : "border-border bg-card hover:border-primary"
@@ -592,34 +636,15 @@ export default function ProgrammingPage() {
                 </Badge>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Factory className="h-3 w-3" />
-                  <span>Equip:</span>
-                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground"><Factory className="h-3 w-3" /><span>Equip:</span></div>
                 <span className="font-medium text-right">{equipamento || 'N/A'}</span>
-                
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <CheckCircle2 className="h-3 w-3" />
-                  <span>Produção:</span>
-                </div>
-                <span className="font-medium text-right">
-                    {qtdReal} / {qtdPlan} pçs
-                </span>
-
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <User className="h-3 w-3" />
-                  <span>Técnico:</span>
-                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground"><CheckCircle2 className="h-3 w-3" /><span>Produção:</span></div>
+                <span className="font-medium text-right">{qtdReal} / {qtdPlan} pçs</span>
+                <div className="flex items-center gap-1.5 text-muted-foreground"><User className="h-3 w-3" /><span>Técnico:</span></div>
                 <span className="font-medium text-right truncate">{tecnico || 'Não definido'}</span>
               </div>
-              {observacao && (
-                <div className="mt-2 pt-2 border-t text-[10px] text-muted-foreground italic">
-                  "{observacao}"
-                </div>
-              )}
-              <div className="mt-2 text-[8px] text-center text-primary font-bold uppercase tracking-widest animate-pulse">
-                  Clique para editar
-              </div>
+              {observacao && <div className="mt-2 pt-2 border-t text-[10px] text-muted-foreground italic">"{observacao}"</div>}
+              <div className="mt-2 text-[8px] text-center text-primary font-bold uppercase tracking-widest animate-pulse">Clique para editar</div>
             </div>
           </TooltipContent>
         </Tooltip>
@@ -640,19 +665,10 @@ export default function ProgrammingPage() {
           <p className="text-muted-foreground">Visualização mensal do plano mestre por turnos.</p>
         </div>
         <div className="flex items-center gap-2 bg-card p-1 rounded-lg border shadow-sm">
-          <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-[140px] text-center font-bold capitalize">
-            {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
-          </div>
-          <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <div className="w-px h-4 bg-border mx-1" />
-          <Button variant="secondary" size="sm" onClick={goToToday} className="h-8">
-            Hoje
-          </Button>
+          <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8"><ChevronLeft className="h-4 w-4" /></Button>
+          <div className="min-w-[140px] text-center font-bold capitalize">{format(currentMonth, 'MMMM yyyy', { locale: ptBR })}</div>
+          <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8"><ChevronRight className="h-4 w-4" /></Button>
+          <div className="w-px h-4 bg-border mx-1" /><Button variant="secondary" size="sm" onClick={goToToday} className="h-8">Hoje</Button>
         </div>
       </div>
 
@@ -660,62 +676,31 @@ export default function ProgrammingPage() {
         <CardContent className="p-0">
           {loading ? (
             <div className="flex h-[600px] items-center justify-center gap-2 bg-card rounded-lg border">
-              <Loader className="h-8 w-8 animate-spin" />
-              <span className="font-medium">Carregando planejamento...</span>
+              <Loader className="h-8 w-8 animate-spin" /><span className="font-medium">Carregando planejamento...</span>
             </div>
           ) : (
             <div className="grid grid-cols-7 gap-px bg-border overflow-hidden rounded-lg border shadow-lg">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
-                <div key={day} className="bg-muted/50 p-2 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  {day}
-                </div>
+                <div key={day} className="bg-muted/50 p-2 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground">{day}</div>
               ))}
-
               {calendarDays.map((day) => {
                 const dayItems = getItemsForDay(day);
                 const isCurrentMonth = isSameMonth(day, monthStart);
                 const isTodayDate = isToday(day);
-
                 return (
-                  <div
-                    key={day.toString()}
-                    className={cn(
-                      "min-h-[160px] bg-card p-1 flex flex-col gap-1 transition-colors",
-                      !isCurrentMonth && "bg-muted/30 opacity-50",
-                      isTodayDate && "ring-1 ring-inset ring-primary z-10"
-                    )}
-                  >
+                  <div key={day.toString()} className={cn("min-h-[160px] bg-card p-1 flex flex-col gap-1 transition-colors", !isCurrentMonth && "bg-muted/30 opacity-50", isTodayDate && "ring-1 ring-inset ring-primary z-10")}>
                     <div className="flex items-center justify-between p-1">
-                      <span className={cn(
-                        "text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full",
-                        isTodayDate ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                      )}>
-                        {format(day, 'd')}
-                      </span>
+                      <span className={cn("text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full", isTodayDate ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{format(day, 'd')}</span>
                     </div>
-
                     <div className="flex-1 space-y-2 overflow-y-auto max-h-[180px] scrollbar-hide pb-2">
                       {turnos.map(turno => {
-                        const itemsInTurno = dayItems.filter(item => {
-                          if (!item.Turno) return turno.id === '1';
-                          return String(item.Turno) === turno.id;
-                        });
-
+                        const itemsInTurno = dayItems.filter(item => { if (!item.Turno) return turno.id === '1'; return String(item.Turno) === turno.id; });
                         return (
                           <div key={turno.id} className="group/turno relative">
-                            <div 
-                              onClick={() => handleShiftClick(day, turno.id)}
-                              className={cn(
-                                "text-[8px] px-1 py-0.5 rounded border font-bold uppercase tracking-tighter cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-between",
-                                turno.color
-                              )}
-                            >
-                              {turno.label}
-                              <Plus className="h-2 w-2 opacity-0 group-hover/turno:opacity-100 transition-opacity" />
+                            <div onClick={() => handleShiftClick(day, turno.id)} className={cn("text-[8px] px-1 py-0.5 rounded border font-bold uppercase tracking-tighter cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-between", turno.color)}>
+                              {turno.label}<Plus className="h-2 w-2 opacity-0 group-hover/turno:opacity-100 transition-opacity" />
                             </div>
-                            <div className="min-h-[10px] mt-1 px-1">
-                              {itemsInTurno.map(item => renderEvent(item))}
-                            </div>
+                            <div className="min-h-[10px] mt-1 px-1">{itemsInTurno.map(item => renderEvent(item))}</div>
                           </div>
                         );
                       })}
@@ -728,332 +713,90 @@ export default function ProgrammingPage() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-4 items-center p-4 bg-muted/30 rounded-lg border border-dashed">
-        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <Info className="h-4 w-4" />
-          <span>Dica: Clique no nome do turno para adicionar ou em uma barra para editar/ver detalhes.</span>
-        </div>
-        <div className="flex-1" />
-        <div className="flex items-center gap-4">
-          {turnos.map(t => (
-            <div key={t.id} className="flex items-center gap-1.5 text-xs">
-              <div className={cn("w-3 h-3 rounded-sm border", t.color.split(' ')[0])} />
-              <span className="text-muted-foreground">{t.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
       <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-8">
         <div className="space-y-1">
           <h2 className="text-xl font-bold tracking-tight">Gráficos de Consolidado</h2>
-          <p className="text-sm text-muted-foreground">Comparativo de peças planejadas vs realizadas por turno.</p>
+          <p className="text-sm text-muted-foreground">Comparativo de peças planejadas vs realizadas.</p>
         </div>
-        
         <div className="flex flex-wrap items-center gap-3 bg-card p-3 rounded-lg border shadow-sm w-full sm:w-auto">
-          {/* Filtro de Dia */}
           <div className="flex items-center gap-2">
             <Label htmlFor="date-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar Dia:</Label>
             <Popover>
                 <PopoverTrigger asChild>
-                    <Button 
-                      id="date-filter" 
-                      variant="outline" 
-                      size="sm" 
-                      className={cn("h-8 text-xs font-bold", !selectedDateFilter && "text-muted-foreground")}
-                    >
+                    <Button id="date-filter" variant="outline" size="sm" className={cn("h-8 text-xs font-bold", !selectedDateFilter && "text-muted-foreground")}>
                         <CalendarIcon className="mr-2 h-3 w-3" />
                         {selectedDateFilter ? format(selectedDateFilter, "dd/MM/yyyy") : "Selecionar dia"}
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar 
-                      mode="single" 
-                      selected={selectedDateFilter} 
-                      onSelect={(date) => {
-                          setSelectedDateFilter(date);
-                          if (date) setSelectedWeekFilter('all');
-                      }} 
-                      initialFocus 
-                    />
+                    <Calendar mode="single" selected={selectedDateFilter} onSelect={(date) => { setSelectedDateFilter(date); if (date) setSelectedWeekFilter('all'); }} initialFocus />
                 </PopoverContent>
             </Popover>
           </div>
-
           <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
-
-          {/* Filtro de Semana */}
           <div className="flex items-center gap-2">
             <Label htmlFor="week-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Semana:</Label>
-            <Select 
-              value={selectedWeekFilter} 
-              onValueChange={(val) => {
-                  setSelectedWeekFilter(val);
-                  if (val !== 'all') setSelectedDateFilter(undefined);
-              }}
-            >
-              <SelectTrigger id="week-filter" className="w-[140px] h-8 text-xs font-bold">
-                <SelectValue placeholder="Semana" />
-              </SelectTrigger>
+            <Select value={selectedWeekFilter} onValueChange={(val) => { setSelectedWeekFilter(val); if (val !== 'all') setSelectedDateFilter(undefined); }}>
+              <SelectTrigger id="week-filter" className="w-[140px] h-8 text-xs font-bold"><SelectValue placeholder="Semana" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                {Array.from({ length: 53 }, (_, i) => i + 1).map(week => (
-                  <SelectItem key={week} value={String(week)}>Semana {week}</SelectItem>
-                ))}
+                {Array.from({ length: 53 }, (_, i) => i + 1).map(week => (<SelectItem key={week} value={String(week)}>Semana {week}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
-
           {(selectedDateFilter || selectedWeekFilter !== 'all') && (
-            <>
-              <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
-                <X className="mr-1 h-3 w-3" /> Limpar
-              </Button>
-            </>
+            <><div className="w-px h-6 bg-border mx-1 hidden sm:block" /><Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"><X className="mr-1 h-3 w-3" /> Limpar</Button></>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <PlanningChart 
-          data={chartData.centur} 
-          title="Consolidado Torno Centur 30" 
-        />
-        <PlanningChart 
-          data={chartData.centro} 
-          title="Consolidado Centro D600" 
-        />
+        <PlanningChart data={chartData.centur} title="Consolidado Torno Centur 30" isDayView={isDayView} />
+        <PlanningChart data={chartData.centro} title="Consolidado Centro D600" isDayView={isDayView} />
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl">
-                {editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}
-            </DialogTitle>
-            <DialogDescription>
-              {editingId 
-                ? 'Atualize as informações e o status de conclusão desta ordem.' 
-                : `Preencha os dados da ordem de produção para ${selectedDay && format(selectedDay, "dd/MM/yyyy")}.`}
-            </DialogDescription>
+            <DialogTitle className="text-2xl">{editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}</DialogTitle>
+            <DialogDescription>{editingId ? 'Atualize as informações e o progresso da produção.' : `Preencha os dados da ordem para ${selectedDay && format(selectedDay, "dd/MM/yyyy")}.`}</DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="equipamento"
-                render={({ field }) => (
+              <FormField control={form.control} name="equipamento" render={({ field }) => (
                   <FormItem className="space-y-4">
-                    <FormLabel className="text-base font-bold text-primary uppercase tracking-wider">
-                      Selecione o Equipamento (Obrigatório)
-                    </FormLabel>
+                    <FormLabel className="text-base font-bold text-primary uppercase tracking-wider">Selecione o Equipamento (Obrigatório)</FormLabel>
                     <div className="grid grid-cols-2 gap-4">
-                      <Button
-                        type="button"
-                        variant={field.value === 'TORNO CNC CENTUR 30' ? 'default' : 'outline'}
-                        className={cn(
-                          "h-24 flex flex-col gap-2 transition-all border-2",
-                          field.value === 'TORNO CNC CENTUR 30' ? "border-primary ring-2 ring-primary/20" : "border-muted"
-                        )}
-                        onClick={() => field.onChange('TORNO CNC CENTUR 30')}
-                      >
-                        <Settings2 className={cn("h-8 w-8", field.value === 'TORNO CNC CENTUR 30' ? "text-primary-foreground" : "text-muted-foreground")} />
-                        <span className="font-bold text-sm">TORNO CENTUR 30</span>
+                      <Button type="button" variant={field.value === 'TORNO CNC CENTUR 30' ? 'default' : 'outline'} className={cn("h-24 flex flex-col gap-2 transition-all border-2", field.value === 'TORNO CNC CENTUR 30' ? "border-primary ring-2 ring-primary/20" : "border-muted")} onClick={() => field.onChange('TORNO CNC CENTUR 30')}>
+                        <Settings2 className={cn("h-8 w-8", field.value === 'TORNO CNC CENTUR 30' ? "text-primary-foreground" : "text-muted-foreground")} /><span className="font-bold text-sm">TORNO CENTUR 30</span>
                       </Button>
-                      <Button
-                        type="button"
-                        variant={field.value === 'CENTRO DE USINAGEM D600' ? 'default' : 'outline'}
-                        className={cn(
-                          "h-24 flex flex-col gap-2 transition-all border-2",
-                          field.value === 'CENTRO DE USINAGEM D600' ? "border-primary ring-2 ring-primary/20" : "border-muted"
-                        )}
-                        onClick={() => field.onChange('CENTRO DE USINAGEM D600')}
-                      >
-                        <Cpu className={cn("h-8 w-8", field.value === 'CENTRO DE USINAGEM D600' ? "text-primary-foreground" : "text-muted-foreground")} />
-                        <span className="font-bold text-sm">CENTRO D600</span>
+                      <Button type="button" variant={field.value === 'CENTRO DE USINAGEM D600' ? 'default' : 'outline'} className={cn("h-24 flex flex-col gap-2 transition-all border-2", field.value === 'CENTRO DE USINAGEM D600' ? "border-primary ring-2 ring-primary/20" : "border-muted")} onClick={() => field.onChange('CENTRO DE USINAGEM D600')}>
+                        <Cpu className={cn("h-8 w-8", field.value === 'CENTRO DE USINAGEM D600' ? "text-primary-foreground" : "text-muted-foreground")} /><span className="font-bold text-sm">CENTRO D600</span>
                       </Button>
-                    </div>
-                    <FormMessage />
+                    </div><FormMessage />
                   </FormItem>
-                )}
-              />
-
+                )} />
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="dataExecucao"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Data</FormLabel>
-                      <FormControl>
-                        <Input disabled {...field} className="bg-muted" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="site"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Site/Fábrica</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormField control={form.control} name="dataExecucao" render={({ field }) => (<FormItem><FormLabel>Data</FormLabel><FormControl><Input disabled {...field} className="bg-muted" /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="site" render={({ field }) => (<FormItem><FormLabel>Site/Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="requisicao"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nº Requisição (Forms)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: F-1024" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="nomeDaPeca"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome da Peça</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Eixo do Motor" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Requisição (Forms)</FormLabel><FormControl><Input placeholder="Ex: F-1024" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel>Nome da Peça</FormLabel><FormControl><Input placeholder="Ex: Eixo do Motor" {...field} /></FormControl><FormMessage /></FormItem>)} />
               </div>
-
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg border border-primary/20">
-                <FormField
-                  control={form.control}
-                  name="quantidade"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-primary font-bold">Qtd. Planejada</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="quantidadeRealizada"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-green-500 font-bold">Qtd. Realizada</FormLabel>
-                      <FormControl>
-                        <Input type="number" className="border-green-500/50 focus-visible:ring-green-500" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-primary font-bold">Qtd. Planejada</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="quantidadeRealizada" render={({ field }) => (<FormItem><FormLabel className="text-green-500 font-bold">Qtd. Realizada</FormLabel><FormControl><Input type="number" className="border-green-500/50 focus-visible:ring-green-500" {...field} /></FormControl><FormMessage /></FormItem>)} />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="horasPlanejadas"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Horas Planejadas</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.1" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="tecnico"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Técnico Responsável</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                            <SelectTrigger>
-                            <SelectValue placeholder="Selecione o técnico" />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
-                        </SelectContent>
-                        </Select>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
+                <FormField control={form.control} name="horasPlanejadas" render={({ field }) => (<FormItem><FormLabel>Horas Planejadas</FormLabel><FormControl><Input type="number" step="0.1" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel>Técnico Responsável</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione o técnico" /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
               </div>
-
-              <FormField
-                control={form.control}
-                name="observacao"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Observações</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Notas adicionais sobre o processo..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
+              <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Notas adicionais sobre o processo..." {...field} /></FormControl><FormMessage /></FormItem>)} />
               <DialogFooter className="flex-col sm:flex-row gap-2">
-                {editingId && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button type="button" variant="destructive" className="sm:mr-auto">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Excluir
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Esta ação não pode ser desfeita. O planejamento será removido permanentemente.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteItem} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                          Confirmar Exclusão
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  {editingId ? 'Salvar Alterações' : 'Salvar Planejamento'}
-                </Button>
+                {editingId && (<AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="destructive" className="sm:mr-auto"><Trash2 className="h-4 w-4 mr-2" />Excluir</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita. O planejamento será removido permanentemente.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteItem} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Confirmar Exclusão</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>)}
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                <Button type="submit">{editingId ? 'Salvar Alterações' : 'Salvar Planejamento'}</Button>
               </DialogFooter>
             </form>
           </Form>
