@@ -2,8 +2,9 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useDatabase } from '@/firebase';
+import { useDatabase, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { ref, onValue, push, set, update, remove } from 'firebase/database';
+import { collection, query } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -269,7 +270,9 @@ const PlanningChart = ({
 
 export default function ProgrammingPage() {
   const database = useDatabase();
+  const firestore = useFirestore();
   const { toast } = useToast();
+  
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -282,6 +285,12 @@ export default function ProgrammingPage() {
 
   const [selectedWeekFilter, setSelectedWeekFilter] = useState<string>('all');
   const [selectedDateFilter, setSelectedDateFilter] = useState<Date | undefined>(undefined);
+
+  // Escuta registros de produção do Firestore para somar como Peças Finalizadas
+  const productionRecordsQuery = useMemoFirebase(() => 
+    firestore ? query(collection(firestore, 'productionRecords')) : null
+  , [firestore]);
+  const { data: firestoreProduction } = useCollection(productionRecordsQuery);
 
   const form = useForm<PlanningFormValues>({
     resolver: zodResolver(planningFormSchema),
@@ -376,6 +385,20 @@ export default function ProgrammingPage() {
   const { chartData, isDayView: calculatedIsDayView } = useMemo(() => {
     const isDayView = !!selectedDateFilter;
 
+    const centurTurns = [
+      { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
+      { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
+      { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 }
+    ];
+    const centroTurns = [
+      { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
+      { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
+      { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 }
+    ];
+
+    const centurMap: Record<string, any> = {};
+    const centroMap: Record<string, any> = {};
+
     const calculateItemVolumes = (item: PlanejamentoItem) => {
       const pPlan = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
       const pReal = Number(item.quantidadeRealizada !== undefined ? item.quantidadeRealizada : item['Quantidade Realizada']) || 0;
@@ -401,31 +424,22 @@ export default function ProgrammingPage() {
       return { pPlan, pReal, oReal, hPlan, hReal };
     };
 
-    if (isDayView) {
-      const centurTurns = [
-        { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
-        { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
-        { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 }
-      ];
-      const centroTurns = [
-        { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
-        { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
-        { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 }
-      ];
+    // 1. Processar dados do Realtime Database (Planejamento)
+    planejamentoData.forEach(item => {
+      const dateStr = item.dataExecucao || item['Data Execução'];
+      if (!dateStr) return;
+      let date;
+      try { date = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { date = new Date(dateStr); }
+      if (isNaN(date.getTime())) return;
 
-      planejamentoData.forEach(item => {
-        const dateStr = item.dataExecucao || item['Data Execução'];
-        if (!dateStr) return;
-        let date;
-        try { date = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { date = new Date(dateStr); }
-        if (isNaN(date.getTime()) || !isSameDay(date, selectedDateFilter!)) return;
-
-        const v = calculateItemVolumes(item);
-        const equip = String(item.equipamento || item.EQUIPAMENTO || '').toUpperCase();
+      const v = calculateItemVolumes(item);
+      const equip = String(item.equipamento || item.EQUIPAMENTO || '').toUpperCase();
+      
+      if (isDayView) {
+        if (!isSameDay(date, selectedDateFilter!)) return;
         const turnoIndex = (parseInt(String(item.Turno || '1')) || 1) - 1;
         const targetArr = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurTurns : 
                            (equip.includes('CENTRO') || equip.includes('D600')) ? centroTurns : null;
-
         if (targetArr && turnoIndex >= 0 && turnoIndex < 3) {
             targetArr[turnoIndex].pecas_plan += v.pPlan;
             targetArr[turnoIndex].pecas_real += v.pReal;
@@ -433,45 +447,78 @@ export default function ProgrammingPage() {
             targetArr[turnoIndex].horas_plan += v.hPlan;
             targetArr[turnoIndex].horas_real += v.hReal;
         }
-      });
-
-      return { chartData: { centur: centurTurns, centro: centroTurns }, isDayView: true };
-    }
-
-    const centurMap: Record<string, any> = {};
-    const centroMap: Record<string, any> = {};
-
-    planejamentoData.forEach(item => {
-      const dateStr = item.dataExecucao || item['Data Execução'];
-      if (!dateStr) return;
-      let date;
-      try { date = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { date = new Date(dateStr); }
-      if (isNaN(date.getTime())) return;
-      if (selectedWeekFilter !== 'all' && getISOWeek(date) !== parseInt(selectedWeekFilter)) return;
-      
-      let key = selectedWeekFilter !== 'all' ? format(date, 'yyyy-MM-dd') : format(date, 'yyyy-MM');
-      let label = selectedWeekFilter !== 'all' ? format(date, 'dd/MM', { locale: ptBR }) : format(date, 'MMM yy', { locale: ptBR });
-
-      const v = calculateItemVolumes(item);
-      const equip = String(item.equipamento || item.EQUIPAMENTO || '').toUpperCase();
-      const targetMap = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurMap : 
-                         (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
-
-      if (targetMap) {
-        if (!targetMap[key]) {
-          targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 };
+      } else {
+        if (selectedWeekFilter !== 'all' && getISOWeek(date) !== parseInt(selectedWeekFilter)) return;
+        let key = selectedWeekFilter !== 'all' ? format(date, 'yyyy-MM-dd') : format(date, 'yyyy-MM');
+        let label = selectedWeekFilter !== 'all' ? format(date, 'dd/MM', { locale: ptBR }) : format(date, 'MMM yy', { locale: ptBR });
+        const targetMap = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurMap : 
+                           (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
+        if (targetMap) {
+          if (!targetMap[key]) {
+            targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 };
+          }
+          targetMap[key].pecas_plan += v.pPlan;
+          targetMap[key].pecas_real += v.pReal;
+          targetMap[key].ops_real += v.oReal;
+          targetMap[key].horas_plan += v.hPlan;
+          targetMap[key].horas_real += v.hReal;
         }
-        targetMap[key].pecas_plan += v.pPlan;
-        targetMap[key].pecas_real += v.pReal;
-        targetMap[key].ops_real += v.oReal;
-        targetMap[key].horas_plan += v.hPlan;
-        targetMap[key].horas_real += v.hReal;
       }
     });
 
+    // 2. Processar registros do Firestore (Produção Real do Técnico)
+    if (firestoreProduction) {
+      firestoreProduction.forEach(record => {
+        const recordDate = record.date?.toDate ? record.date.toDate() : (record.date ? new Date(record.date) : null);
+        if (!recordDate || isNaN(recordDate.getTime())) return;
+
+        const qty = Number(record.quantityProduced) || 0;
+        if (qty <= 0) return;
+
+        const equip = String(record.machine || '').toUpperCase();
+        
+        // Determinar turno aproximado pelo horário de criação
+        const hour = record.createdAt?.toDate ? record.createdAt.toDate().getHours() : 10;
+        let tIdx = 0; // 1º Turno (default)
+        if (hour >= 14 && hour < 22) tIdx = 1; // 2º Turno
+        else if (hour >= 22 || hour < 6) tIdx = 2; // 3º Turno
+
+        // Extrair número de operações se possível
+        let ops = 0;
+        const opsMatch = String(record.operationsNumber || '').match(/\d+/);
+        ops = opsMatch ? parseInt(opsMatch[0]) : qty;
+
+        if (isDayView) {
+          if (!isSameDay(recordDate, selectedDateFilter!)) return;
+          const targetArr = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurTurns : 
+                             (equip.includes('CENTRO') || equip.includes('D600')) ? centroTurns : null;
+          if (targetArr && tIdx >= 0 && tIdx < 3) {
+            targetArr[tIdx].pecas_real += qty;
+            targetArr[tIdx].ops_real += ops;
+          }
+        } else {
+          if (selectedWeekFilter !== 'all' && getISOWeek(recordDate) !== parseInt(selectedWeekFilter)) return;
+          let key = selectedWeekFilter !== 'all' ? format(recordDate, 'yyyy-MM-dd') : format(recordDate, 'yyyy-MM');
+          let label = selectedWeekFilter !== 'all' ? format(recordDate, 'dd/MM', { locale: ptBR }) : format(recordDate, 'MMM yy', { locale: ptBR });
+          const targetMap = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurMap : 
+                             (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
+          if (targetMap) {
+            if (!targetMap[key]) {
+              targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 };
+            }
+            targetMap[key].pecas_real += qty;
+            targetMap[key].ops_real += ops;
+          }
+        }
+      });
+    }
+
     const sortFn = (a: any, b: any) => a.key.localeCompare(b.key);
-    return { chartData: { centur: Object.values(centurMap).sort(sortFn), centro: Object.values(centroMap).sort(sortFn) }, isDayView: false };
-  }, [planejamentoData, selectedWeekFilter, selectedDateFilter, viewMetric]);
+    return { chartData: { 
+      centur: isDayView ? centurTurns : Object.values(centurMap).sort(sortFn), 
+      centro: isDayView ? centroTurns : Object.values(centroMap).sort(sortFn) 
+    }, isDayView };
+  }, [planejamentoData, firestoreProduction, selectedWeekFilter, selectedDateFilter, viewMetric]);
 
   const handleShiftClick = (day: Date, turnoId: string) => {
     setEditingId(null);
