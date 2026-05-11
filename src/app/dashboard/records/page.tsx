@@ -112,13 +112,17 @@ const normalizeFactoryName = (name: any): string => {
 
 const getCategoryKey = (reason: string): string => {
   const r = String(reason || '').toUpperCase().trim();
+  if (r === '') return 'PRODUCAO';
+  
   if (r.includes('SETUP')) return 'SETUP';
   if (r.includes('CAFÉ') || r.includes('CAFE')) return 'CAFE';
   if (r.includes('LIMPEZA')) return 'LIMPEZA';
-  if (r.includes('DDS') || r.includes('ADM') || r.includes('APONTAMENTO') || r.includes('HORAS')) return 'DDS';
+  if (r.includes('DDS') || r.includes('ADM') || r.includes('APONTAMENTO')) return 'DDS';
   if (r.includes('INSPEÇÃO') || r.includes('INSPECAO') || r.includes('QUALIDADE') || r.includes('VALIDAÇÃO')) return 'QUALIDADE';
   if (r.includes('MANUTENÇÃO') || r.includes('MANUTENCAO')) return 'MANUTENCAO';
-  return 'OUTROS';
+  
+  // Retorna a string original para qualquer outro motivo, para que apareça de forma exata no gráfico
+  return r;
 };
 
 export default function RecordsPage() {
@@ -254,12 +258,13 @@ export default function RecordsPage() {
   const lossCategoryFilter = (record: any, isPlanning: boolean) => {
     if (selectedLossReason === 'all') return true;
 
-    let category = '';
     const rawReason = (isPlanning ? (record['Perdas planejadas'] || '') : (record.lossReason || '')).toUpperCase();
+    const category = getCategoryKey(rawReason);
 
-    if (isPlanning && rawReason === '') category = 'PRODUCAO';
-    else {
-      category = getCategoryKey(rawReason);
+    // Se o filtro selecionado for "OUTROS", deve mostrar qualquer coisa que não seja as categorias principais
+    if (selectedLossReason === 'OUTROS') {
+      const mainCategories = ['PRODUCAO', 'SETUP', 'DDS', 'CAFE', 'LIMPEZA', 'QUALIDADE', 'MANUTENCAO'];
+      return !mainCategories.includes(category);
     }
 
     return category === selectedLossReason;
@@ -306,6 +311,7 @@ export default function RecordsPage() {
 
   const operatorFilteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
+    // Filtra produção apenas se o filtro global for 'all' ou 'PRODUCAO'
     if (selectedLossReason !== 'all' && selectedLossReason !== 'PRODUCAO') return [];
     return productionRecords.filter(operatorFilter);
   }, [productionRecords, selectedOperator, selectedLossReason]);
@@ -321,8 +327,6 @@ export default function RecordsPage() {
     const getOrCreate = (factory: string) => {
       if (!dataMap[factory]) {
         dataMap[factory] = { 
-          plan_PRODUCAO: 0, plan_SETUP: 0, plan_DDS: 0, plan_CAFE: 0, plan_LIMPEZA: 0, plan_QUALIDADE: 0, plan_MANUTENCAO: 0, plan_OUTROS: 0,
-          real_PRODUCAO: 0, real_SETUP: 0, real_DDS: 0, real_CAFE: 0, real_LIMPEZA: 0, real_QUALIDADE: 0, real_MANUTENCAO: 0, real_OUTROS: 0,
           totalPlanejado: 0,
           totalRealizado: 0,
         };
@@ -340,7 +344,7 @@ export default function RecordsPage() {
 
       const d = getOrCreate(factory);
       const rawReason = String(record['Perdas planejadas'] || '').toUpperCase().trim();
-      const catKey = rawReason === '' ? 'PRODUCAO' : getCategoryKey(rawReason);
+      const catKey = getCategoryKey(rawReason);
       
       const key = `plan_${catKey}`;
       d[key] = (d[key] || 0) + machineHours;
@@ -352,7 +356,7 @@ export default function RecordsPage() {
         const hours = (Number(record.machiningTime) || 0) / 60;
         if (hours > 0) {
             const d = getOrCreate(factory);
-            d.real_PRODUCAO += hours;
+            d.real_PRODUCAO = (d.real_PRODUCAO || 0) + hours;
             d.totalRealizado += hours;
         }
     });

@@ -23,22 +23,25 @@ interface PlannedVsMachinedChartProps {
   loading: boolean;
 }
 
-const CATEGORIES = [
-    { key: 'PRODUCAO', label: 'Usinagem', color: '#ffffff' },
-    { key: 'SETUP', label: 'Setup', color: '#ef4444' },
-    { key: 'DDS', label: 'DDS/ADM', color: '#f97316' },
-    { key: 'CAFE', label: 'Parada para Café', color: '#eab308' },
-    { key: 'LIMPEZA', label: 'Limpeza Planejada', color: '#22c55e' },
-    { key: 'QUALIDADE', label: 'Qualidade/Inspeção', color: '#3b82f6' },
-    { key: 'MANUTENCAO', label: 'Manutenção', color: '#7c3aed' },
-    { key: 'OUTROS', label: 'Outras Perdas', color: '#6b7280' },
-];
+// Estilos para categorias conhecidas. 
+// Motivos dinâmicos que não estiverem aqui usarão uma cor padrão.
+const CATEGORY_STYLES: Record<string, { label: string; color: string }> = {
+    'PRODUCAO': { label: 'Usinagem', color: '#ffffff' },
+    'SETUP': { label: 'Setup', color: '#ef4444' },
+    'DDS': { label: 'DDS/ADM', color: '#f97316' },
+    'CAFE': { label: 'Parada para Café', color: '#eab308' },
+    'LIMPEZA': { label: 'Limpeza Planejada', color: '#22c55e' },
+    'QUALIDADE': { label: 'Qualidade/Inspeção', color: '#3b82f6' },
+    'MANUTENCAO': { label: 'Manutenção', color: '#7c3aed' },
+    // Mapeamento de strings longas comuns do formulário para labels mais limpas
+    'MANUTENÇÃO PLANEJADA': { label: 'Manutenção Planejada', color: '#7c3aed' },
+    'TEMPO DE CAFÉ': { label: 'Tempo de Café', color: '#eab308' },
+    'LIMPEZA PLANEJADA': { label: 'Limpeza Planejada', color: '#22c55e' },
+    'DDS, APONTAMENTO HORAS, ATIVIDADE ADM': { label: 'DDS/ADM', color: '#f97316' },
+    'INSPEÇÃO & VALIDAÇÃO DAS PEÇAS': { label: 'Inspeção/Qualidade', color: '#3b82f6' },
+};
 
-const chartConfig = CATEGORIES.reduce((acc, cat) => {
-    acc[`plan_${cat.key}`] = { label: `${cat.label} (Plan)`, color: cat.color };
-    acc[`real_${cat.key}`] = { label: `${cat.label} (Real)`, color: cat.color };
-    return acc;
-}, {} as any);
+const DEFAULT_COLOR = '#6b7280'; // Cinza para motivos específicos não mapeados
 
 export function PlannedVsMachinedChart({
   data,
@@ -51,6 +54,41 @@ export function PlannedVsMachinedChart({
     return { totalPlanejado, totalRealizado };
   }, [data]);
 
+  // Identifica dinamicamente todas as chaves de motivos presentes nos dados
+  const dynamicCategories = useMemo(() => {
+    const keysSet = new Set<string>();
+    data.forEach(item => {
+      Object.keys(item).forEach(k => {
+        if (k.startsWith('plan_') || k.startsWith('real_')) {
+          const reason = k.replace(/^(plan_|real_)/, '');
+          keysSet.add(reason);
+        }
+      });
+    });
+
+    const reasons = Array.from(keysSet);
+    
+    // Ordenação: Produção primeiro, depois alfabética
+    return reasons.sort((a, b) => {
+        if (a === 'PRODUCAO') return -1;
+        if (b === 'PRODUCAO') return 1;
+        return a.localeCompare(b);
+    }).map(reason => ({
+        key: reason,
+        label: CATEGORY_STYLES[reason]?.label || reason,
+        color: CATEGORY_STYLES[reason]?.color || DEFAULT_COLOR
+    }));
+  }, [data]);
+
+  const chartConfig = useMemo(() => {
+    const config: any = {};
+    dynamicCategories.forEach(cat => {
+        config[`plan_${cat.key}`] = { label: `${cat.label} (Plan)`, color: cat.color };
+        config[`real_${cat.key}`] = { label: `${cat.label} (Real)`, color: cat.color };
+    });
+    return config;
+  }, [dynamicCategories]);
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const p = payload[0].payload;
@@ -60,7 +98,7 @@ export function PlannedVsMachinedChart({
       const difference = machinedTotal - plannedTotal;
 
       return (
-        <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[16rem]">
+        <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[20rem] max-w-[28rem]">
           <div className="grid gap-1.5">
             <div className="flex justify-between items-center mb-2">
               <p className="font-semibold text-lg">{label}</p>
@@ -72,14 +110,14 @@ export function PlannedVsMachinedChart({
                     <span className="font-bold">{plannedTotal.toFixed(1)}h</span>
                 </div>
                 <div className="pl-3 flex flex-col gap-0.5">
-                    {CATEGORIES.map(cat => {
+                    {dynamicCategories.map(cat => {
                         const val = p[`plan_${cat.key}`] || 0;
                         if (val <= 0) return null;
                         return (
                             <div key={`plan-${cat.key}`} className="flex items-center gap-2">
                                 <div className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />
                                 <div className="flex justify-between flex-1">
-                                    <span className="text-muted-foreground text-[10px]">{cat.label}</span>
+                                    <span className="text-muted-foreground text-[10px] truncate max-w-[180px]">{cat.label}</span>
                                     <span className="font-bold text-[10px]">{val.toFixed(1)}h</span>
                                 </div>
                             </div>
@@ -94,14 +132,14 @@ export function PlannedVsMachinedChart({
                     <span className="font-bold">{machinedTotal.toFixed(1)}h</span>
                 </div>
                 <div className="pl-3 flex flex-col gap-0.5">
-                    {CATEGORIES.map(cat => {
+                    {dynamicCategories.map(cat => {
                         const val = p[`real_${cat.key}`] || 0;
                         if (val <= 0) return null;
                         return (
                             <div key={`real-${cat.key}`} className="flex items-center gap-2">
                                 <div className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />
                                 <div className="flex justify-between flex-1">
-                                    <span className="text-muted-foreground text-[10px]">{cat.label}</span>
+                                    <span className="text-muted-foreground text-[10px] truncate max-w-[180px]">{cat.label}</span>
                                     <span className="font-bold text-[10px]">{val.toFixed(1)}h</span>
                                 </div>
                             </div>
@@ -129,12 +167,16 @@ export function PlannedVsMachinedChart({
   const CustomLegend = () => {
     return (
       <div className="flex items-center justify-center gap-x-4 gap-y-2 mt-4 flex-wrap max-w-5xl mx-auto border-t pt-4">
-        {CATEGORIES.map(cat => (
-           <div key={cat.key} className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: cat.color}} />
-            <span className="text-[10px] font-bold uppercase text-muted-foreground">{cat.label}</span>
-          </div>
-        ))}
+        {dynamicCategories.length <= 10 ? (
+            dynamicCategories.map(cat => (
+                <div key={cat.key} className="flex items-center gap-1.5">
+                 <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: cat.color}} />
+                 <span className="text-[10px] font-bold uppercase text-muted-foreground">{cat.label}</span>
+               </div>
+             ))
+        ) : (
+            <span className="text-[10px] font-bold uppercase text-muted-foreground">Diversos motivos de parada detalhados no Tooltip</span>
+        )}
         <div className="flex items-center gap-4 border-l pl-4 ml-2">
             <span className="text-[9px] font-black uppercase text-foreground">Barra Esq: Plan | Barra Dir: Real</span>
         </div>
@@ -150,7 +192,7 @@ export function PlannedVsMachinedChart({
             <div>
                 <CardTitle>Planejado vs Realizado</CardTitle>
                 <CardDescription>
-                Comparativo visual detalhado com detalhamento completo de categorias e perdas.
+                Comparativo visual detalhado com todos os motivos reais de parada registrados.
                 </CardDescription>
             </div>
              {loading ? (
@@ -202,13 +244,13 @@ export function PlannedVsMachinedChart({
                   <Legend content={<CustomLegend />} />
                   
                   {/* BARRA PLANEJADO (ESQUERDA) */}
-                  {CATEGORIES.map((cat, idx) => (
+                  {dynamicCategories.map((cat, idx) => (
                     <Bar 
                         key={`plan-${cat.key}`} 
                         dataKey={`plan_${cat.key}`} 
                         stackId="planejado" 
                         fill={cat.color}
-                        radius={idx === CATEGORIES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        radius={idx === dynamicCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                     >
                         {idx === 0 && (
                             <LabelList 
@@ -218,7 +260,7 @@ export function PlannedVsMachinedChart({
                                 className="fill-muted-foreground text-[8px] uppercase font-bold" 
                             />
                         )}
-                        {idx === CATEGORIES.length - 1 && (
+                        {idx === dynamicCategories.length - 1 && (
                             <LabelList
                                 dataKey="totalPlanejado"
                                 position="top"
@@ -231,14 +273,14 @@ export function PlannedVsMachinedChart({
                   ))}
 
                   {/* BARRA REALIZADO (DIREITA) */}
-                   {CATEGORIES.map((cat, idx) => (
+                   {dynamicCategories.map((cat, idx) => (
                     <Bar 
                         key={`real-${cat.key}`} 
                         dataKey={`real_${cat.key}`} 
                         stackId="usinado" 
                         fill={cat.color}
                         opacity={0.8}
-                        radius={idx === CATEGORIES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        radius={idx === dynamicCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                     >
                         {idx === 0 && (
                             <LabelList 
@@ -248,7 +290,7 @@ export function PlannedVsMachinedChart({
                                 className="fill-muted-foreground text-[8px] uppercase font-bold" 
                             />
                         )}
-                         {idx === CATEGORIES.length - 1 && (
+                         {idx === dynamicCategories.length - 1 && (
                             <LabelList
                                 dataKey="totalRealizado"
                                 position="top"
