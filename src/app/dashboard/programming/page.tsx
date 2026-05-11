@@ -54,7 +54,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter
-} from "@/components/ui/dialog";
+} from "@/Dialog";
 import {
   Form,
   FormControl,
@@ -84,7 +84,8 @@ import {
   CartesianGrid, 
   Tooltip as RechartsTooltip, 
   Legend,
-  LabelList
+  LabelList,
+  Cell
 } from 'recharts';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -110,6 +111,8 @@ interface PlanejamentoItem {
   Quantidade?: number;
   quantidadeRealizada?: number;
   'Quantidade Realizada'?: number;
+  operacoesRealizadas?: number;
+  'Operações Realizadas'?: number;
   operacoesPorPeca?: number;
   'Operações por Peça'?: number;
   tecnico?: string;
@@ -171,6 +174,7 @@ const planningFormSchema = z.object({
   nomeDaPeca: z.string().min(1, 'Nome da peça é obrigatório.'),
   quantidade: z.coerce.number().min(0, 'Quantidade deve ser zero ou maior.'),
   quantidadeRealizada: z.coerce.number().default(0),
+  operacoesRealizadas: z.coerce.number().default(0),
   operacoesPorPeca: z.coerce.number().min(1, 'Mínimo 1 operação.'),
   tecnico: z.string().min(1, 'Técnico é obrigatório.'),
   horasPlanejadas: z.coerce.number().default(0),
@@ -194,7 +198,7 @@ const PlanningChart = ({
   data: any[], 
   title: string, 
   isDayView: boolean, 
-  metric: 'pieces' | 'operations' | 'hours',
+  metric: 'production' | 'hours',
 }) => {
   if (!data || data.length === 0) return (
     <Card className="flex h-[300px] items-center justify-center border-dashed">
@@ -202,20 +206,18 @@ const PlanningChart = ({
     </Card>
   );
 
-  const unit = metric === 'pieces' ? 'p' : metric === 'operations' ? 'op' : 'h';
-  
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold uppercase tracking-tight">{title}</CardTitle>
         <CardDescription className="text-[10px]">
-          {isDayView ? "Visão por Turno" : `Consolidado por ${metric === 'pieces' ? 'Peças' : metric === 'operations' ? 'Operações' : 'Horas'}`}
+          {isDayView ? "Visão por Turno" : `Consolidado ${metric === 'production' ? 'de Produção' : 'de Horas'}`}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-[400px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barGap={8} margin={{ top: 30, right: 30, left: 10, bottom: 20 }}>
+            <BarChart data={data} barGap={8} margin={{ top: 30, right: 30, left: 10, bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
               <XAxis 
                 dataKey="label" 
@@ -229,43 +231,35 @@ const PlanningChart = ({
                 className="text-[10px]" 
                 axisLine={false} 
                 tickLine={false}
-                tickFormatter={(val) => `${val}${unit}`}
               />
               <RechartsTooltip 
                 contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
                 itemStyle={{ fontSize: '12px' }}
-                formatter={(val: number) => [`${val.toFixed(1)} ${unit}`, '']}
               />
               <Legend verticalAlign="bottom" height={36}/>
               
-              <Bar 
-                name="Planejado" 
-                dataKey="total_plan" 
-                fill="#6b7280" 
-                opacity={0.6} 
-                radius={[4, 4, 0, 0]}
-              >
-                <LabelList 
-                    dataKey="total_plan" 
-                    position="top" 
-                    className="fill-muted-foreground text-[10px] font-black"
-                    formatter={(val: number) => val > 0 ? `${val.toFixed(1)}${unit}` : ''}
-                />
-              </Bar>
-
-              <Bar 
-                name="Realizado" 
-                dataKey="total_real" 
-                fill="#a855f7" 
-                radius={[4, 4, 0, 0]}
-              >
-                <LabelList 
-                    dataKey="total_real" 
-                    position="top" 
-                    className="fill-foreground text-[10px] font-black"
-                    formatter={(val: number) => val > 0 ? `${val.toFixed(1)}${unit}` : ''}
-                />
-              </Bar>
+              {metric === 'production' ? (
+                <>
+                  <Bar name="Peças Plan." dataKey="pecas_plan" fill="#94a3b8" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="pecas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" />
+                  </Bar>
+                  <Bar name="Peças Fin." dataKey="pecas_real" fill="#22c55e" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="pecas_real" position="top" className="fill-foreground text-[10px] font-bold" />
+                  </Bar>
+                  <Bar name="Ops. Realizadas" dataKey="ops_real" fill="#a855f7" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="ops_real" position="top" className="fill-foreground text-[10px] font-bold" />
+                  </Bar>
+                </>
+              ) : (
+                <>
+                  <Bar name="Horas Planejadas" dataKey="horas_plan" fill="#6b7280" opacity={0.6} radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="horas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" formatter={(val: number) => `${val.toFixed(1)}h`} />
+                  </Bar>
+                  <Bar name="Horas Realizadas" dataKey="horas_real" fill="#3b82f6" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="horas_real" position="top" className="fill-foreground text-[10px] font-bold" formatter={(val: number) => `${val.toFixed(1)}h`} />
+                  </Bar>
+                </>
+              )}
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -280,7 +274,7 @@ export default function ProgrammingPage() {
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMetric, setViewMetric] = useState<'pieces' | 'operations' | 'hours'>('pieces');
+  const [viewMetric, setViewMetric] = useState<'production' | 'hours'>('production');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -299,6 +293,7 @@ export default function ProgrammingPage() {
       nomeDaPeca: '',
       quantidade: 0,
       quantidadeRealizada: 0,
+      operacoesRealizadas: 0,
       operacoesPorPeca: 1,
       tecnico: '',
       horasPlanejadas: 0,
@@ -383,46 +378,40 @@ export default function ProgrammingPage() {
     const isDayView = !!selectedDateFilter;
 
     const calculateItemVolumes = (item: PlanejamentoItem) => {
-      let plan = 0, real = 0;
-      const qtd = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
-      const qtdReal = Number(item.quantidadeRealizada !== undefined ? item.quantidadeRealizada : item['Quantidade Realizada']) || 0;
-      const ops = Number(item.operacoesPorPeca !== undefined ? item.operacoesPorPeca : (item['Operações por Peça'] || 1));
-      const scale = qtd > 0 ? (qtdReal / qtd) : (qtdReal > 0 ? 1 : 0);
+      const pPlan = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
+      const pReal = Number(item.quantidadeRealizada !== undefined ? item.quantidadeRealizada : item['Quantidade Realizada']) || 0;
+      const oReal = Number(item.operacoesRealizadas !== undefined ? item.operacoesRealizadas : (item['Operações Realizadas'] || 0)) || 0;
+      
+      let hPlan = 0, hReal = 0;
+      const scale = pPlan > 0 ? (pReal / pPlan) : (pReal > 0 ? 1 : 0);
 
-      if (viewMetric === 'pieces') {
-        plan = qtd;
-        real = qtdReal;
-      } else if (viewMetric === 'operations') {
-        plan = qtd * ops;
-        real = qtdReal * ops;
-      } else { // hours
-        if (item.atividades && Array.isArray(item.atividades)) {
-            item.atividades.forEach(ativ => {
-                const pTime = Number(ativ.tempo) || 0;
-                plan += pTime;
-                real += pTime * Math.min(1, scale);
-            });
-        } else {
-            const h = typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
-                ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
-                : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0);
-            plan = h;
-            real = h * Math.min(1, scale);
-        }
+      if (item.atividades && Array.isArray(item.atividades)) {
+          item.atividades.forEach(ativ => {
+              const pTime = Number(ativ.tempo) || 0;
+              hPlan += pTime;
+              hReal += pTime * Math.min(1, scale);
+          });
+      } else {
+          const h = typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
+              ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
+              : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0);
+          hPlan = h;
+          hReal = h * Math.min(1, scale);
       }
-      return { plan, real };
+      
+      return { pPlan, pReal, oReal, hPlan, hReal };
     };
 
     if (isDayView) {
       const centurTurns = [
-        { label: '1º TURNO', total_plan: 0, total_real: 0 },
-        { label: '2º TURNO', total_plan: 0, total_real: 0 },
-        { label: '3º TURNO', total_plan: 0, total_real: 0 }
+        { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
+        { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
+        { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 }
       ];
       const centroTurns = [
-        { label: '1º TURNO', total_plan: 0, total_real: 0 },
-        { label: '2º TURNO', total_plan: 0, total_real: 0 },
-        { label: '3º TURNO', total_plan: 0, total_real: 0 }
+        { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
+        { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
+        { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 }
       ];
 
       planejamentoData.forEach(item => {
@@ -432,15 +421,18 @@ export default function ProgrammingPage() {
         try { date = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { date = new Date(dateStr); }
         if (isNaN(date.getTime()) || !isSameDay(date, selectedDateFilter!)) return;
 
-        const volumes = calculateItemVolumes(item);
+        const v = calculateItemVolumes(item);
         const equip = String(item.equipamento || item.EQUIPAMENTO || '').toUpperCase();
         const turnoIndex = (parseInt(String(item.Turno || '1')) || 1) - 1;
         const targetArr = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurTurns : 
                            (equip.includes('CENTRO') || equip.includes('D600')) ? centroTurns : null;
 
         if (targetArr && turnoIndex >= 0 && turnoIndex < 3) {
-            targetArr[turnoIndex].total_plan += volumes.plan;
-            targetArr[turnoIndex].total_real += volumes.real;
+            targetArr[turnoIndex].pecas_plan += v.pPlan;
+            targetArr[turnoIndex].pecas_real += v.pReal;
+            targetArr[turnoIndex].ops_real += v.oReal;
+            targetArr[turnoIndex].horas_plan += v.hPlan;
+            targetArr[turnoIndex].horas_real += v.hReal;
         }
       });
 
@@ -461,17 +453,20 @@ export default function ProgrammingPage() {
       let key = selectedWeekFilter !== 'all' ? format(date, 'yyyy-MM-dd') : format(date, 'yyyy-MM');
       let label = selectedWeekFilter !== 'all' ? format(date, 'dd/MM', { locale: ptBR }) : format(date, 'MMM yy', { locale: ptBR });
 
-      const volumes = calculateItemVolumes(item);
+      const v = calculateItemVolumes(item);
       const equip = String(item.equipamento || item.EQUIPAMENTO || '').toUpperCase();
       const targetMap = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurMap : 
                          (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
 
       if (targetMap) {
         if (!targetMap[key]) {
-          targetMap[key] = { key, label, total_plan: 0, total_real: 0 };
+          targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 };
         }
-        targetMap[key].total_plan += volumes.plan;
-        targetMap[key].total_real += volumes.real;
+        targetMap[key].pecas_plan += v.pPlan;
+        targetMap[key].pecas_real += v.pReal;
+        targetMap[key].ops_real += v.oReal;
+        targetMap[key].horas_plan += v.hPlan;
+        targetMap[key].horas_real += v.hReal;
       }
     });
 
@@ -491,6 +486,7 @@ export default function ProgrammingPage() {
       nomeDaPeca: '',
       quantidade: 0,
       quantidadeRealizada: 0,
+      operacoesRealizadas: 0,
       operacoesPorPeca: 1,
       tecnico: '',
       horasPlanejadas: 0,
@@ -525,6 +521,7 @@ export default function ProgrammingPage() {
       nomeDaPeca: item.nomeDaPeca || item['Nome da Peça'] || '',
       quantidade: Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0,
       quantidadeRealizada: Number(item.quantidadeRealizada !== undefined ? item.quantidadeRealizada : item['Quantidade Realizada']) || 0,
+      operacoesRealizadas: Number(item.operacoesRealizadas !== undefined ? item.operacoesRealizadas : (item['Operações Realizadas'] || 0)) || 0,
       operacoesPorPeca: Number(item.operacoesPorPeca !== undefined ? item.operacoesPorPeca : (item['Operações por Peça'] || 1)),
       tecnico: item.tecnico || item.Técnicos || '',
       horasPlanejadas: typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
@@ -559,6 +556,7 @@ export default function ProgrammingPage() {
         nomeDaPeca: values.nomeDaPeca,
         quantidade: values.quantidade,
         quantidadeRealizada: values.quantidadeRealizada,
+        operacoesRealizadas: values.operacoesRealizadas,
         operacoesPorPeca: values.operacoesPorPeca,
         tecnico: values.tecnico,
         horasPlanejadas: values.horasPlanejadas,
@@ -674,8 +672,7 @@ export default function ProgrammingPage() {
         <div className="flex flex-wrap items-center gap-3 bg-card p-3 rounded-lg border shadow-sm">
           <Tabs value={viewMetric} onValueChange={(val: any) => setViewMetric(val)}>
             <TabsList className="h-8">
-              <TabsTrigger value="pieces" className="text-[10px] font-bold">PEÇAS</TabsTrigger>
-              <TabsTrigger value="operations" className="text-[10px] font-bold">OPS</TabsTrigger>
+              <TabsTrigger value="production" className="text-[10px] font-bold">PRODUÇÃO</TabsTrigger>
               <TabsTrigger value="hours" className="text-[10px] font-bold flex items-center gap-1"><Clock className="h-3 w-3" /> HORAS</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -770,10 +767,13 @@ export default function ProgrammingPage() {
                 <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Requisição</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel>Qtd. Plan.</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="quantidadeRealizada" render={({ field }) => (<FormItem><FormLabel>Qtd. Real.</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="operacoesPorPeca" render={({ field }) => (<FormItem><FormLabel>Ops/Peça</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
+              <div className="grid grid-cols-3 gap-4 bg-muted/10 p-3 rounded-lg border border-dashed">
+                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Peças Plan.</FormLabel><FormControl><Input type="number" className="h-8" {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="quantidadeRealizada" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold text-green-500">Peças Fin.</FormLabel><FormControl><Input type="number" className="h-8 border-green-500/30" {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="operacoesRealizadas" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold text-purple-500">Ops. Realizadas</FormLabel><FormControl><Input type="number" className="h-8 border-purple-500/30" {...field} /></FormControl></FormItem>)} />
+              </div>
+              <div className="grid grid-cols-1">
+                 <FormField control={form.control} name="operacoesPorPeca" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Ops/Peça (Base Plan.)</FormLabel><FormControl><Input type="number" className="h-8" {...field} /></FormControl></FormItem>)} />
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
