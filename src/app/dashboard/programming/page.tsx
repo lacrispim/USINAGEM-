@@ -54,7 +54,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter
-} from "@/Dialog";
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -85,7 +85,6 @@ import {
   Tooltip as RechartsTooltip, 
   Legend,
   LabelList,
-  Cell
 } from 'recharts';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -240,23 +239,23 @@ const PlanningChart = ({
               
               {metric === 'production' ? (
                 <>
-                  <Bar name="Peças Plan." dataKey="pecas_plan" fill="#94a3b8" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="pecas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" />
-                  </Bar>
                   <Bar name="Peças Fin." dataKey="pecas_real" fill="#22c55e" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="pecas_real" position="top" className="fill-foreground text-[10px] font-bold" />
                   </Bar>
                   <Bar name="Ops. Realizadas" dataKey="ops_real" fill="#a855f7" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="ops_real" position="top" className="fill-foreground text-[10px] font-bold" />
                   </Bar>
+                  <Bar name="Peças Plan." dataKey="pecas_plan" fill="#6b7280" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="pecas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" />
+                  </Bar>
                 </>
               ) : (
                 <>
-                  <Bar name="Horas Planejadas" dataKey="horas_plan" fill="#6b7280" opacity={0.6} radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="horas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" formatter={(val: number) => `${val.toFixed(1)}h`} />
-                  </Bar>
                   <Bar name="Horas Realizadas" dataKey="horas_real" fill="#3b82f6" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="horas_real" position="top" className="fill-foreground text-[10px] font-bold" formatter={(val: number) => `${val.toFixed(1)}h`} />
+                  </Bar>
+                  <Bar name="Horas Planejadas" dataKey="horas_plan" fill="#6b7280" opacity={0.6} radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="horas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" formatter={(val: number) => `${val.toFixed(1)}h`} />
                   </Bar>
                 </>
               )}
