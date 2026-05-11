@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -23,7 +24,8 @@ import {
   Settings2,
   CheckCircle2,
   X,
-  Layers
+  Layers,
+  Clock
 } from 'lucide-react';
 import { 
   format, 
@@ -99,7 +101,8 @@ import {
   CartesianGrid, 
   Tooltip as RechartsTooltip, 
   Legend,
-  LabelList
+  LabelList,
+  Cell
 } from 'recharts';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -131,6 +134,8 @@ interface PlanejamentoItem {
   equipamento?: string;
   EQUIPAMENTO?: string;
   Turno?: string | number;
+  perdaPlanejada?: string;
+  'Perdas planejadas'?: string;
 }
 
 const turnos = [
@@ -162,12 +167,21 @@ const factoryList = [
     "TORRE"
 ];
 
+const lossOptions = [
+  { value: 'PRODUCAO', label: 'Produção Normal', color: '#a855f7' },
+  { value: 'SETUP', label: 'Setup', color: '#ef4444' },
+  { value: 'DDS', label: 'DDS / ADM / Apontamento', color: '#f97316' },
+  { value: 'CAFE', label: 'Parada para Café', color: '#eab308' },
+  { value: 'LIMPEZA', label: 'Limpeza Planejada', color: '#22c55e' },
+  { value: 'QUALIDADE', label: 'Inspeção / Qualidade', color: '#3b82f6' },
+];
+
 const planningFormSchema = z.object({
   dataExecucao: z.string().min(1, 'Data é obrigatória.'),
   equipamento: z.string().min(1, 'Equipamento é obrigatório.'),
   requisicao: z.string().min(1, 'Nº da Requisição é obrigatório.'),
   nomeDaPeca: z.string().min(1, 'Nome da peça é obrigatório.'),
-  quantidade: z.coerce.number().min(1, 'Quantidade deve ser maior que zero.'),
+  quantidade: z.coerce.number().min(0, 'Quantidade deve ser zero ou maior.'),
   quantidadeRealizada: z.coerce.number().default(0),
   operacoesPorPeca: z.coerce.number().min(1, 'Mínimo 1 operação.'),
   tecnico: z.string().min(1, 'Técnico é obrigatório.'),
@@ -175,13 +189,13 @@ const planningFormSchema = z.object({
   turno: z.string(),
   site: z.string().min(1, 'Site é obrigatório.'),
   observacao: z.string().optional(),
+  perdaPlanejada: z.string().default('PRODUCAO'),
 });
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
 const CustomLegend = (props: any) => {
-  const { payload, isDayView } = props;
-  if (!payload) return null;
+  const { isDayView, metric } = props;
 
   if (isDayView) {
     return (
@@ -198,51 +212,49 @@ const CustomLegend = (props: any) => {
     );
   }
 
+  // Legend for Period View (Stacked)
   return (
-    <div className="flex flex-col gap-2 mb-6">
-      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 items-center">
-        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2">Planejado:</span>
-        {payload.filter((p: any) => p.dataKey.startsWith('plan')).map((entry: any, index: number) => (
-          <div key={`item-plan-${index}`} className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="text-[9px] font-bold uppercase">{entry.value}</span>
+    <div className="flex flex-col gap-4 mb-6">
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 items-center border-b pb-2">
+        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2">Tipos:</span>
+        {lossOptions.map((opt) => (
+           <div key={opt.value} className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: opt.color }} />
+            <span className="text-[9px] font-bold uppercase">{opt.label}</span>
           </div>
         ))}
       </div>
-      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 items-center">
-        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2">Realizado:</span>
-        {payload.filter((p: any) => p.dataKey.startsWith('real')).map((entry: any, index: number) => (
-          <div key={`item-real-${index}`} className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="text-[9px] font-bold uppercase">{entry.value}</span>
-          </div>
-        ))}
+      <div className="flex justify-center gap-8">
+         <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full border-2 border-muted-foreground" />
+          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Barra Esq: Plan | Barra Dir: Real</span>
+        </div>
       </div>
     </div>
   );
 };
 
-const PlanningChart = ({ data, title, isDayView, metric }: { data: any[], title: string, isDayView: boolean, metric: 'pieces' | 'operations' }) => {
+const PlanningChart = ({ data, title, isDayView, metric }: { data: any[], title: string, isDayView: boolean, metric: 'pieces' | 'operations' | 'hours' }) => {
   if (!data || data.length === 0) return (
     <Card className="flex h-[300px] items-center justify-center border-dashed">
       <p className="text-muted-foreground text-xs uppercase font-bold tracking-widest">{title}: Sem dados</p>
     </Card>
   );
 
-  const unit = metric === 'pieces' ? 'p' : 'op';
+  const unit = metric === 'pieces' ? 'p' : metric === 'operations' ? 'op' : 'h';
   
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold uppercase tracking-tight">{title}</CardTitle>
         <CardDescription className="text-[10px]">
-          {isDayView ? "Visão por Turno" : `Consolidado por ${metric === 'pieces' ? 'Peças' : 'Operações'}`}
+          {isDayView ? "Visão por Turno" : `Consolidado por ${metric === 'pieces' ? 'Peças' : metric === 'operations' ? 'Operações' : 'Horas'}`}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-[450px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barGap={isDayView ? 12 : 8} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
+            <BarChart data={data} barGap={isDayView ? 12 : 6} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
               <XAxis 
                 dataKey="label" 
@@ -261,9 +273,9 @@ const PlanningChart = ({ data, title, isDayView, metric }: { data: any[], title:
               <RechartsTooltip 
                 contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
                 itemStyle={{ fontSize: '12px' }}
-                formatter={(val: number) => [`${val} ${unit}`, '']}
+                formatter={(val: number) => [`${val.toFixed(1)} ${unit}`, '']}
               />
-              <Legend content={<CustomLegend isDayView={isDayView} />} verticalAlign="top" />
+              <Legend content={<CustomLegend isDayView={isDayView} metric={metric} />} verticalAlign="top" />
               
               {isDayView ? (
                 <>
@@ -272,7 +284,7 @@ const PlanningChart = ({ data, title, isDayView, metric }: { data: any[], title:
                         dataKey="planejado" 
                         position="top" 
                         className="fill-foreground text-[10px] font-black"
-                        formatter={(val: number) => val > 0 ? `${val}${unit}` : ''}
+                        formatter={(val: number) => val > 0 ? `${val.toFixed(1)}${unit}` : ''}
                     />
                   </Bar>
                   <Bar dataKey="realizado" name="Realizado" fill="#22c55e" radius={[4, 4, 0, 0]}>
@@ -280,31 +292,34 @@ const PlanningChart = ({ data, title, isDayView, metric }: { data: any[], title:
                         dataKey="realizado" 
                         position="top" 
                         className="fill-green-500 text-[10px] font-black"
-                        formatter={(val: number) => val > 0 ? `${val}${unit}` : ''}
+                        formatter={(val: number) => val > 0 ? `${val.toFixed(1)}${unit}` : ''}
                     />
                   </Bar>
                 </>
               ) : (
                 <>
-                  <Bar dataKey="plan_t1" stackId="planejado" name="1º T" fill="#c084fc" />
-                  <Bar dataKey="plan_t2" stackId="planejado" name="2º T" fill="#a855f7" />
-                  <Bar dataKey="plan_t3" stackId="planejado" name="3º T" fill="#7e22ce" radius={[4, 4, 0, 0]}>
+                  {/* Categorized Stacks */}
+                  {lossOptions.map(opt => (
+                    <Bar key={`plan_${opt.value}`} dataKey={`plan_${opt.value}`} stackId="planejado" fill={opt.color} />
+                  ))}
+                  <Bar dataKey="spacer_plan" stackId="planejado" fill="transparent" radius={[4, 4, 0, 0]}>
                     <LabelList 
                         dataKey="total_plan" 
                         position="top" 
                         className="fill-foreground text-[10px] font-black"
-                        formatter={(val: number) => val > 0 ? `${val}${unit}` : ''}
+                        formatter={(val: number) => val > 0 ? `${val.toFixed(1)}${unit}` : ''}
                     />
                   </Bar>
-                  
-                  <Bar dataKey="real_t1" stackId="realizado" name="1º T" fill="#86efac" />
-                  <Bar dataKey="real_t2" stackId="realizado" name="2º T" fill="#22c55e" />
-                  <Bar dataKey="real_t3" stackId="realizado" name="3º T" fill="#15803d" radius={[4, 4, 0, 0]}>
+
+                  {lossOptions.map(opt => (
+                    <Bar key={`real_${opt.value}`} dataKey={`real_${opt.value}`} stackId="realizado" fill={opt.color} opacity={0.7} />
+                  ))}
+                  <Bar dataKey="spacer_real" stackId="realizado" fill="transparent" radius={[4, 4, 0, 0]}>
                     <LabelList 
                         dataKey="total_real" 
                         position="top" 
                         className="fill-green-500 text-[10px] font-black"
-                        formatter={(val: number) => val > 0 ? `${val}${unit}` : ''}
+                        formatter={(val: number) => val > 0 ? `${val.toFixed(1)}${unit}` : ''}
                     />
                   </Bar>
                 </>
@@ -323,7 +338,7 @@ export default function ProgrammingPage() {
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMetric, setViewMetric] = useState<'pieces' | 'operations'>('pieces');
+  const [viewMetric, setViewMetric] = useState<'pieces' | 'operations' | 'hours'>('pieces');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -348,6 +363,7 @@ export default function ProgrammingPage() {
       turno: '1',
       site: 'VALINHOS DOVE',
       observacao: '',
+      perdaPlanejada: 'PRODUCAO',
     },
   });
 
@@ -413,11 +429,29 @@ export default function ProgrammingPage() {
       const qtd = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
       const qtdReal = Number(item.quantidadeRealizada !== undefined ? item.quantidadeRealizada : item['Quantidade Realizada']) || 0;
       const ops = Number(item.operacoesPorPeca !== undefined ? item.operacoesPorPeca : (item['Operações por Peça'] || 1));
-      
+      const hours = typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
+        ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
+        : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0);
+
+      const typeRaw = (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase();
+      let type = 'PRODUCAO';
+      if (typeRaw.includes('SETUP')) type = 'SETUP';
+      else if (typeRaw.includes('DDS') || typeRaw.includes('ADM') || typeRaw.includes('APONTAMENTO')) type = 'DDS';
+      else if (typeRaw.includes('CAFÉ') || typeRaw.includes('CAFE')) type = 'CAFE';
+      else if (typeRaw.includes('LIMPEZA')) type = 'LIMPEZA';
+      else if (typeRaw.includes('INSPEÇÃO') || typeRaw.includes('QUALIDADE')) type = 'QUALIDADE';
+
       if (viewMetric === 'operations') {
-        return { plan: qtd * ops, real: qtdReal * ops };
+        return { plan: qtd * ops, real: qtdReal * ops, type };
       }
-      return { plan: qtd, real: qtdReal };
+      if (viewMetric === 'hours') {
+        // Assume for simplicity in realized hours planning vs actual hours that it matches planned if done, but user can add more fields if needed.
+        // For planning dashboard, we use planned hours as the baseline for both unless Realized is tracked separately.
+        // Let's use qtdReal/qtdPlan to scale hours if it's production.
+        const scale = qtd > 0 ? (qtdReal / qtd) : 1; 
+        return { plan: hours, real: hours * Math.min(1, scale), type };
+      }
+      return { plan: qtd, real: qtdReal, type };
     };
 
     if (isDayView) {
@@ -481,9 +515,8 @@ export default function ProgrammingPage() {
         label = format(date, 'MMM yy', { locale: ptBR });
       }
 
-      const { plan, real } = processItem(item);
+      const { plan, real, type } = processItem(item);
       const equip = String(item.equipamento || item.EQUIPAMENTO || '').toUpperCase();
-      const turno = String(item.Turno || '1');
 
       const targetMap = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurMap : 
                          (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
@@ -491,19 +524,15 @@ export default function ProgrammingPage() {
       if (targetMap) {
         if (!targetMap[key]) {
           targetMap[key] = { 
-            key, label, 
-            total_plan: 0, 
-            total_real: 0,
-            plan_t1: 0, plan_t2: 0, plan_t3: 0,
-            real_t1: 0, real_t2: 0, real_t3: 0
+            key, label, total_plan: 0, total_real: 0,
+            // Categories
+            ...lossOptions.reduce((acc, opt) => ({ ...acc, [`plan_${opt.value}`]: 0, [`real_${opt.value}`]: 0 }), {})
           };
         }
         targetMap[key].total_plan += plan;
         targetMap[key].total_real += real;
-
-        if (turno === '1') { targetMap[key].plan_t1 += plan; targetMap[key].real_t1 += real; }
-        else if (turno === '2') { targetMap[key].plan_t2 += plan; targetMap[key].real_t2 += real; }
-        else if (turno === '3') { targetMap[key].plan_t3 += plan; targetMap[key].real_t3 += real; }
+        targetMap[key][`plan_${type}`] += plan;
+        targetMap[key][`real_${type}`] += real;
       }
     });
 
@@ -535,6 +564,7 @@ export default function ProgrammingPage() {
       horasPlanejadas: 0,
       site: 'VALINHOS DOVE',
       observacao: '',
+      perdaPlanejada: 'PRODUCAO',
     });
     setIsDialogOpen(true);
   };
@@ -549,6 +579,14 @@ export default function ProgrammingPage() {
         try { itemDate = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { itemDate = new Date(dateStr); }
     }
     setSelectedDay(itemDate);
+
+    const typeRaw = (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase();
+    let initialType = 'PRODUCAO';
+    if (typeRaw.includes('SETUP')) initialType = 'SETUP';
+    else if (typeRaw.includes('DDS') || typeRaw.includes('ADM')) initialType = 'DDS';
+    else if (typeRaw.includes('CAFÉ') || typeRaw.includes('CAFE')) initialType = 'CAFE';
+    else if (typeRaw.includes('LIMPEZA')) initialType = 'LIMPEZA';
+    else if (typeRaw.includes('INSPEÇÃO') || typeRaw.includes('QUALIDADE')) initialType = 'QUALIDADE';
 
     form.reset({
       dataExecucao: dateStr || '',
@@ -565,6 +603,7 @@ export default function ProgrammingPage() {
         : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0),
       site: item.site || item.Site || 'VALINHOS DOVE',
       observacao: item.observacao || item.Observação || '',
+      perdaPlanejada: initialType,
     });
     setIsDialogOpen(true);
   };
@@ -585,6 +624,9 @@ export default function ProgrammingPage() {
   async function onSubmit(values: PlanningFormValues) {
     if (!database) return;
     try {
+      // Find the descriptive label for the loss selection
+      const lossLabel = lossOptions.find(o => o.value === values.perdaPlanejada)?.label || '';
+
       const payload = {
         dataExecucao: values.dataExecucao,
         equipamento: values.equipamento,
@@ -598,6 +640,7 @@ export default function ProgrammingPage() {
         turno: values.turno,
         site: values.site,
         observacao: values.observacao || '',
+        'Perdas planejadas': values.perdaPlanejada === 'PRODUCAO' ? '' : lossLabel.toUpperCase()
       };
 
       if (editingId) {
@@ -628,6 +671,14 @@ export default function ProgrammingPage() {
     const qtdReal = Number(item.quantidadeRealizada !== undefined ? item.quantidadeRealizada : item['Quantidade Realizada']) || 0;
     const ops = Number(item.operacoesPorPeca !== undefined ? item.operacoesPorPeca : (item['Operações por Peça'] || 1));
     const isCompleted = qtdReal >= qtdPlan && qtdPlan > 0;
+    
+    const typeRaw = (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase();
+    let badgeColor = "bg-primary";
+    if (typeRaw.includes('SETUP')) badgeColor = "bg-red-500";
+    else if (typeRaw.includes('DDS') || typeRaw.includes('ADM')) badgeColor = "bg-orange-500";
+    else if (typeRaw.includes('CAFÉ') || typeRaw.includes('CAFE')) badgeColor = "bg-yellow-500 text-black";
+    else if (typeRaw.includes('LIMPEZA')) badgeColor = "bg-green-500";
+    else if (typeRaw.includes('INSPEÇÃO') || typeRaw.includes('QUALIDADE')) badgeColor = "bg-blue-500";
 
     return (
       <TooltipProvider key={item.id}>
@@ -649,7 +700,7 @@ export default function ProgrammingPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between border-b pb-1">
                 <span className="font-bold text-sm">Req: {requisicao}</span>
-                <Badge variant={isCompleted ? "default" : "outline"} className={cn("text-[10px]", isCompleted && "bg-green-500 hover:bg-green-600")}>
+                <Badge className={cn("text-[10px]", badgeColor)}>
                     {isCompleted ? 'Finalizado' : site}
                 </Badge>
               </div>
@@ -736,15 +787,16 @@ export default function ProgrammingPage() {
       <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-8">
         <div className="space-y-1">
           <h2 className="text-xl font-bold tracking-tight">Gráficos de Consolidado</h2>
-          <p className="text-sm text-muted-foreground">Comparativo de performance por métrica de esforço.</p>
+          <p className="text-sm text-muted-foreground">Performance e alocação de tempo por tipo de atividade.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 bg-card p-3 rounded-lg border shadow-sm w-full sm:w-auto">
           <div className="flex items-center gap-2">
             <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Métrica:</Label>
             <Tabs value={viewMetric} onValueChange={(val: any) => setViewMetric(val)} className="h-8">
               <TabsList className="h-8">
-                <TabsTrigger value="pieces" className="text-[10px] font-bold px-3 py-1">PEÇAS</TabsTrigger>
-                <TabsTrigger value="operations" className="text-[10px] font-bold px-3 py-1">OPERAÇÕES</TabsTrigger>
+                <TabsTrigger value="pieces" className="text-[10px] font-bold px-2 py-1">PEÇAS</TabsTrigger>
+                <TabsTrigger value="operations" className="text-[10px] font-bold px-2 py-1">OPS</TabsTrigger>
+                <TabsTrigger value="hours" className="text-[10px] font-bold px-2 py-1 flex items-center gap-1"><Clock className="h-3 w-3" /> HORAS</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -806,6 +858,31 @@ export default function ProgrammingPage() {
                     </div><FormMessage />
                   </FormItem>
                 )} />
+
+              <FormField control={form.control} name="perdaPlanejada" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold">Tipo de Atividade / Perda Planejada</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="border-2">
+                        <SelectValue placeholder="Selecione o tipo de atividade" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {lossOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: opt.color }} />
+                            {opt.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="dataExecucao" render={({ field }) => (<FormItem><FormLabel>Data</FormLabel><FormControl><Input disabled {...field} className="bg-muted" /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="site" render={({ field }) => (<FormItem><FormLabel>Site/Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
