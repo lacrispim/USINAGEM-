@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -119,16 +120,13 @@ const normalizeFactoryName = (name: any): string => {
 
 const getCategoryKey = (reason: string): string => {
   const r = String(reason || '').toUpperCase().trim();
-  // Normalização: Usinagem e USINAGEM (e campos vazios) são tratados como PRODUCAO
   if (r === '' || r === 'USINAGEM' || r === 'PRODUCAO' || r === 'PRODUÇÃO') return 'PRODUCAO';
-  
   if (r.includes('SETUP')) return 'SETUP';
   if (r.includes('CAFÉ') || r.includes('CAFE')) return 'TEMPO DE CAFÉ';
   if (r.includes('LIMPEZA')) return 'LIMPEZA PLANEJADA';
   if (r.includes('DDS') || r.includes('ADM') || r.includes('APONTAMENTO')) return 'DDS, APONTAMENTO HORAS, ATIVIDADE ADM';
   if (r.includes('INSPEÇÃO') || r.includes('INSPECAO') || r.includes('QUALIDADE') || r.includes('VALIDAÇÃO')) return 'INSPEÇÃO & VALIDAÇÃO DAS PEÇAS';
   if (r.includes('MANUTENÇÃO') || r.includes('MANUTENCAO')) return 'MANUTENÇÃO PLANEJADA';
-  
   return r;
 };
 
@@ -264,6 +262,10 @@ export default function RecordsPage() {
 
   const lossCategoryFilter = (record: any, isPlanning: boolean) => {
     if (selectedLossReason === 'all') return true;
+    
+    if (isPlanning && record.atividades && Array.isArray(record.atividades)) {
+        return record.atividades.some((a: any) => getCategoryKey(a.tipo) === selectedLossReason);
+    }
 
     const rawReason = (isPlanning ? (record['Perdas planejadas'] || '') : (record.lossReason || '')).toUpperCase();
     const category = getCategoryKey(rawReason);
@@ -336,19 +338,33 @@ export default function RecordsPage() {
 
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record['Site']);
-      const machineHours = typeof record['Horas Máquina'] === 'string' 
-        ? parseFloat(record['Horas Máquina'].replace(',', '.')) 
-        : (Number(record['Horas Máquina']) || 0);
-      
-      if (isNaN(machineHours)) return;
-
       const d = getOrCreate(factory);
-      const rawReason = String(record['Perdas planejadas'] || '').toUpperCase().trim();
-      const catKey = getCategoryKey(rawReason);
-      
-      const key = `plan_${catKey}`;
-      d[key] = (d[key] || 0) + machineHours;
-      d.totalPlanejado += machineHours;
+
+      if (record.atividades && Array.isArray(record.atividades)) {
+        record.atividades.forEach((ativ: any) => {
+          const catKey = getCategoryKey(ativ.tipo);
+          if (selectedLossReason === 'all' || catKey === selectedLossReason) {
+            const time = Number(ativ.tempo) || 0;
+            const key = `plan_${catKey}`;
+            d[key] = (d[key] || 0) + time;
+            d.totalPlanejado += time;
+          }
+        });
+      } else {
+        const machineHours = typeof record['Horas Máquina'] === 'string' 
+          ? parseFloat(record['Horas Máquina'].replace(',', '.')) 
+          : (Number(record['Horas Máquina']) || 0);
+        
+        if (!isNaN(machineHours)) {
+          const rawReason = String(record['Perdas planejadas'] || '').toUpperCase().trim();
+          const catKey = getCategoryKey(rawReason);
+          if (selectedLossReason === 'all' || catKey === selectedLossReason) {
+            const key = `plan_${catKey}`;
+            d[key] = (d[key] || 0) + machineHours;
+            d.totalPlanejado += machineHours;
+          }
+        }
+      }
     });
     
     operatorFilteredProductionRecords.forEach(record => {
@@ -381,51 +397,13 @@ export default function RecordsPage() {
       }
   }).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
 
-  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords]);
-
+  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords, selectedLossReason]);
 
   useEffect(() => {
     setSelectedMonth('all');
     setSelectedWeek('all');
     setSelectedDate(undefined);
   }, [selectedYear]);
-
-   useEffect(() => {
-    if (selectedMonth !== 'all') {
-      setSelectedWeek('all');
-      setSelectedDate(undefined);
-    }
-  }, [selectedMonth]);
-
-  useEffect(() => {
-    if (selectedWeek !== 'all') {
-      setSelectedMonth('all');
-      setSelectedDate(undefined);
-    }
-  }, [selectedWeek]);
-  
-  useEffect(() => {
-    if (selectedDate) {
-      setSelectedMonth('all');
-      setSelectedWeek('all');
-      const year = getYear(selectedDate);
-      if (selectedYear && String(year) !== selectedYear) setSelectedYear(String(year));
-    }
-  }, [selectedDate, selectedYear]);
-
-  const totalHoursData = useMemo(() => {
-    const totalMachiningMinutes = (operatorFilteredProductionRecords || []).reduce(
-      (sum, record) => sum + (Number(record.machiningTime) || 0),
-      0
-    );
-    const totalLostMinutes = (operatorFilteredLossRecords || []).reduce(
-      (sum, record) => sum + (Number(record.timeLost) || 0),
-      0
-    );
-    const totalMinutes = totalMachiningMinutes + totalLostMinutes;
-    const totalHours = totalMinutes / 60;
-    return { totalHours: totalHours.toFixed(1) };
-  }, [operatorFilteredProductionRecords, operatorFilteredLossRecords]);
 
   const isLoading = loadingProduction || loadingLoss || !isClient;
 
@@ -454,7 +432,7 @@ export default function RecordsPage() {
             <Hourglass className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {isLoading ? <Loader className="animate-spin" /> : <div className="text-2xl font-bold">{totalHoursData.totalHours}h</div>}
+            {isLoading ? <Loader className="animate-spin" /> : <div className="text-2xl font-bold">{((operatorFilteredProductionRecords.reduce((s,r) => s + (Number(r.machiningTime)||0), 0) + operatorFilteredLossRecords.reduce((s,r) => s + (Number(r.timeLost)||0), 0))/60).toFixed(1)}h</div>}
           </CardContent>
         </Card>
         <Card>
@@ -550,8 +528,7 @@ export default function RecordsPage() {
                   </SelectContent>
               </Select>
           </div>
-          {(selectedDate || selectedYear !== String(new Date().getFullYear()) || selectedMonth !== 'all' || selectedWeek !== 'all' || (selectedOperator && selectedOperator !== 'all') || selectedLossReason !== 'all') && (
-            <div className="flex items-end pb-0.5">
+          <div className="flex items-end pb-0.5">
                <Button variant="ghost" size="sm" onClick={() => {
                   setSelectedYear(String(new Date().getFullYear()));
                   setSelectedMonth('all');
@@ -560,15 +537,14 @@ export default function RecordsPage() {
                   setSelectedOperator('all');
                   setSelectedLossReason('all');
                   setSelectedFactory(null);
-               }} className="h-8 text-[10px] font-black uppercase tracking-widest text-destructive hover:text-destructive hover:bg-destructive/10">Limpar</Button>
-            </div>
-          )}
+               }} className="h-8 text-[10px] font-black uppercase tracking-widest text-destructive">Limpar</Button>
+          </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Planejado vs Realizado por Técnico</CardTitle>
-          <CardDescription>Comparativo de horas planejadas (Plan) e realizadas (Real) por operador. Clique na barra para filtrar.</CardDescription>
+          <CardDescription>Comparativo de horas planejadas (Plan) e realizadas (Real) por operador.</CardDescription>
         </CardHeader>
         <CardContent>
           <OperatorPerformanceChart 
@@ -584,16 +560,9 @@ export default function RecordsPage() {
 
       <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
       
-      <OeeLossWaterfallChart 
-        productionData={operatorFilteredProductionRecords}
-        lossData={operatorFilteredLossRecords}
-        loading={isLoading}
-      />
-
+      <OeeLossWaterfallChart productionData={operatorFilteredProductionRecords} lossData={operatorFilteredLossRecords} loading={isLoading} />
       <DailyPdlMplLossChart lossData={operatorFilteredLossRecords} loading={isLoading} />
-
       <MonthlyOeeEvolutionChart loading={isLoading} />
-      
       <StatusByFormChart data={operatorFilteredProductionRecords} loading={isLoading} />
       
       <Card>
