@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -18,6 +19,7 @@ import {
   PlusCircle,
   CalendarIcon,
   User,
+  Filter,
 } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useDatabase } from '@/firebase';
 import { ref, onValue } from 'firebase/database';
@@ -56,6 +58,17 @@ const months = [
     { value: '9', label: 'Outubro' },
     { value: '10', label: 'Novembro' },
     { value: '11', label: 'Dezembro' },
+];
+
+const lossCategories = [
+  { value: 'PRODUCAO', label: 'Produção' },
+  { value: 'SETUP', label: 'Setup' },
+  { value: 'DDS', label: 'DDS/ADM' },
+  { value: 'CAFE', label: 'Café' },
+  { value: 'LIMPEZA', label: 'Limpeza' },
+  { value: 'QUALIDADE', label: 'Qualidade' },
+  { value: 'MANUTENCAO', label: 'Manutenção' },
+  { value: 'OUTROS', label: 'Outras Perdas' },
 ];
 
 const operatorList = [
@@ -108,6 +121,7 @@ export default function RecordsPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
+  const [selectedLossReason, setSelectedLossReason] = useState<string>('all');
 
   const [planejamentoData, setPlanejamentoData] = useState<any[]>([]);
   const [loadingPlanejamento, setLoadingPlanejamento] = useState(true);
@@ -225,6 +239,24 @@ export default function RecordsPage() {
     const normalizedOp = normalizeOperatorName(rawOp);
     return normalizedOp === selectedOperator || normalizedOp.includes(selectedOperator);
   };
+
+  const lossCategoryFilter = (record: any, isPlanning: boolean) => {
+    if (selectedLossReason === 'all') return true;
+
+    let category = '';
+    const rawReason = (isPlanning ? (record['Perdas planejadas'] || '') : (record.lossReason || '')).toUpperCase();
+
+    if (isPlanning && rawReason === '') category = 'PRODUCAO';
+    else if (rawReason.includes('SETUP')) category = 'SETUP';
+    else if (rawReason.includes('DDS') || rawReason.includes('ADM') || rawReason.includes('APONTAMENTO') || rawReason.includes('HORAS')) category = 'DDS';
+    else if (rawReason.includes('CAFÉ') || rawReason.includes('CAFE')) category = 'CAFE';
+    else if (rawReason.includes('LIMPEZA')) category = 'LIMPEZA';
+    else if (rawReason.includes('INSPEÇÃO') || rawReason.includes('QUALIDADE') || rawReason.includes('VALIDAÇÃO')) category = 'QUALIDADE';
+    else if (rawReason.includes('MANUTENÇÃO') || rawReason.includes('MANUTENCAO')) category = 'MANUTENCAO';
+    else category = 'OUTROS';
+
+    return category === selectedLossReason;
+  };
   
   const handleOperatorToggle = (op: string | null) => {
     if (selectedOperator === op) {
@@ -260,19 +292,22 @@ export default function RecordsPage() {
           const normalizedSite = normalizeFactoryName(record['Site']);
           const factoryMatch = !selectedFactory || normalizedSite === selectedFactory;
           if (!factoryMatch) return false;
-          return operatorFilter(record);
+          if (!operatorFilter(record)) return false;
+          return lossCategoryFilter(record, true);
       });
-  }, [planejamentoData, selectedDate, selectedYear, selectedMonth, selectedWeek, selectedFactory, selectedOperator]);
+  }, [planejamentoData, selectedDate, selectedYear, selectedMonth, selectedWeek, selectedFactory, selectedOperator, selectedLossReason]);
 
   const operatorFilteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
+    // Production records are implicitly 'PRODUCAO'
+    if (selectedLossReason !== 'all' && selectedLossReason !== 'PRODUCAO') return [];
     return productionRecords.filter(operatorFilter);
-  }, [productionRecords, selectedOperator]);
+  }, [productionRecords, selectedOperator, selectedLossReason]);
 
   const operatorFilteredLossRecords = useMemo(() => {
     if (!lossRecords) return [];
-    return lossRecords.filter(operatorFilter);
-  }, [lossRecords, selectedOperator]);
+    return lossRecords.filter(record => operatorFilter(record) && lossCategoryFilter(record, false));
+  }, [lossRecords, selectedOperator, selectedLossReason]);
 
   const plannedVsMachinedData = useMemo(() => {
     const dataMap: { [factory: string]: any } = {};
@@ -453,59 +488,92 @@ export default function RecordsPage() {
         </Card>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-start gap-2">
-          <div className="grid w-full sm:max-[120px] gap-1.5">
-              <Label htmlFor="year-filter">Ano</Label>
+      <div className="flex flex-col sm:flex-row justify-start gap-2 bg-card p-3 rounded-lg border shadow-sm">
+          <div className="grid w-full sm:max-w-[100px] gap-1.5">
+              <Label htmlFor="year-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Ano</Label>
               <Select value={selectedYear || 'all'} onValueChange={setSelectedYear}>
-                  <SelectTrigger id="year-filter"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="year-filter" className="h-8 text-xs font-bold"><SelectValue /></SelectTrigger>
                   <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
                       {availableYears.map(year => <SelectItem key={year} value={String(year)}>{year}</SelectItem>)}
                   </SelectContent>
               </Select>
           </div>
-          <div className="grid w-full sm:max-[120px] gap-1.5">
-              <Label htmlFor="month-filter">Mês</Label>
+          <div className="grid w-full sm:max-w-[110px] gap-1.5">
+              <Label htmlFor="month-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mês</Label>
               <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={!selectedYear || selectedYear === 'all' || !!selectedDate || selectedWeek !== 'all'}>
-                  <SelectTrigger id="month-filter"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="month-filter" className="h-8 text-xs font-bold"><SelectValue /></SelectTrigger>
                   <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
                       {months.map(month => <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>)}
                   </SelectContent>
               </Select>
           </div>
-          <div className="grid w-full sm:max-[150px] gap-1.5">
-              <Label htmlFor="week-filter">Semana</Label>
+          <div className="grid w-full sm:max-w-[120px] gap-1.5">
+              <Label htmlFor="week-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Semana</Label>
               <Select value={selectedWeek} onValueChange={setSelectedWeek} disabled={!selectedYear || selectedYear === 'all' || !!selectedDate || selectedMonth !== 'all'}>
-                  <SelectTrigger id="week-filter"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="week-filter" className="h-8 text-xs font-bold"><SelectValue /></SelectTrigger>
                   <SelectContent>
                       <SelectItem value="all">Todas</SelectItem>
                       {availableWeeks.map(week => <SelectItem key={week} value={String(week)}>Semana {week}</SelectItem>)}
                   </SelectContent>
               </Select>
           </div>
-          <div className="grid w-full sm:max-[180px] gap-1.5">
-              <Label htmlFor="date-filter">Dia</Label>
+          <div className="grid w-full sm:max-w-[140px] gap-1.5">
+              <Label htmlFor="date-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Dia</Label>
               <Popover>
                   <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione um dia</span>}
+                      <Button variant="outline" size="sm" className={cn("h-8 text-xs font-bold justify-start text-left", !selectedDate && "text-muted-foreground")}>
+                          <CalendarIcon className="mr-2 h-3 w-3" />
+                          {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecionar</span>}
                       </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus /></PopoverContent>
               </Popover>
           </div>
-          <div className="grid w-full sm:max-[200px] gap-1.5">
-              <Label htmlFor="operator-filter">Técnico</Label>
+          <div className="grid w-full sm:max-w-[160px] gap-1.5">
+              <Label htmlFor="operator-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Técnico</Label>
               <Select value={selectedOperator || 'all'} onValueChange={setSelectedOperator}>
-                  <SelectTrigger id="operator-filter"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="operator-filter" className="h-8 text-xs font-bold">
+                    <div className="flex items-center gap-2 truncate">
+                      <User className="h-3 w-3 text-muted-foreground" />
+                      <SelectValue />
+                    </div>
+                  </SelectTrigger>
                   <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
                       {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
                   </SelectContent>
               </Select>
           </div>
+          <div className="grid w-full sm:max-w-[160px] gap-1.5">
+              <Label htmlFor="loss-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Motivo / Categoria</Label>
+              <Select value={selectedLossReason} onValueChange={setSelectedLossReason}>
+                  <SelectTrigger id="loss-filter" className="h-8 text-xs font-bold">
+                    <div className="flex items-center gap-2 truncate">
+                      <Filter className="h-3 w-3 text-muted-foreground" />
+                      <SelectValue />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Todas Categorias</SelectItem>
+                      {lossCategories.map(cat => <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>)}
+                  </SelectContent>
+              </Select>
+          </div>
+          {(selectedDate || selectedYear !== String(new Date().getFullYear()) || selectedMonth !== 'all' || selectedWeek !== 'all' || (selectedOperator && selectedOperator !== 'all') || selectedLossReason !== 'all') && (
+            <div className="flex items-end pb-0.5">
+               <Button variant="ghost" size="sm" onClick={() => {
+                  setSelectedYear(String(new Date().getFullYear()));
+                  setSelectedMonth('all');
+                  setSelectedWeek('all');
+                  setSelectedDate(undefined);
+                  setSelectedOperator('all');
+                  setSelectedLossReason('all');
+                  setSelectedFactory(null);
+               }} className="h-8 text-[10px] font-black uppercase tracking-widest text-destructive hover:text-destructive hover:bg-destructive/10">Limpar</Button>
+            </div>
+          )}
       </div>
 
       <Card>
@@ -515,9 +583,9 @@ export default function RecordsPage() {
         </CardHeader>
         <CardContent>
           <OperatorPerformanceChart 
-            productionData={productionRecords || []}
-            lossData={lossRecords || []}
-            plannedData={filteredPlanejamentoData || []}
+            productionData={operatorFilteredProductionRecords}
+            lossData={operatorFilteredLossRecords}
+            plannedData={filteredPlanejamentoData}
             loading={isLoading}
             selectedOperator={selectedOperator}
             onOperatorSelect={handleOperatorToggle}
@@ -556,3 +624,4 @@ export default function RecordsPage() {
     </div>
   );
 }
+
