@@ -16,17 +16,12 @@ import {
   ChevronRight, 
   Loader, 
   Calendar as CalendarIcon,
-  Factory,
-  User,
   Plus,
   Trash2,
   Cpu,
   Settings2,
   CheckCircle2,
-  X,
-  Layers,
   Clock,
-  Filter,
   PlusCircle
 } from 'lucide-react';
 import { 
@@ -53,13 +48,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
 import {
@@ -68,7 +61,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
@@ -83,17 +75,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { 
   ResponsiveContainer, 
   BarChart,
@@ -103,14 +84,12 @@ import {
   CartesianGrid, 
   Tooltip as RechartsTooltip, 
   Legend,
-  LabelList,
-  Cell
+  LabelList
 } from 'recharts';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Checkbox } from '@/components/ui/checkbox';
 
 interface AtividadePlanejada {
   tipo: string;
@@ -200,50 +179,22 @@ const planningFormSchema = z.object({
   observacao: z.string().optional(),
   atividades: z.array(z.object({
     tipo: z.string().min(1, 'Tipo é obrigatório'),
-    tempo: z.coerce.number().min(0.01, 'Tempo deve ser maior que zero')
+    tempo: z.coerce.number().min(0, 'Tempo deve ser zero ou maior')
   })).min(1, 'Adicione pelo menos uma atividade'),
 });
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
-
-const CustomLegend = (props: any) => {
-  const { isDayView, metric, visibleLossTypes } = props;
-
-  const activeOptions = lossOptions.filter(opt => visibleLossTypes.includes(opt.value));
-
-  return (
-    <div className="flex flex-col gap-4 mt-6">
-      <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 items-center border-t pt-4">
-        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2">Categorias:</span>
-        {activeOptions.map((opt) => (
-           <div key={opt.value} className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: opt.color }} />
-            <span className="text-[9px] font-bold uppercase">{opt.label}</span>
-          </div>
-        ))}
-      </div>
-      <div className="flex justify-center gap-8">
-         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full border-2 border-muted-foreground" />
-          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Barra Esq: Plan | Barra Dir: Real</span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const PlanningChart = ({ 
   data, 
   title, 
   isDayView, 
   metric, 
-  visibleLossTypes 
 }: { 
   data: any[], 
   title: string, 
   isDayView: boolean, 
   metric: 'pieces' | 'operations' | 'hours',
-  visibleLossTypes: string[]
 }) => {
   if (!data || data.length === 0) return (
     <Card className="flex h-[300px] items-center justify-center border-dashed">
@@ -252,7 +203,6 @@ const PlanningChart = ({
   );
 
   const unit = metric === 'pieces' ? 'p' : metric === 'operations' ? 'op' : 'h';
-  const activeOptions = lossOptions.filter(opt => visibleLossTypes.includes(opt.value));
   
   return (
     <Card>
@@ -263,9 +213,9 @@ const PlanningChart = ({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[500px] w-full">
+        <div className="h-[400px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barGap={isDayView ? 12 : 6} margin={{ top: 30, right: 30, left: 10, bottom: 80 }}>
+            <BarChart data={data} barGap={8} margin={{ top: 30, right: 30, left: 10, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
               <XAxis 
                 dataKey="label" 
@@ -286,28 +236,33 @@ const PlanningChart = ({
                 itemStyle={{ fontSize: '12px' }}
                 formatter={(val: number) => [`${val.toFixed(1)} ${unit}`, '']}
               />
-              <Legend content={<CustomLegend isDayView={isDayView} metric={metric} visibleLossTypes={visibleLossTypes} />} verticalAlign="bottom" />
+              <Legend verticalAlign="bottom" height={36}/>
               
-              {activeOptions.map(opt => (
-                <Bar key={`plan_${opt.value}`} dataKey={`plan_${opt.value}`} stackId="planejado" fill={opt.color} />
-              ))}
-              <Bar dataKey="spacer_plan" stackId="planejado" fill="transparent" radius={[4, 4, 0, 0]}>
+              <Bar 
+                name="Planejado" 
+                dataKey="total_plan" 
+                fill="#6b7280" 
+                opacity={0.6} 
+                radius={[4, 4, 0, 0]}
+              >
                 <LabelList 
                     dataKey="total_plan" 
                     position="top" 
-                    className="fill-foreground text-[10px] font-black"
+                    className="fill-muted-foreground text-[10px] font-black"
                     formatter={(val: number) => val > 0 ? `${val.toFixed(1)}${unit}` : ''}
                 />
               </Bar>
 
-              {activeOptions.map(opt => (
-                <Bar key={`real_${opt.value}`} dataKey={`real_${opt.value}`} stackId="realizado" fill={opt.color} opacity={0.7} />
-              ))}
-              <Bar dataKey="spacer_real" stackId="realizado" fill="transparent" radius={[4, 4, 0, 0]}>
+              <Bar 
+                name="Realizado" 
+                dataKey="total_real" 
+                fill="#a855f7" 
+                radius={[4, 4, 0, 0]}
+              >
                 <LabelList 
                     dataKey="total_real" 
                     position="top" 
-                    className="fill-green-500 text-[10px] font-black"
+                    className="fill-foreground text-[10px] font-black"
                     formatter={(val: number) => val > 0 ? `${val.toFixed(1)}${unit}` : ''}
                 />
               </Bar>
@@ -326,7 +281,6 @@ export default function ProgrammingPage() {
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewMetric, setViewMetric] = useState<'pieces' | 'operations' | 'hours'>('pieces');
-  const [visibleLossTypes, setVisibleLossTypes] = useState<string[]>(lossOptions.map(o => o.value));
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -425,87 +379,50 @@ export default function ProgrammingPage() {
     });
   };
 
-  const toggleLossType = (type: string) => {
-    setVisibleLossTypes(prev => 
-      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-    );
-  };
-
   const { chartData, isDayView: calculatedIsDayView } = useMemo(() => {
     const isDayView = !!selectedDateFilter;
 
-    const processItemToActivities = (item: PlanejamentoItem) => {
-      const results: { plan: number, real: number, type: string }[] = [];
+    const calculateItemVolumes = (item: PlanejamentoItem) => {
+      let plan = 0, real = 0;
       const qtd = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
       const qtdReal = Number(item.quantidadeRealizada !== undefined ? item.quantidadeRealizada : item['Quantidade Realizada']) || 0;
       const ops = Number(item.operacoesPorPeca !== undefined ? item.operacoesPorPeca : (item['Operações por Peça'] || 1));
       const scale = qtd > 0 ? (qtdReal / qtd) : (qtdReal > 0 ? 1 : 0);
 
-      if (item.atividades && Array.isArray(item.atividades)) {
-        item.atividades.forEach(ativ => {
-          const type = ativ.tipo.toUpperCase().includes('SETUP') ? 'SETUP' :
-                       ativ.tipo.toUpperCase().includes('DDS') || ativ.tipo.toUpperCase().includes('ADM') ? 'DDS' :
-                       ativ.tipo.toUpperCase().includes('CAFÉ') || ativ.tipo.toUpperCase().includes('CAFE') ? 'CAFE' :
-                       ativ.tipo.toUpperCase().includes('LIMPEZA') ? 'LIMPEZA' :
-                       ativ.tipo.toUpperCase().includes('QUALIDADE') || ativ.tipo.toUpperCase().includes('INSPEÇÃO') ? 'QUALIDADE' : 'PRODUCAO';
-
-          if (!visibleLossTypes.includes(type)) return;
-
-          let planVal = 0, realVal = 0;
-          if (viewMetric === 'pieces') {
-            planVal = type === 'PRODUCAO' ? qtd : 0;
-            realVal = type === 'PRODUCAO' ? qtdReal : 0;
-          } else if (viewMetric === 'operations') {
-            planVal = type === 'PRODUCAO' ? qtd * ops : 0;
-            realVal = type === 'PRODUCAO' ? qtdReal * ops : 0;
-          } else { // hours
-            planVal = Number(ativ.tempo) || 0;
-            realVal = planVal * Math.min(1, scale);
-          }
-          results.push({ plan: planVal, real: realVal, type });
-        });
-      } else {
-        // Fallback for legacy data
-        const typeRaw = (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase();
-        let type = 'PRODUCAO';
-        if (typeRaw.includes('SETUP')) type = 'SETUP';
-        else if (typeRaw.includes('DDS') || typeRaw.includes('ADM')) type = 'DDS';
-        else if (typeRaw.includes('CAFÉ') || typeRaw.includes('CAFE')) type = 'CAFE';
-        else if (typeRaw.includes('LIMPEZA')) type = 'LIMPEZA';
-        else if (typeRaw.includes('QUALIDADE')) type = 'QUALIDADE';
-
-        if (visibleLossTypes.includes(type)) {
-          let planVal = 0, realVal = 0;
-          const machineHours = typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
-            ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
-            : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0);
-
-          if (viewMetric === 'pieces') {
-            planVal = type === 'PRODUCAO' ? qtd : 0;
-            realVal = type === 'PRODUCAO' ? qtdReal : 0;
-          } else if (viewMetric === 'operations') {
-            planVal = type === 'PRODUCAO' ? qtd * ops : 0;
-            realVal = type === 'PRODUCAO' ? qtdReal * ops : 0;
-          } else {
-            planVal = machineHours;
-            realVal = planVal * Math.min(1, scale);
-          }
-          results.push({ plan: planVal, real: realVal, type });
+      if (viewMetric === 'pieces') {
+        plan = qtd;
+        real = qtdReal;
+      } else if (viewMetric === 'operations') {
+        plan = qtd * ops;
+        real = qtdReal * ops;
+      } else { // hours
+        if (item.atividades && Array.isArray(item.atividades)) {
+            item.atividades.forEach(ativ => {
+                const pTime = Number(ativ.tempo) || 0;
+                plan += pTime;
+                real += pTime * Math.min(1, scale);
+            });
+        } else {
+            const h = typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
+                ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
+                : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0);
+            plan = h;
+            real = h * Math.min(1, scale);
         }
       }
-      return results;
+      return { plan, real };
     };
 
     if (isDayView) {
       const centurTurns = [
-        { label: '1º Turno', total_plan: 0, total_real: 0, ...lossOptions.reduce((acc, opt) => ({ ...acc, [`plan_${opt.value}`]: 0, [`real_${opt.value}`]: 0 }), {}) },
-        { label: '2º Turno', total_plan: 0, total_real: 0, ...lossOptions.reduce((acc, opt) => ({ ...acc, [`plan_${opt.value}`]: 0, [`real_${opt.value}`]: 0 }), {}) },
-        { label: '3º Turno', total_plan: 0, total_real: 0, ...lossOptions.reduce((acc, opt) => ({ ...acc, [`plan_${opt.value}`]: 0, [`real_${opt.value}`]: 0 }), {}) }
+        { label: '1º TURNO', total_plan: 0, total_real: 0 },
+        { label: '2º TURNO', total_plan: 0, total_real: 0 },
+        { label: '3º TURNO', total_plan: 0, total_real: 0 }
       ];
       const centroTurns = [
-        { label: '1º Turno', total_plan: 0, total_real: 0, ...lossOptions.reduce((acc, opt) => ({ ...acc, [`plan_${opt.value}`]: 0, [`real_${opt.value}`]: 0 }), {}) },
-        { label: '2º Turno', total_plan: 0, total_real: 0, ...lossOptions.reduce((acc, opt) => ({ ...acc, [`plan_${opt.value}`]: 0, [`real_${opt.value}`]: 0 }), {}) },
-        { label: '3º Turno', total_plan: 0, total_real: 0, ...lossOptions.reduce((acc, opt) => ({ ...acc, [`plan_${opt.value}`]: 0, [`real_${opt.value}`]: 0 }), {}) }
+        { label: '1º TURNO', total_plan: 0, total_real: 0 },
+        { label: '2º TURNO', total_plan: 0, total_real: 0 },
+        { label: '3º TURNO', total_plan: 0, total_real: 0 }
       ];
 
       planejamentoData.forEach(item => {
@@ -515,19 +432,15 @@ export default function ProgrammingPage() {
         try { date = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { date = new Date(dateStr); }
         if (isNaN(date.getTime()) || !isSameDay(date, selectedDateFilter!)) return;
 
-        const activities = processItemToActivities(item);
+        const volumes = calculateItemVolumes(item);
         const equip = String(item.equipamento || item.EQUIPAMENTO || '').toUpperCase();
         const turnoIndex = (parseInt(String(item.Turno || '1')) || 1) - 1;
         const targetArr = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurTurns : 
                            (equip.includes('CENTRO') || equip.includes('D600')) ? centroTurns : null;
 
         if (targetArr && turnoIndex >= 0 && turnoIndex < 3) {
-          activities.forEach(ativ => {
-            targetArr[turnoIndex][`plan_${ativ.type}`] += ativ.plan;
-            targetArr[turnoIndex][`real_${ativ.type}`] += ativ.real;
-            targetArr[turnoIndex].total_plan += ativ.plan;
-            targetArr[turnoIndex].total_real += ativ.real;
-          });
+            targetArr[turnoIndex].total_plan += volumes.plan;
+            targetArr[turnoIndex].total_real += volumes.real;
         }
       });
 
@@ -548,27 +461,23 @@ export default function ProgrammingPage() {
       let key = selectedWeekFilter !== 'all' ? format(date, 'yyyy-MM-dd') : format(date, 'yyyy-MM');
       let label = selectedWeekFilter !== 'all' ? format(date, 'dd/MM', { locale: ptBR }) : format(date, 'MMM yy', { locale: ptBR });
 
-      const activities = processItemToActivities(item);
+      const volumes = calculateItemVolumes(item);
       const equip = String(item.equipamento || item.EQUIPAMENTO || '').toUpperCase();
       const targetMap = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurMap : 
                          (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
 
       if (targetMap) {
         if (!targetMap[key]) {
-          targetMap[key] = { key, label, total_plan: 0, total_real: 0, ...lossOptions.reduce((acc, opt) => ({ ...acc, [`plan_${opt.value}`]: 0, [`real_${opt.value}`]: 0 }), {}) };
+          targetMap[key] = { key, label, total_plan: 0, total_real: 0 };
         }
-        activities.forEach(ativ => {
-          targetMap[key][`plan_${ativ.type}`] += ativ.plan;
-          targetMap[key][`real_${ativ.type}`] += ativ.real;
-          targetMap[key].total_plan += ativ.plan;
-          targetMap[key].total_real += ativ.real;
-        });
+        targetMap[key].total_plan += volumes.plan;
+        targetMap[key].total_real += volumes.real;
       }
     });
 
     const sortFn = (a: any, b: any) => a.key.localeCompare(b.key);
     return { chartData: { centur: Object.values(centurMap).sort(sortFn), centro: Object.values(centroMap).sort(sortFn) }, isDayView: false };
-  }, [planejamentoData, selectedWeekFilter, selectedDateFilter, viewMetric, visibleLossTypes]);
+  }, [planejamentoData, selectedWeekFilter, selectedDateFilter, viewMetric]);
 
   const handleShiftClick = (day: Date, turnoId: string) => {
     setEditingId(null);
@@ -771,19 +680,6 @@ export default function ProgrammingPage() {
             </TabsList>
           </Tabs>
           <Popover>
-            <PopoverTrigger asChild><Button variant="outline" size="sm" className="h-8 text-xs font-bold gap-2"><Filter className="h-3 w-3" />({visibleLossTypes.length})</Button></PopoverTrigger>
-            <PopoverContent className="w-56 p-3">
-                {lossOptions.map((opt) => (
-                  <div key={opt.value} className="flex items-center space-x-2 py-1">
-                    <Checkbox id={`f-${opt.value}`} checked={visibleLossTypes.includes(opt.value)} onCheckedChange={() => toggleLossType(opt.value)} />
-                    <label htmlFor={`f-${opt.value}`} className="text-[10px] font-bold uppercase cursor-pointer flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: opt.color }} />{opt.label}
-                    </label>
-                  </div>
-                ))}
-            </PopoverContent>
-          </Popover>
-          <Popover>
               <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className={cn("h-8 text-xs font-bold", !selectedDateFilter && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-3 w-3" />{selectedDateFilter ? format(selectedDateFilter, "dd/MM/yyyy") : "Dia"}
@@ -802,8 +698,8 @@ export default function ProgrammingPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <PlanningChart data={chartData.centur} title="Torno Centur 30" isDayView={calculatedIsDayView} metric={viewMetric} visibleLossTypes={visibleLossTypes} />
-        <PlanningChart data={chartData.centro} title="Centro D600" isDayView={calculatedIsDayView} metric={viewMetric} visibleLossTypes={visibleLossTypes} />
+        <PlanningChart data={chartData.centur} title="Torno Centur 30" isDayView={calculatedIsDayView} metric={viewMetric} />
+        <PlanningChart data={chartData.centro} title="Centro D600" isDayView={calculatedIsDayView} metric={viewMetric} />
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -830,7 +726,7 @@ export default function ProgrammingPage() {
               <div className="space-y-4 rounded-lg border p-4 bg-muted/20">
                 <div className="flex items-center justify-between">
                     <Label className="font-bold uppercase text-[10px] tracking-widest text-primary">Atividades / Perdas Planejadas</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={() => append({ tipo: 'PRODUCAO', tempo: 0 })} className="h-7 text-[10px] font-bold"><PlusCircle className="h-3 w-3 mr-1" /> ADICIONAR PERDA</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ tipo: 'PRODUCAO', tempo: 0 })} className="h-7 text-[10px] font-bold"><PlusCircle className="h-3 w-3 mr-1" /> ADICIONAR ATIVIDADE</Button>
                 </div>
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex gap-3 items-end border-b pb-3 last:border-0 last:pb-0">
