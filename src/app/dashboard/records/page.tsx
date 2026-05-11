@@ -62,13 +62,21 @@ const months = [
 
 const lossCategories = [
   { value: 'PRODUCAO', label: 'Produção' },
+  { value: 'MANUTENÇÃO PLANEJADA', label: 'Manutenção Planejada' },
+  { value: 'TEMPO DE CAFÉ', label: 'Tempo de Café' },
+  { value: 'LIMPEZA PLANEJADA', label: 'Limpeza Planejada' },
   { value: 'SETUP', label: 'Setup' },
-  { value: 'DDS', label: 'DDS/ADM' },
-  { value: 'CAFE', label: 'Café' },
-  { value: 'LIMPEZA', label: 'Limpeza' },
-  { value: 'QUALIDADE', label: 'Qualidade' },
-  { value: 'MANUTENCAO', label: 'Manutenção' },
-  { value: 'OUTROS', label: 'Outras Perdas' },
+  { value: 'DDS, APONTAMENTO HORAS, ATIVIDADE ADM', label: 'Atividades ADM' },
+  { value: 'INSPEÇÃO & VALIDAÇÃO DAS PEÇAS', label: 'Qualidade / Inspeção' },
+  { value: 'QUEBRA', label: 'Quebra' },
+  { value: 'FALHA DE PROCESSO', label: 'Falha de Processo' },
+  { value: 'ABSENTEÍSMO', label: 'Absenteísmo' },
+  { value: 'FALTA DE MATERIAL & FERRAMENTA', label: 'Falta Material/Ferr.' },
+  { value: 'MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS', label: 'Movimentação' },
+  { value: 'PEQUENAS PARADAS', label: 'Pequenas Paradas' },
+  { value: 'AJUSTES CORRETIVOS DE PROCESSOS', label: 'Ajustes Corretivos' },
+  { value: 'VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)', label: 'Velocidade Reduzida' },
+  { value: 'RETRABALHO', label: 'Retrabalho' },
 ];
 
 const operatorList = [
@@ -115,13 +123,12 @@ const getCategoryKey = (reason: string): string => {
   if (r === '') return 'PRODUCAO';
   
   if (r.includes('SETUP')) return 'SETUP';
-  if (r.includes('CAFÉ') || r.includes('CAFE')) return 'CAFE';
-  if (r.includes('LIMPEZA')) return 'LIMPEZA';
-  if (r.includes('DDS') || r.includes('ADM') || r.includes('APONTAMENTO')) return 'DDS';
-  if (r.includes('INSPEÇÃO') || r.includes('INSPECAO') || r.includes('QUALIDADE') || r.includes('VALIDAÇÃO')) return 'QUALIDADE';
-  if (r.includes('MANUTENÇÃO') || r.includes('MANUTENCAO')) return 'MANUTENCAO';
+  if (r.includes('CAFÉ') || r.includes('CAFE')) return 'TEMPO DE CAFÉ';
+  if (r.includes('LIMPEZA')) return 'LIMPEZA PLANEJADA';
+  if (r.includes('DDS') || r.includes('ADM') || r.includes('APONTAMENTO')) return 'DDS, APONTAMENTO HORAS, ATIVIDADE ADM';
+  if (r.includes('INSPEÇÃO') || r.includes('INSPECAO') || r.includes('QUALIDADE') || r.includes('VALIDAÇÃO')) return 'INSPEÇÃO & VALIDAÇÃO DAS PEÇAS';
+  if (r.includes('MANUTENÇÃO') || r.includes('MANUTENCAO')) return 'MANUTENÇÃO PLANEJADA';
   
-  // Retorna a string original para qualquer outro motivo, para que apareça de forma exata no gráfico
   return r;
 };
 
@@ -261,12 +268,6 @@ export default function RecordsPage() {
     const rawReason = (isPlanning ? (record['Perdas planejadas'] || '') : (record.lossReason || '')).toUpperCase();
     const category = getCategoryKey(rawReason);
 
-    // Se o filtro selecionado for "OUTROS", deve mostrar qualquer coisa que não seja as categorias principais
-    if (selectedLossReason === 'OUTROS') {
-      const mainCategories = ['PRODUCAO', 'SETUP', 'DDS', 'CAFE', 'LIMPEZA', 'QUALIDADE', 'MANUTENCAO'];
-      return !mainCategories.includes(category);
-    }
-
     return category === selectedLossReason;
   };
   
@@ -311,7 +312,6 @@ export default function RecordsPage() {
 
   const operatorFilteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
-    // Filtra produção apenas se o filtro global for 'all' ou 'PRODUCAO'
     if (selectedLossReason !== 'all' && selectedLossReason !== 'PRODUCAO') return [];
     return productionRecords.filter(operatorFilter);
   }, [productionRecords, selectedOperator, selectedLossReason]);

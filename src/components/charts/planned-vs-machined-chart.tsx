@@ -28,17 +28,20 @@ interface PlannedVsMachinedChartProps {
 const CATEGORY_STYLES: Record<string, { label: string; color: string }> = {
     'PRODUCAO': { label: 'Usinagem', color: '#ffffff' },
     'SETUP': { label: 'Setup', color: '#ef4444' },
-    'DDS': { label: 'DDS/ADM', color: '#f97316' },
-    'CAFE': { label: 'Parada para Café', color: '#eab308' },
-    'LIMPEZA': { label: 'Limpeza Planejada', color: '#22c55e' },
-    'QUALIDADE': { label: 'Qualidade/Inspeção', color: '#3b82f6' },
-    'MANUTENCAO': { label: 'Manutenção', color: '#7c3aed' },
-    // Mapeamento de strings longas comuns do formulário para labels mais limpas
-    'MANUTENÇÃO PLANEJADA': { label: 'Manutenção Planejada', color: '#7c3aed' },
-    'TEMPO DE CAFÉ': { label: 'Tempo de Café', color: '#eab308' },
-    'LIMPEZA PLANEJADA': { label: 'Limpeza Planejada', color: '#22c55e' },
-    'DDS, APONTAMENTO HORAS, ATIVIDADE ADM': { label: 'DDS/ADM', color: '#f97316' },
-    'INSPEÇÃO & VALIDAÇÃO DAS PEÇAS': { label: 'Inspeção/Qualidade', color: '#3b82f6' },
+    'TEMPO DE CAFÉ': { label: 'Café', color: '#eab308' },
+    'LIMPEZA PLANEJADA': { label: 'Limpeza', color: '#22c55e' },
+    'DDS, APONTAMENTO HORAS, ATIVIDADE ADM': { label: 'Ativ. ADM', color: '#f97316' },
+    'INSPEÇÃO & VALIDAÇÃO DAS PEÇAS': { label: 'Qualidade', color: '#3b82f6' },
+    'MANUTENÇÃO PLANEJADA': { label: 'Manutenção', color: '#7c3aed' },
+    'QUEBRA': { label: 'Quebra', color: '#b91c1c' },
+    'FALHA DE PROCESSO': { label: 'Falha Proc.', color: '#451a03' },
+    'ABSENTEÍSMO': { label: 'Absenteísmo', color: '#4b5563' },
+    'FALTA DE MATERIAL & FERRAMENTA': { label: 'Falta Mat/Ferr', color: '#1e3a8a' },
+    'MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS': { label: 'Movimentação', color: '#064e3b' },
+    'PEQUENAS PARADAS': { label: 'Peq. Paradas', color: '#78350f' },
+    'AJUSTES CORRETIVOS DE PROCESSOS': { label: 'Ajustes', color: '#be185d' },
+    'VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)': { label: 'Vel. Reduzida', color: '#4c1d95' },
+    'RETRABALHO': { label: 'Retrabalho', color: '#111827' },
 };
 
 const DEFAULT_COLOR = '#6b7280'; // Cinza para motivos específicos não mapeados
@@ -167,7 +170,7 @@ export function PlannedVsMachinedChart({
   const CustomLegend = () => {
     return (
       <div className="flex items-center justify-center gap-x-4 gap-y-2 mt-4 flex-wrap max-w-5xl mx-auto border-t pt-4">
-        {dynamicCategories.length <= 10 ? (
+        {dynamicCategories.length <= 16 ? (
             dynamicCategories.map(cat => (
                 <div key={cat.key} className="flex items-center gap-1.5">
                  <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: cat.color}} />
@@ -192,7 +195,7 @@ export function PlannedVsMachinedChart({
             <div>
                 <CardTitle>Planejado vs Realizado</CardTitle>
                 <CardDescription>
-                Comparativo visual detalhado com todos os motivos reais de parada registrados.
+                Comparativo visual detalhado. Cada motivo de parada mantém a mesma cor em ambas as colunas.
                 </CardDescription>
             </div>
              {loading ? (
@@ -306,7 +309,7 @@ export function PlannedVsMachinedChart({
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="flex h-[450px] w-full flex-col items-center justify-center">
+          <div className="flex h-[350px] w-full flex-col items-center justify-center">
             <p className="text-sm text-muted-foreground">
               Nenhum dado para exibir o comparativo.
             </p>
