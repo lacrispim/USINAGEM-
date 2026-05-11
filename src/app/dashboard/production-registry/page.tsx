@@ -350,9 +350,9 @@ const ProductionFormContent = () => {
                             </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                            <SelectItem value="usinagem">USINAGEM</SelectItem>
-                            <SelectItem value="programacao">PROGRAMAÇÃO</SelectItem>
-                            <SelectItem value="primeira-peca">PRIMEIRA PEÇA</SelectItem>
+                            <SelectItem value="USINAGEM">USINAGEM</SelectItem>
+                            <SelectItem value="PROGRAMACAO">PROGRAMAÇÃO</SelectItem>
+                            <SelectItem value="PRIMEIRA PEÇA">PRIMEIRA PEÇA</SelectItem>
                             </SelectContent>
                         </Select>
                         <FormMessage />
@@ -1186,9 +1186,9 @@ export default function ProductionRegistryPage() {
                                   <Select value={editedRecord.activityType} onValueChange={(value) => handleSelectChange('activityType', value)}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="usinagem">USINAGEM</SelectItem>
-                                        <SelectItem value="programacao">PROGRAMAÇÃO</SelectItem>
-                                        <SelectItem value="primeira-peca">PRIMEIRA PEÇA</SelectItem>
+                                        <SelectItem value="USINAGEM">USINAGEM</SelectItem>
+                                        <SelectItem value="PROGRAMACAO">PROGRAMAÇÃO</SelectItem>
+                                        <SelectItem value="PRIMEIRA PEÇA">PRIMEIRA PEÇA</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </TableCell>
@@ -1230,7 +1230,7 @@ export default function ProductionRegistryPage() {
                                 <TableCell>{record.operatorId}</TableCell>
                                 <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
                                 <TableCell>{record.factory}</TableCell>
-                                <TableCell><Badge variant="outline">{record.activityType}</Badge></TableCell>
+                                <TableCell><Badge variant="outline">{record.activityType?.toUpperCase()}</Badge></TableCell>
                                 <TableCell>{record.machine}</TableCell>
                                 <TableCell>{record.formsNumber}</TableCell>
                                 <TableCell>{record.operationsNumber}</TableCell>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -120,7 +119,8 @@ const normalizeFactoryName = (name: any): string => {
 
 const getCategoryKey = (reason: string): string => {
   const r = String(reason || '').toUpperCase().trim();
-  if (r === '') return 'PRODUCAO';
+  // Normalização: Usinagem e USINAGEM (e campos vazios) são tratados como PRODUCAO
+  if (r === '' || r === 'USINAGEM' || r === 'PRODUCAO' || r === 'PRODUÇÃO') return 'PRODUCAO';
   
   if (r.includes('SETUP')) return 'SETUP';
   if (r.includes('CAFÉ') || r.includes('CAFE')) return 'TEMPO DE CAFÉ';
