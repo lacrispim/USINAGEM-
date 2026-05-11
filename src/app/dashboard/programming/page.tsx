@@ -25,7 +25,8 @@ import {
   CheckCircle2,
   X,
   Layers,
-  Clock
+  Clock,
+  Filter
 } from 'lucide-react';
 import { 
   format, 
@@ -108,6 +109,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface PlanejamentoItem {
   id: string;
@@ -195,7 +197,9 @@ const planningFormSchema = z.object({
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
 const CustomLegend = (props: any) => {
-  const { isDayView, metric } = props;
+  const { isDayView, metric, visibleLossTypes } = props;
+
+  const activeOptions = lossOptions.filter(opt => visibleLossTypes.includes(opt.value));
 
   if (isDayView) {
     return (
@@ -217,7 +221,7 @@ const CustomLegend = (props: any) => {
     <div className="flex flex-col gap-4 mb-6">
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 items-center border-b pb-2">
         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2">Tipos:</span>
-        {lossOptions.map((opt) => (
+        {activeOptions.map((opt) => (
            <div key={opt.value} className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: opt.color }} />
             <span className="text-[9px] font-bold uppercase">{opt.label}</span>
@@ -234,7 +238,19 @@ const CustomLegend = (props: any) => {
   );
 };
 
-const PlanningChart = ({ data, title, isDayView, metric }: { data: any[], title: string, isDayView: boolean, metric: 'pieces' | 'operations' | 'hours' }) => {
+const PlanningChart = ({ 
+  data, 
+  title, 
+  isDayView, 
+  metric, 
+  visibleLossTypes 
+}: { 
+  data: any[], 
+  title: string, 
+  isDayView: boolean, 
+  metric: 'pieces' | 'operations' | 'hours',
+  visibleLossTypes: string[]
+}) => {
   if (!data || data.length === 0) return (
     <Card className="flex h-[300px] items-center justify-center border-dashed">
       <p className="text-muted-foreground text-xs uppercase font-bold tracking-widest">{title}: Sem dados</p>
@@ -242,6 +258,7 @@ const PlanningChart = ({ data, title, isDayView, metric }: { data: any[], title:
   );
 
   const unit = metric === 'pieces' ? 'p' : metric === 'operations' ? 'op' : 'h';
+  const activeOptions = lossOptions.filter(opt => visibleLossTypes.includes(opt.value));
   
   return (
     <Card>
@@ -275,7 +292,7 @@ const PlanningChart = ({ data, title, isDayView, metric }: { data: any[], title:
                 itemStyle={{ fontSize: '12px' }}
                 formatter={(val: number) => [`${val.toFixed(1)} ${unit}`, '']}
               />
-              <Legend content={<CustomLegend isDayView={isDayView} metric={metric} />} verticalAlign="top" />
+              <Legend content={<CustomLegend isDayView={isDayView} metric={metric} visibleLossTypes={visibleLossTypes} />} verticalAlign="top" />
               
               {isDayView ? (
                 <>
@@ -299,7 +316,7 @@ const PlanningChart = ({ data, title, isDayView, metric }: { data: any[], title:
               ) : (
                 <>
                   {/* Categorized Stacks */}
-                  {lossOptions.map(opt => (
+                  {activeOptions.map(opt => (
                     <Bar key={`plan_${opt.value}`} dataKey={`plan_${opt.value}`} stackId="planejado" fill={opt.color} />
                   ))}
                   <Bar dataKey="spacer_plan" stackId="planejado" fill="transparent" radius={[4, 4, 0, 0]}>
@@ -311,7 +328,7 @@ const PlanningChart = ({ data, title, isDayView, metric }: { data: any[], title:
                     />
                   </Bar>
 
-                  {lossOptions.map(opt => (
+                  {activeOptions.map(opt => (
                     <Bar key={`real_${opt.value}`} dataKey={`real_${opt.value}`} stackId="realizado" fill={opt.color} opacity={0.7} />
                   ))}
                   <Bar dataKey="spacer_real" stackId="realizado" fill="transparent" radius={[4, 4, 0, 0]}>
@@ -339,6 +356,7 @@ export default function ProgrammingPage() {
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewMetric, setViewMetric] = useState<'pieces' | 'operations' | 'hours'>('pieces');
+  const [visibleLossTypes, setVisibleLossTypes] = useState<string[]>(lossOptions.map(o => o.value));
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -422,6 +440,12 @@ export default function ProgrammingPage() {
     });
   };
 
+  const toggleLossType = (type: string) => {
+    setVisibleLossTypes(prev => 
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
+
   const { chartData, isDayView: calculatedIsDayView } = useMemo(() => {
     const isDayView = !!selectedDateFilter;
 
@@ -441,13 +465,15 @@ export default function ProgrammingPage() {
       else if (typeRaw.includes('LIMPEZA')) type = 'LIMPEZA';
       else if (typeRaw.includes('INSPEÇÃO') || typeRaw.includes('QUALIDADE')) type = 'QUALIDADE';
 
+      // Check if this type is visible
+      if (!visibleLossTypes.includes(type)) {
+        return { plan: 0, real: 0, type };
+      }
+
       if (viewMetric === 'operations') {
         return { plan: qtd * ops, real: qtdReal * ops, type };
       }
       if (viewMetric === 'hours') {
-        // Assume for simplicity in realized hours planning vs actual hours that it matches planned if done, but user can add more fields if needed.
-        // For planning dashboard, we use planned hours as the baseline for both unless Realized is tracked separately.
-        // Let's use qtdReal/qtdPlan to scale hours if it's production.
         const scale = qtd > 0 ? (qtdReal / qtd) : 1; 
         return { plan: hours, real: hours * Math.min(1, scale), type };
       }
@@ -525,7 +551,6 @@ export default function ProgrammingPage() {
         if (!targetMap[key]) {
           targetMap[key] = { 
             key, label, total_plan: 0, total_real: 0,
-            // Categories
             ...lossOptions.reduce((acc, opt) => ({ ...acc, [`plan_${opt.value}`]: 0, [`real_${opt.value}`]: 0 }), {})
           };
         }
@@ -545,7 +570,7 @@ export default function ProgrammingPage() {
       },
       isDayView: false
     };
-  }, [planejamentoData, selectedWeekFilter, selectedDateFilter, viewMetric]);
+  }, [planejamentoData, selectedWeekFilter, selectedDateFilter, viewMetric, visibleLossTypes]);
 
   const handleShiftClick = (day: Date, turnoId: string) => {
     setEditingId(null);
@@ -624,7 +649,6 @@ export default function ProgrammingPage() {
   async function onSubmit(values: PlanningFormValues) {
     if (!database) return;
     try {
-      // Find the descriptive label for the loss selection
       const lossLabel = lossOptions.find(o => o.value === values.perdaPlanejada)?.label || '';
 
       const payload = {
@@ -726,6 +750,7 @@ export default function ProgrammingPage() {
   const clearFilters = () => {
     setSelectedDateFilter(undefined);
     setSelectedWeekFilter('all');
+    setVisibleLossTypes(lossOptions.map(o => o.value));
   };
 
   return (
@@ -802,6 +827,45 @@ export default function ProgrammingPage() {
           </div>
           <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
           <div className="flex items-center gap-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Categorias:</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs font-bold gap-2">
+                  <Filter className="h-3 w-3" />
+                  ({visibleLossTypes.length}/{lossOptions.length})
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-3" align="end">
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b pb-1">Filtrar Atividades</p>
+                  <div className="grid gap-2">
+                    {lossOptions.map((opt) => (
+                      <div key={opt.value} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`filter-${opt.value}`} 
+                          checked={visibleLossTypes.includes(opt.value)}
+                          onCheckedChange={() => toggleLossType(opt.value)}
+                        />
+                        <label 
+                          htmlFor={`filter-${opt.value}`}
+                          className="text-[10px] font-bold uppercase leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+                        >
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: opt.color }} />
+                          {opt.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-2 border-t mt-2 flex justify-between">
+                      <Button variant="ghost" size="sm" className="h-6 text-[8px] uppercase font-black" onClick={() => setVisibleLossTypes(lossOptions.map(o => o.value))}>Todos</Button>
+                      <Button variant="ghost" size="sm" className="h-6 text-[8px] uppercase font-black text-destructive" onClick={() => setVisibleLossTypes(['PRODUCAO'])}>Apenas Prod.</Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
+          <div className="flex items-center gap-2">
             <Label htmlFor="date-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Dia:</Label>
             <Popover>
                 <PopoverTrigger asChild>
@@ -826,15 +890,27 @@ export default function ProgrammingPage() {
               </SelectContent>
             </Select>
           </div>
-          {(selectedDateFilter || selectedWeekFilter !== 'all') && (
+          {(selectedDateFilter || selectedWeekFilter !== 'all' || visibleLossTypes.length !== lossOptions.length) && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"><X className="mr-1 h-3 w-3" /> Limpar</Button>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <PlanningChart data={chartData.centur} title="Consolidado Torno Centur 30" isDayView={calculatedIsDayView} metric={viewMetric} />
-        <PlanningChart data={chartData.centro} title="Consolidado Centro D600" isDayView={calculatedIsDayView} metric={viewMetric} />
+        <PlanningChart 
+          data={chartData.centur} 
+          title="Consolidado Torno Centur 30" 
+          isDayView={calculatedIsDayView} 
+          metric={viewMetric} 
+          visibleLossTypes={visibleLossTypes}
+        />
+        <PlanningChart 
+          data={chartData.centro} 
+          title="Consolidado Centro D600" 
+          isDayView={calculatedIsDayView} 
+          metric={viewMetric} 
+          visibleLossTypes={visibleLossTypes}
+        />
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
