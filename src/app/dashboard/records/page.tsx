@@ -110,6 +110,17 @@ const normalizeFactoryName = (name: any): string => {
   return n;
 };
 
+const getCategoryKey = (reason: string): string => {
+  const r = String(reason || '').toUpperCase().trim();
+  if (r.includes('SETUP')) return 'SETUP';
+  if (r.includes('CAFÉ') || r.includes('CAFE')) return 'CAFE';
+  if (r.includes('LIMPEZA')) return 'LIMPEZA';
+  if (r.includes('DDS') || r.includes('ADM') || r.includes('APONTAMENTO') || r.includes('HORAS')) return 'DDS';
+  if (r.includes('INSPEÇÃO') || r.includes('INSPECAO') || r.includes('QUALIDADE') || r.includes('VALIDAÇÃO')) return 'QUALIDADE';
+  if (r.includes('MANUTENÇÃO') || r.includes('MANUTENCAO')) return 'MANUTENCAO';
+  return 'OUTROS';
+};
+
 export default function RecordsPage() {
   const firestore = useFirestore();
   const database = useDatabase();
@@ -247,13 +258,9 @@ export default function RecordsPage() {
     const rawReason = (isPlanning ? (record['Perdas planejadas'] || '') : (record.lossReason || '')).toUpperCase();
 
     if (isPlanning && rawReason === '') category = 'PRODUCAO';
-    else if (rawReason.includes('SETUP')) category = 'SETUP';
-    else if (rawReason.includes('DDS') || rawReason.includes('ADM') || rawReason.includes('APONTAMENTO') || rawReason.includes('HORAS')) category = 'DDS';
-    else if (rawReason.includes('CAFÉ') || rawReason.includes('CAFE')) category = 'CAFE';
-    else if (rawReason.includes('LIMPEZA')) category = 'LIMPEZA';
-    else if (rawReason.includes('INSPEÇÃO') || rawReason.includes('QUALIDADE') || rawReason.includes('VALIDAÇÃO')) category = 'QUALIDADE';
-    else if (rawReason.includes('MANUTENÇÃO') || rawReason.includes('MANUTENCAO')) category = 'MANUTENCAO';
-    else category = 'OUTROS';
+    else {
+      category = getCategoryKey(rawReason);
+    }
 
     return category === selectedLossReason;
   };
@@ -299,7 +306,6 @@ export default function RecordsPage() {
 
   const operatorFilteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
-    // Production records are implicitly 'PRODUCAO'
     if (selectedLossReason !== 'all' && selectedLossReason !== 'PRODUCAO') return [];
     return productionRecords.filter(operatorFilter);
   }, [productionRecords, selectedOperator, selectedLossReason]);
@@ -315,16 +321,10 @@ export default function RecordsPage() {
     const getOrCreate = (factory: string) => {
       if (!dataMap[factory]) {
         dataMap[factory] = { 
-          usinagemPlanejada: 0, 
-          paradaCafePlanejada: 0,
-          limpezaPlanejada: 0,
-          apontamentoPlanejado: 0,
-          inspecaoPlanejada: 0,
-          setupPlanejado: 0,
-          usinagem: 0, 
-          setup: 0, 
-          dds: 0, 
-          outrasPerdas: 0 
+          plan_PRODUCAO: 0, plan_SETUP: 0, plan_DDS: 0, plan_CAFE: 0, plan_LIMPEZA: 0, plan_QUALIDADE: 0, plan_MANUTENCAO: 0, plan_OUTROS: 0,
+          real_PRODUCAO: 0, real_SETUP: 0, real_DDS: 0, real_CAFE: 0, real_LIMPEZA: 0, real_QUALIDADE: 0, real_MANUTENCAO: 0, real_OUTROS: 0,
+          totalPlanejado: 0,
+          totalRealizado: 0,
         };
       }
       return dataMap[factory];
@@ -339,23 +339,12 @@ export default function RecordsPage() {
       if (isNaN(machineHours)) return;
 
       const d = getOrCreate(factory);
-      const lossReason = String(record['Perdas planejadas'] || '').toUpperCase().trim();
-
-      if (lossReason === '') {
-        d.usinagemPlanejada += machineHours;
-      } else if (lossReason.includes('CAFÉ') || lossReason.includes('CAFE')) {
-        d.paradaCafePlanejada += machineHours;
-      } else if (lossReason.includes('LIMPEZA')) {
-        d.limpezaPlanejada += machineHours;
-      } else if (lossReason.includes('APONTAMENTO') || lossReason.includes('TURNO') || lossReason.includes('DDS')) {
-        d.apontamentoPlanejado += machineHours;
-      } else if (lossReason.includes('INSPEÇÃO') || lossReason.includes('INSPECAO') || lossReason.includes('QUALIDADE')) {
-        d.inspecaoPlanejada += machineHours;
-      } else if (lossReason.includes('SETUP')) {
-        d.setupPlanejado += machineHours;
-      } else {
-        d.usinagemPlanejada += machineHours;
-      }
+      const rawReason = String(record['Perdas planejadas'] || '').toUpperCase().trim();
+      const catKey = rawReason === '' ? 'PRODUCAO' : getCategoryKey(rawReason);
+      
+      const key = `plan_${catKey}`;
+      d[key] = (d[key] || 0) + machineHours;
+      d.totalPlanejado += machineHours;
     });
     
     operatorFilteredProductionRecords.forEach(record => {
@@ -363,7 +352,8 @@ export default function RecordsPage() {
         const hours = (Number(record.machiningTime) || 0) / 60;
         if (hours > 0) {
             const d = getOrCreate(factory);
-            d.usinagem += hours;
+            d.real_PRODUCAO += hours;
+            d.totalRealizado += hours;
         }
     });
 
@@ -373,22 +363,17 @@ export default function RecordsPage() {
         if (hours > 0) {
             const d = getOrCreate(factory);
             const reason = record.lossReason?.toUpperCase() || '';
-            if (reason.includes('SETUP')) d.setup += hours;
-            else if (reason.includes('DDS')) d.dds += hours;
-            else d.outrasPerdas += hours;
+            const catKey = getCategoryKey(reason);
+            const key = `real_${catKey}`;
+            d[key] = (d[key] || 0) + hours;
+            d.totalRealizado += hours;
         }
     });
 
     return Object.keys(dataMap).map(factory => {
-      const d = dataMap[factory];
-      const totalPlanejado = d.usinagemPlanejada + d.paradaCafePlanejada + d.limpezaPlanejada + d.apontamentoPlanejado + d.inspecaoPlanejada + d.setupPlanejado;
-      const totalRealizado = d.usinagem + d.setup + d.dds + d.outrasPerdas;
-      
       return {
           name: factory,
-          ...d,
-          totalPlanejado,
-          totalRealizado,
+          ...dataMap[factory],
       }
   }).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
 
@@ -624,4 +609,3 @@ export default function RecordsPage() {
     </div>
   );
 }
-
