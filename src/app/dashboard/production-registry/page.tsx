@@ -81,17 +81,6 @@ const lossReasonDetails = [
 
 const lossReasonOptions = lossReasonDetails.map(item => item.value);
 
-const lossCategories = [
-    { value: 'PRODUCAO', label: 'Produção' },
-    { value: 'SETUP', label: 'Setup' },
-    { value: 'DDS', label: 'DDS/ADM' },
-    { value: 'CAFE', label: 'Café' },
-    { value: 'LIMPEZA', label: 'Limpeza' },
-    { value: 'QUALIDADE', label: 'Qualidade' },
-    { value: 'MANUTENCAO', label: 'Manutenção' },
-    { value: 'OUTROS', label: 'Outras Perdas' },
-];
-
 const operatorList = [
     "Daniel Solivo",
     "Rodrigo Cantano",
@@ -769,17 +758,6 @@ const statusColorMap: { [key: string]: string } = {
     'Serviços Externos': 'bg-blue-500',
 };
 
-const getCategoryFromReason = (reason: string): string => {
-  const r = String(reason || '').toUpperCase().trim();
-  if (r.includes('SETUP')) return 'SETUP';
-  if (r.includes('CAFÉ') || r.includes('CAFE')) return 'CAFE';
-  if (r.includes('LIMPEZA')) return 'LIMPEZA';
-  if (r.includes('DDS') || r.includes('ADM') || r.includes('APONTAMENTO')) return 'DDS';
-  if (r.includes('INSPEÇÃO') || r.includes('INSPECAO') || r.includes('QUALIDADE') || r.includes('VALIDAÇÃO')) return 'QUALIDADE';
-  if (r.includes('MANUTENÇÃO') || r.includes('MANUTENCAO')) return 'MANUTENCAO';
-  return 'OUTROS';
-};
-
 export default function ProductionRegistryPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -859,7 +837,7 @@ export default function ProductionRegistryPage() {
       const formsMatch = !formsFilter || (record.formsNumber && 
         record.formsNumber.toLowerCase().includes(formsFilter.toLowerCase()));
       
-      const categoryMatch = selectedCategory === 'all' || getCategoryFromReason(record.lossReason) === selectedCategory;
+      const categoryMatch = selectedCategory === 'all' || record.lossReason === selectedCategory;
 
       return operatorMatch && formsMatch && categoryMatch;
     });
@@ -1055,7 +1033,7 @@ export default function ProductionRegistryPage() {
           </div>
           <div className="mt-8 space-y-8">
              <div className="flex flex-col sm:flex-row justify-end gap-4 items-end">
-                <div className="grid w-full sm:max-w-[180px] gap-1.5">
+                <div className="grid w-full sm:max-w-[200px] gap-1.5">
                     <Label htmlFor="category-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Categorias / Perdas</Label>
                     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                         <SelectTrigger id="category-filter" className="h-8 text-xs font-bold">
@@ -1066,9 +1044,10 @@ export default function ProductionRegistryPage() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Todas</SelectItem>
-                            {lossCategories.map((cat) => (
-                                <SelectItem key={cat.value} value={cat.value}>
-                                    {cat.label}
+                            <SelectItem value="PRODUCAO">Produção</SelectItem>
+                            {lossReasonOptions.map((reason) => (
+                                <SelectItem key={reason} value={reason}>
+                                    {reason}
                                 </SelectItem>
                             ))}
                         </SelectContent>
