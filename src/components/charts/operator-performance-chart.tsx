@@ -257,11 +257,11 @@ export function OperatorPerformanceChart({
               <ChartTooltip cursor={{ fill: 'hsl(var(--accent))', opacity: 0.05 }} content={<CustomTooltip />} />
               
               <ReferenceLine x={7} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2}>
-                  <Label value="Meta: 7h" position="top" fill="#ef4444" fontSize={10} fontWeight="bold" />
+                  <Label value="Meta 7h" position="top" fill="#ef4444" fontSize={10} fontWeight="bold" />
               </ReferenceLine>
 
               <ReferenceLine x={8} stroke="#f97316" strokeDasharray="3 3" strokeWidth={2}>
-                  <Label value="Meta: 8h (William)" position="top" fill="#f97316" fontSize={10} fontWeight="bold" />
+                  <Label value="Meta 8h" position="top" fill="#f97316" fontSize={10} fontWeight="bold" />
               </ReferenceLine>
               
               {activePlanCategories.map((cat, idx) => (
