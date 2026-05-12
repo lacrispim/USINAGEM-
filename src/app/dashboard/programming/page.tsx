@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -23,7 +22,8 @@ import {
   Settings2,
   CheckCircle2,
   Clock,
-  PlusCircle
+  PlusCircle,
+  Move
 } from 'lucide-react';
 import { 
   format, 
@@ -124,6 +124,7 @@ interface PlanejamentoItem {
   equipamento?: string;
   EQUIPAMENTO?: string;
   Turno?: string | number;
+  turno?: string | number;
   perdaPlanejada?: string;
   'Perdas planejadas'?: string;
   atividades?: AtividadePlanejada[];
@@ -286,6 +287,8 @@ export default function ProgrammingPage() {
   const [selectedWeekFilter, setSelectedWeekFilter] = useState<string>('all');
   const [selectedDateFilter, setSelectedDateFilter] = useState<Date | undefined>(undefined);
 
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+
   // Escuta registros de produção do Firestore para somar como Peças Finalizadas
   const productionRecordsQuery = useMemoFirebase(() => 
     firestore ? query(collection(firestore, 'productionRecords')) : null
@@ -382,6 +385,31 @@ export default function ProgrammingPage() {
     });
   };
 
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedItemId(id);
+    e.dataTransfer.setData('itemId', id);
+  };
+
+  const handleDrop = async (e: React.DragEvent, day: Date, turnoId: string) => {
+    e.preventDefault();
+    const itemId = e.dataTransfer.getData('itemId') || draggedItemId;
+    if (!itemId || !database) return;
+
+    const newDateStr = format(day, 'dd/MM/yyyy');
+    try {
+      await update(ref(database, `/Planejamento S/${itemId}`), {
+        dataExecucao: newDateStr,
+        Turno: turnoId,
+        turno: turnoId
+      });
+      toast({ title: "Planejamento Movido", description: `Movido para ${newDateStr} - ${turnoId}º Turno` });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Erro ao mover", variant: "destructive" });
+    }
+    setDraggedItemId(null);
+  };
+
   const { chartData, isDayView: calculatedIsDayView } = useMemo(() => {
     const isDayView = !!selectedDateFilter;
 
@@ -437,7 +465,8 @@ export default function ProgrammingPage() {
       
       if (isDayView) {
         if (!isSameDay(date, selectedDateFilter!)) return;
-        const turnoIndex = (parseInt(String(item.Turno || '1')) || 1) - 1;
+        const shiftVal = item.Turno || item.turno || '1';
+        const turnoIndex = (parseInt(String(shiftVal)) || 1) - 1;
         const targetArr = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurTurns : 
                            (equip.includes('CENTRO') || equip.includes('D600')) ? centroTurns : null;
         if (targetArr && turnoIndex >= 0 && turnoIndex < 3) {
@@ -545,7 +574,8 @@ export default function ProgrammingPage() {
 
   const handleItemClick = (item: PlanejamentoItem) => {
     setEditingId(item.id);
-    setSelectedTurno(String(item.Turno || '1'));
+    const shiftVal = String(item.Turno || item.turno || '1');
+    setSelectedTurno(shiftVal);
     
     let itemDate = new Date();
     const dateStr = item.dataExecucao || item['Data Execução'];
@@ -561,7 +591,7 @@ export default function ProgrammingPage() {
 
     form.reset({
       dataExecucao: dateStr || '',
-      turno: item.Turno ? String(item.Turno) : '1',
+      turno: shiftVal,
       equipamento: item.equipamento || item.EQUIPAMENTO || '',
       requisicao: item.requisicao || item['Requisição'] || '',
       nomeDaPeca: item.nomeDaPeca || item['Nome da Peça'] || '',
@@ -606,6 +636,7 @@ export default function ProgrammingPage() {
         operacoesPorPeca: values.operacoesPorPeca,
         tecnico: values.tecnico,
         horasPlanejadas: values.horasPlanejadas,
+        Turno: values.turno,
         turno: values.turno,
         site: values.site,
         observacao: values.observacao || '',
@@ -634,12 +665,15 @@ export default function ProgrammingPage() {
         <Tooltip>
           <TooltipTrigger asChild>
             <div 
+              draggable
+              onDragStart={(e) => handleDragStart(e, item.id)}
               onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}
               className={cn(
-                "mb-1 cursor-pointer truncate rounded border p-1 text-[10px] leading-tight shadow-sm transition-all flex items-center gap-1",
+                "mb-1 cursor-grab active:cursor-grabbing truncate rounded border p-1 text-[10px] leading-tight shadow-sm transition-all flex items-center gap-1 group/event",
                 isCompleted ? "border-green-500/50 bg-green-500/5" : "border-border bg-card hover:border-primary"
               )}
             >
+              <Move className="h-2 w-2 opacity-0 group-hover/event:opacity-40 transition-opacity" />
               {isCompleted && <CheckCircle2 className="h-2 w-2 text-green-500 shrink-0" />}
               <span className="font-bold text-primary mr-1">{item.requisicao || item['Requisição']}</span>
               <span className="truncate">{item.nomeDaPeca || item['Nome da Peça']}</span>
@@ -651,6 +685,7 @@ export default function ProgrammingPage() {
                 <span className="text-muted-foreground">Produção:</span><span className="font-medium text-right">{qtdReal} / {qtdPlan} pçs</span>
                 <span className="text-muted-foreground">Total Planejado:</span><span className="font-medium text-right">{(Number(item.horasPlanejadas || item['Horas Máquina']) || 0).toFixed(1)}h</span>
                 <span className="text-muted-foreground">Técnico:</span><span className="font-medium text-right truncate">{item.tecnico || item.Técnicos}</span>
+                <span className="text-[10px] text-muted-foreground col-span-2 pt-1 border-t italic">Segure e arraste para mudar a data ou turno</span>
             </div>
           </TooltipContent>
         </Tooltip>
@@ -663,7 +698,7 @@ export default function ProgrammingPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Planejamento de Produção</h1>
-          <p className="text-muted-foreground">Visualização mensal do plano mestre por turnos.</p>
+          <p className="text-muted-foreground">Visualização mensal do plano mestre por turnos com suporte a Drag & Drop.</p>
         </div>
         <div className="flex items-center gap-2 bg-card p-1 rounded-lg border shadow-sm">
           <Button variant="ghost" size="icon" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
@@ -694,10 +729,18 @@ export default function ProgrammingPage() {
                     </div>
                     <div className="flex-1 space-y-2 overflow-y-auto max-h-[180px] scrollbar-hide">
                       {turnos.map(turno => {
-                        const itemsInTurno = dayItems.filter(item => { if (!item.Turno) return turno.id === '1'; return String(item.Turno) === turno.id; });
+                        const itemsInTurno = dayItems.filter(item => { 
+                          const shiftVal = String(item.Turno || item.turno || '1');
+                          return shiftVal === turno.id; 
+                        });
                         return (
-                          <div key={turno.id} className="group/turno relative">
-                            <div onClick={() => handleShiftClick(day, turno.id)} className={cn("text-[8px] px-1 py-0.5 rounded border font-bold uppercase cursor-pointer hover:opacity-80 flex items-center justify-between", turno.color)}>
+                          <div 
+                            key={turno.id} 
+                            className="group/turno relative"
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => handleDrop(e, day, turno.id)}
+                          >
+                            <div onClick={() => handleShiftClick(day, turno.id)} className={cn("text-[8px] px-1 py-0.5 rounded border font-bold uppercase cursor-pointer hover:opacity-80 flex items-center justify-between transition-colors", turno.color)}>
                               {turno.label}<Plus className="h-2 w-2 opacity-0 group-hover/turno:opacity-100" />
                             </div>
                             <div className="min-h-[5px] mt-1">{itemsInTurno.map(item => renderEvent(item))}</div>
