@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -253,7 +252,7 @@ export default function RecordsPage() {
 
   const operatorFilter = (record: any) => {
     if (!selectedOperator || selectedOperator === 'all') return true;
-    const rawOp = record.operatorId || record['Técnicos'] || record['Técnico'];
+    const rawOp = record.operatorId || record.tecnico || record['Técnicos'] || record['Técnico'];
     if (!rawOp) return false;
     
     const normalizedOp = normalizeOperatorName(rawOp);
@@ -267,7 +266,7 @@ export default function RecordsPage() {
         return record.atividades.some((a: any) => getCategoryKey(a.tipo) === selectedLossReason);
     }
 
-    const rawReason = (isPlanning ? (record['Perdas planejadas'] || '') : (record.lossReason || '')).toUpperCase();
+    const rawReason = (isPlanning ? (record['Perdas planejadas'] || record.perdaPlanejada || '') : (record.lossReason || '')).toUpperCase();
     const category = getCategoryKey(rawReason);
 
     return category === selectedLossReason;
@@ -295,7 +294,7 @@ export default function RecordsPage() {
       };
 
       return planejamentoData.filter(record => {
-          const dateStr = record['Data Execução'] || record['Data'];
+          const dateStr = record.dataExecucao || record['Data Execução'] || record['Data'];
           if (!dateStr) return false;
           let recordDate;
           try {
@@ -304,9 +303,12 @@ export default function RecordsPage() {
               if (isNaN(recordDate.getTime())) return false;
           } catch { return false; }
           if (!dateFilter(recordDate)) return false;
-          const normalizedSite = normalizeFactoryName(record['Site']);
+          
+          const siteName = record.site || record['Site'];
+          const normalizedSite = normalizeFactoryName(siteName);
           const factoryMatch = !selectedFactory || normalizedSite === selectedFactory;
           if (!factoryMatch) return false;
+          
           if (!operatorFilter(record)) return false;
           return lossCategoryFilter(record, true);
       });
@@ -337,7 +339,8 @@ export default function RecordsPage() {
     };
 
     filteredPlanejamentoData.forEach(record => {
-      const factory = normalizeFactoryName(record['Site']);
+      const siteName = record.site || record['Site'];
+      const factory = normalizeFactoryName(siteName);
       const d = getOrCreate(factory);
 
       if (record.atividades && Array.isArray(record.atividades)) {
@@ -351,12 +354,13 @@ export default function RecordsPage() {
           }
         });
       } else {
-        const machineHours = typeof record['Horas Máquina'] === 'string' 
-          ? parseFloat(record['Horas Máquina'].replace(',', '.')) 
-          : (Number(record['Horas Máquina']) || 0);
+        const rawHours = record.horasPlanejadas || record['Horas Máquina'];
+        const machineHours = typeof rawHours === 'string' 
+          ? parseFloat(rawHours.replace(',', '.')) 
+          : (Number(rawHours) || 0);
         
         if (!isNaN(machineHours)) {
-          const rawReason = String(record['Perdas planejadas'] || '').toUpperCase().trim();
+          const rawReason = String(record.perdaPlanejada || record['Perdas planejadas'] || '').toUpperCase().trim();
           const catKey = getCategoryKey(rawReason);
           if (selectedLossReason === 'all' || catKey === selectedLossReason) {
             const key = `plan_${catKey}`;
