@@ -109,7 +109,7 @@ export function OperatorPerformanceChart({
     };
 
     productionData.forEach(record => {
-      const name = normalizeOperatorName(record.operatorId || record['Técnicos'] || record['Técnico']);
+      const name = normalizeOperatorName(record.operatorId || record.tecnico || record['Técnicos'] || record['Técnico']);
       if (name) {
         const stats = getOrCreate(name);
         stats.real += Number(record.machiningTime || 0) / 60;
@@ -117,7 +117,7 @@ export function OperatorPerformanceChart({
     });
 
     lossData.forEach(record => {
-      const name = normalizeOperatorName(record.operatorId || record['Técnicos'] || record['Técnico']);
+      const name = normalizeOperatorName(record.operatorId || record.tecnico || record['Técnicos'] || record['Técnico']);
       if (name) {
         const stats = getOrCreate(name);
         stats.real += Number(record.timeLost || 0) / 60;
@@ -125,7 +125,7 @@ export function OperatorPerformanceChart({
     });
 
     plannedData.forEach(record => {
-      const name = normalizeOperatorName(record['Técnicos'] || record['Técnico'] || record.operatorId);
+      const name = normalizeOperatorName(record.tecnico || record['Técnicos'] || record['Técnico'] || record.operatorId);
       if (name) {
         const stats = getOrCreate(name);
         
@@ -139,10 +139,11 @@ export function OperatorPerformanceChart({
              categoriesFound.add(catKey);
           });
         } else {
-          const machineHours = typeof record['Horas Máquina'] === 'string' 
-              ? parseFloat(record['Horas Máquina'].replace(',', '.')) 
-              : (Number(record['Horas Máquina']) || 0);
-          const rawReason = String(record['Perdas planejadas'] || '').toUpperCase().trim();
+          const rawHours = record.horasPlanejadas || record['Horas Máquina'];
+          const machineHours = typeof rawHours === 'string' 
+              ? parseFloat(rawHours.replace(',', '.')) 
+              : (Number(rawHours) || 0);
+          const rawReason = String(record['Perdas planejadas'] || record.perdaPlanejada || '').toUpperCase().trim();
           const catKey = getCategoryKey(rawReason);
           const field = `plan_${catKey}`;
           stats[field] = (stats[field] || 0) + machineHours;
@@ -159,7 +160,6 @@ export function OperatorPerformanceChart({
       }))
       .sort((a, b) => (b.real + b.planTotal) - (a.real + a.planTotal));
 
-    // Ordenação das categorias: Produção primeiro, Limpeza por último para destaque visual na ponta
     const sortedCategories = Array.from(categoriesFound).sort((a, b) => {
         if (a === 'PRODUCAO') return -1;
         if (b === 'PRODUCAO') return 1;
