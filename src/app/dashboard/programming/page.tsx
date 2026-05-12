@@ -62,6 +62,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
@@ -176,7 +177,7 @@ const planningFormSchema = z.object({
   quantidade: z.coerce.number().min(0, 'Quantidade deve ser zero ou maior.'),
   quantidadeRealizada: z.coerce.number().default(0),
   operacoesRealizadas: z.coerce.number().default(0),
-  operacoesPorPeca: z.coerce.number().min(1, 'Mínimo 1 operação.'),
+  operacoesPorPeca: z.coerce.number().default(1),
   tecnico: z.string().min(1, 'Técnico é obrigatório.'),
   horasPlanejadas: z.coerce.number().default(0),
   turno: z.string(),
@@ -860,9 +861,6 @@ export default function ProgrammingPage() {
                 <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Peças Plan.</FormLabel><FormControl><Input type="number" className="h-8" {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="quantidadeRealizada" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold text-green-500">Peças Fin.</FormLabel><FormControl><Input type="number" className="h-8 border-green-500/30" {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="operacoesRealizadas" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold text-purple-500">Ops. Realizadas</FormLabel><FormControl><Input type="number" className="h-8 border-purple-500/30" {...field} /></FormControl></FormItem>)} />
-              </div>
-              <div className="grid grid-cols-1">
-                 <FormField control={form.control} name="operacoesPorPeca" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Ops/Peça (Base Plan.)</FormLabel><FormControl><Input type="number" className="h-8" {...field} /></FormControl></FormItem>)} />
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
