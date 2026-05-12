@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter } from 'lucide-react';
+import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter, CalendarDays } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -56,10 +56,25 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp, orderBy, query, deleteDoc, doc, updateDoc, limit } from 'firebase/firestore';
-import { format, parse, startOfDay, endOfDay } from 'date-fns';
+import { format, parse, startOfDay, endOfDay, getMonth, getYear } from 'date-fns';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { Label } from '@/components/ui/label';
+
+const months = [
+    { value: '0', label: 'Janeiro' },
+    { value: '1', label: 'Fevereiro' },
+    { value: '2', label: 'Março' },
+    { value: '3', label: 'Abril' },
+    { value: '4', label: 'Maio' },
+    { value: '5', label: 'Junho' },
+    { value: '6', label: 'Julho' },
+    { value: '7', label: 'Agosto' },
+    { value: '8', label: 'Setembro' },
+    { value: '9', label: 'Outubro' },
+    { value: '10', label: 'Novembro' },
+    { value: '11', label: 'Dezembro' },
+];
 
 const lossReasonDetails = [
     { value: "MANUTENÇÃO PLANEJADA", description: "LUBRIFICAÇÃO DA MÁQUINA" },
@@ -770,23 +785,23 @@ export default function ProductionRegistryPage() {
   
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [formsFilter, setFormsFilter] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const productionRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(500)) : null
+    firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1000)) : null
   , [firestore]);
   const { data: productionRecords, isLoading: loadingProduction } = useCollection(productionRecordsQuery);
   
   const lossRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(500)) : null
+    firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(1000)) : null
   , [firestore]);
   const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossRecordsQuery);
 
   const filteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
     
-    // Se selecionou uma perda específica, a tabela de produção deve ficar vazia
     if (selectedCategory !== 'all' && selectedCategory !== 'PRODUCAO') return [];
 
     const thirtyDaysAgo = new Date();
@@ -800,6 +815,11 @@ export default function ProductionRegistryPage() {
       if (selectedDate) {
         const isSameDay = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
         if (!isSameDay) return false;
+      } else if (selectedMonth !== 'all') {
+          const monthIdx = parseInt(selectedMonth);
+          if (recordDate.getMonth() !== monthIdx) return false;
+          // Mostra apenas registros do ano atual ao filtrar por mês para simplificar
+          if (recordDate.getFullYear() !== new Date().getFullYear()) return false;
       } else {
         if (recordDate < startOfLimit) return false;
       }
@@ -810,12 +830,11 @@ export default function ProductionRegistryPage() {
 
       return operatorMatch && formsMatch;
     });
-  }, [productionRecords, selectedOperator, selectedDate, formsFilter, selectedCategory]);
+  }, [productionRecords, selectedOperator, selectedDate, selectedMonth, formsFilter, selectedCategory]);
 
   const filteredLossRecords = useMemo(() => {
     if (!lossRecords) return [];
 
-    // Se selecionou Produção, a tabela de perdas deve ficar vazia
     if (selectedCategory === 'PRODUCAO') return [];
 
     const thirtyDaysAgo = new Date();
@@ -829,6 +848,10 @@ export default function ProductionRegistryPage() {
       if (selectedDate) {
         const isSameDay = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
         if (!isSameDay) return false;
+      } else if (selectedMonth !== 'all') {
+          const monthIdx = parseInt(selectedMonth);
+          if (recordDate.getMonth() !== monthIdx) return false;
+          if (recordDate.getFullYear() !== new Date().getFullYear()) return false;
       } else {
         if (recordDate < startOfLimit) return false;
       }
@@ -841,7 +864,7 @@ export default function ProductionRegistryPage() {
 
       return operatorMatch && formsMatch && categoryMatch;
     });
-  }, [lossRecords, selectedOperator, selectedDate, formsFilter, selectedCategory]);
+  }, [lossRecords, selectedOperator, selectedDate, selectedMonth, formsFilter, selectedCategory]);
 
   const handleDelete = async (collectionName: string, id: string) => {
     if (!firestore) return;
@@ -1032,8 +1055,8 @@ export default function ProductionRegistryPage() {
             <LossFormContent />
           </div>
           <div className="mt-8 space-y-8">
-             <div className="flex flex-col sm:flex-row justify-end gap-4 items-end">
-                <div className="grid w-full sm:max-w-[200px] gap-1.5">
+             <div className="flex flex-col sm:flex-row justify-end gap-3 items-end bg-card p-3 rounded-lg border shadow-sm flex-wrap">
+                <div className="grid w-full sm:max-w-[180px] gap-1.5">
                     <Label htmlFor="category-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Categorias / Perdas</Label>
                     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                         <SelectTrigger id="category-filter" className="h-8 text-xs font-bold">
@@ -1053,21 +1076,40 @@ export default function ProductionRegistryPage() {
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="grid w-full sm:max-w-xs gap-1.5">
+                <div className="grid w-full sm:max-w-[180px] gap-1.5">
                     <Label htmlFor="forms-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Nº Forms</Label>
                     <div className="relative">
                         <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
                         <Input
                             id="forms-filter"
-                            placeholder="Buscar n° do forms..."
+                            placeholder="Buscar n°..."
                             className="pl-8 h-8 text-xs"
                             value={formsFilter}
                             onChange={(e) => setFormsFilter(e.target.value)}
                         />
                     </div>
                 </div>
-                <div className="grid w-full sm:max-w-xs gap-1.5">
-                    <Label htmlFor="date-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Data</Label>
+                <div className="grid w-full sm:max-w-[120px] gap-1.5">
+                    <Label htmlFor="month-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Mês</Label>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                        <SelectTrigger id="month-filter" className="h-8 text-xs font-bold">
+                            <div className='flex items-center gap-2'>
+                                <CalendarDays className="h-3 w-3 text-muted-foreground" />
+                                <SelectValue placeholder="Mês" />
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            {months.map((m) => (
+                                <SelectItem key={m.value} value={m.value}>
+                                    {m.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid w-full sm:max-w-[120px] gap-1.5">
+                    <Label htmlFor="date-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Dia</Label>
                     <Popover>
                         <PopoverTrigger asChild>
                         <Button
@@ -1080,7 +1122,7 @@ export default function ProductionRegistryPage() {
                             )}
                         >
                             <CalendarIcon className="mr-2 h-3 w-3" />
-                            {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Selecione uma data</span>}
+                            {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Dia</span>}
                         </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -1093,7 +1135,7 @@ export default function ProductionRegistryPage() {
                         </PopoverContent>
                     </Popover>
                 </div>
-                <div className="grid w-full sm:max-w-xs gap-1.5">
+                <div className="grid w-full sm:max-w-[180px] gap-1.5">
                     <Label htmlFor="operator-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Técnico</Label>
                     <Select value={selectedOperator} onValueChange={setSelectedOperator}>
                         <SelectTrigger id="operator-filter" className="h-8 text-xs font-bold">
@@ -1112,12 +1154,13 @@ export default function ProductionRegistryPage() {
                         </SelectContent>
                     </Select>
                 </div>
-                {(selectedDate || selectedOperator !== 'all' || formsFilter || selectedCategory !== 'all') && (
+                {(selectedDate || selectedOperator !== 'all' || formsFilter || selectedCategory !== 'all' || selectedMonth !== 'all') && (
                   <Button variant="ghost" size="sm" onClick={() => {
                     setSelectedDate(undefined);
                     setSelectedOperator('all');
                     setFormsFilter('');
                     setSelectedCategory('all');
+                    setSelectedMonth('all');
                   }} className="h-8 text-xs text-destructive">Limpar</Button>
                 )}
             </div>
@@ -1128,7 +1171,7 @@ export default function ProductionRegistryPage() {
                   <div className="flex items-center justify-between">
                       <div>
                           <CardTitle>Registros de Produção Recentes</CardTitle>
-                          <CardDescription>Últimas entradas de produção (exibindo últimos 30 dias por padrão).</CardDescription>
+                          <CardDescription>Visualização de registros (por padrão últimos 30 dias ou mês selecionado).</CardDescription>
                       </div>
                       <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredProductionRecords, 'Registros_Producao')}>
                           <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -1288,7 +1331,7 @@ export default function ProductionRegistryPage() {
                   <div className="flex items-center justify-between">
                       <div>
                           <CardTitle>Registros de Perdas Recentes</CardTitle>
-                          <CardDescription>Entradas de perdas de produção (exibindo últimos 30 dias por padrão).</CardDescription>
+                          <CardDescription>Visualização de perdas (por padrão últimos 30 dias ou mês selecionado).</CardDescription>
                       </div>
                       <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredLossRecords, 'Registros_Perdas')}>
                           <FileSpreadsheet className="mr-2 h-4 w-4" />
