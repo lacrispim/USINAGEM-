@@ -185,7 +185,7 @@ export function OperatorPerformanceChart({
   }, [activePlanCategories]);
   
   const maxVal = Math.max(...chartData.map(d => Math.max(d.planTotal, d.real)), 0);
-  const xAxisDomainMax = Math.max(9, Math.ceil(maxVal) + 1);
+  const xAxisDomainMax = Math.max(10, Math.ceil(maxVal) + 1);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -250,7 +250,7 @@ export function OperatorPerformanceChart({
       <div className="h-[450px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ChartContainer config={chartConfig} className="h-full w-full">
-            <BarChart data={chartData} layout="vertical" barGap={4} margin={{ top: 20, right: 60, left: 40, bottom: 20 }} onClick={(e) => e?.activeLabel && onOperatorSelect(e.activeLabel)}>
+            <BarChart data={chartData} layout="vertical" barGap={4} margin={{ top: 30, right: 60, left: 40, bottom: 20 }} onClick={(e) => e?.activeLabel && onOperatorSelect(e.activeLabel)}>
               <CartesianGrid horizontal={false} strokeOpacity={0.1} />
                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={120} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
               <XAxis type="number" domain={[0, xAxisDomainMax]} unit="h" tickLine={false} axisLine={false} className="text-[10px]" />
@@ -258,6 +258,10 @@ export function OperatorPerformanceChart({
               
               <ReferenceLine x={7} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2}>
                   <Label value="Meta: 7h" position="top" fill="#ef4444" fontSize={10} fontWeight="bold" />
+              </ReferenceLine>
+
+              <ReferenceLine x={8} stroke="#f97316" strokeDasharray="3 3" strokeWidth={2}>
+                  <Label value="Meta: 8h (William)" position="top" fill="#f97316" fontSize={10} fontWeight="bold" />
               </ReferenceLine>
               
               {activePlanCategories.map((cat, idx) => (
