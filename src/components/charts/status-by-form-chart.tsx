@@ -30,7 +30,7 @@ const STATUS_COLORS: { [key: string]: string } = {
     'Inspeção/Qualidade': 'hsl(262 84% 57%)', // purple
     'Rejeitado': 'hsl(0 72% 51%)', // red
     'Serviços Externos': 'hsl(221 83% 53%)', // blue
-    'Serviço de Bancada/Serra': 'hsl(35 84% 35%)', // amber/brown
+    'Programa concluído': 'hsl(35 84% 35%)', // amber/brown
 };
 
 const ALL_STATUSES = [
@@ -40,7 +40,7 @@ const ALL_STATUSES = [
   'Inspeção/Qualidade',
   'Rejeitado',
   'Serviços Externos',
-  'Serviço de Bancada/Serra',
+  'Programa concluído',
 ];
 
 interface StatusByFormChartProps {
