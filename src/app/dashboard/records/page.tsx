@@ -280,7 +280,6 @@ export default function RecordsPage() {
     }
   };
 
-  // Base data filtered by date/factory/category but NOT by operator (for comparison charts)
   const basePlanejamentoData = useMemo(() => {
       return planejamentoData.filter(record => {
           const dateStr = record.dataExecucao || record['Data Execução'] || record['Data'];
@@ -323,7 +322,6 @@ export default function RecordsPage() {
     return lossRecords.filter(record => lossCategoryFilter(record, false));
   }, [lossRecords, selectedLossReason]);
 
-  // Operator-specific filtered data for KPIs and Trends
   const operatorFilteredProductionRecords = useMemo(() => {
     return baseProductionRecords.filter(operatorFilter);
   }, [baseProductionRecords, selectedOperator]);
@@ -349,7 +347,7 @@ export default function RecordsPage() {
       return dataMap[factory];
     };
 
-    basePlanejamentoData.forEach(record => {
+    filteredPlanejamentoData.forEach(record => {
       const siteName = record.site || record['Site'];
       const factory = normalizeFactoryName(siteName);
       const d = getOrCreate(factory);
@@ -382,7 +380,7 @@ export default function RecordsPage() {
       }
     });
     
-    baseProductionRecords.forEach(record => {
+    operatorFilteredProductionRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.machiningTime) || 0) / 60;
         if (hours > 0) {
@@ -392,7 +390,7 @@ export default function RecordsPage() {
         }
     });
 
-    baseLossRecords.forEach(record => {
+    operatorFilteredLossRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.timeLost) || 0) / 60;
         if (hours > 0) {
@@ -412,7 +410,7 @@ export default function RecordsPage() {
       }
   }).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
 
-  }, [basePlanejamentoData, baseProductionRecords, baseLossRecords, selectedLossReason]);
+  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords, selectedLossReason]);
 
   useEffect(() => {
     setSelectedMonth('all');

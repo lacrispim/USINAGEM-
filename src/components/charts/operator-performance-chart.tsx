@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -171,6 +170,11 @@ export function OperatorPerformanceChart({
       }))
       .sort((a, b) => (b.realTotal + b.planTotal) - (a.realTotal + a.planTotal));
 
+    // Filtrar apenas o operador selecionado, se houver um
+    const filteredData = selectedOperator && selectedOperator !== 'all'
+        ? sortedData.filter(item => item.name === selectedOperator)
+        : sortedData;
+
     const sortedCategories = Array.from(categoriesFound).sort((a, b) => {
         if (a === 'PRODUCAO') return -1;
         if (b === 'PRODUCAO') return 1;
@@ -178,10 +182,10 @@ export function OperatorPerformanceChart({
     });
 
     return { 
-        chartData: sortedData, 
+        chartData: filteredData, 
         activeCategories: sortedCategories
     };
-  }, [productionData, lossData, plannedData]);
+  }, [productionData, lossData, plannedData, selectedOperator]);
 
   const chartConfig = useMemo(() => {
     const config: any = {};
@@ -275,9 +279,27 @@ export function OperatorPerformanceChart({
       <div className="h-[450px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ChartContainer config={chartConfig} className="h-full w-full">
-            <BarChart data={chartData} layout="vertical" barGap={4} margin={{ top: 30, right: 60, left: 40, bottom: 20 }} onClick={(e) => e?.activeLabel && onOperatorSelect(e.activeLabel)}>
+            <BarChart 
+                data={chartData} 
+                layout="vertical" 
+                barGap={4} 
+                margin={{ top: 30, right: 60, left: 40, bottom: 20 }}
+                onClick={(e) => {
+                    if (e && e.activeLabel) {
+                        onOperatorSelect(e.activeLabel);
+                    }
+                }}
+            >
               <CartesianGrid horizontal={false} strokeOpacity={0.1} />
-               <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={120} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+               <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    tickLine={false} 
+                    axisLine={false} 
+                    tickMargin={10} 
+                    width={120} 
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, cursor: 'pointer' }} 
+                />
               <XAxis type="number" domain={[0, xAxisDomainMax]} unit="h" tickLine={false} axisLine={false} className="text-[10px]" />
               <ChartTooltip cursor={{ fill: 'hsl(var(--accent))', opacity: 0.05 }} content={<CustomTooltip />} />
               
@@ -298,6 +320,7 @@ export function OperatorPerformanceChart({
                     fill={CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR}
                     barSize={15}
                     radius={idx === activeCategories.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                    className="cursor-pointer"
                 >
                     {idx === activeCategories.length - 1 && (
                         <LabelList 
@@ -321,6 +344,7 @@ export function OperatorPerformanceChart({
                     opacity={0.8}
                     barSize={15}
                     radius={idx === activeCategories.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                    className="cursor-pointer"
                 >
                     {idx === activeCategories.length - 1 && (
                         <LabelList 
