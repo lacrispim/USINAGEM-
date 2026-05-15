@@ -330,6 +330,7 @@ const ProductionFormContent = () => {
                                 <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
                                 <SelectItem value="Rejeitado">Rejeitado</SelectItem>
                                 <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
+                                <SelectItem value="Serviço de Bancada/Serra">Serviço de Bancada/Serra</SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -771,6 +772,7 @@ const statusColorMap: { [key: string]: string } = {
     'Inspeção/Qualidade': 'bg-purple-500',
     'Rejeitado': 'bg-red-500',
     'Serviços Externos': 'bg-blue-500',
+    'Serviço de Bancada/Serra': 'bg-amber-700',
 };
 
 export default function ProductionRegistryPage() {
@@ -1258,6 +1260,7 @@ export default function ProductionRegistryPage() {
                                           <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
                                           <SelectItem value="Rejeitado">Rejeitado</SelectItem>
                                           <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
+                                          <SelectItem value="Serviço de Bancada/Serra">Serviço de Bancada/Serra</SelectItem>
                                       </SelectContent>
                                     </Select>
                                 </TableCell>
@@ -1289,6 +1292,7 @@ export default function ProductionRegistryPage() {
                                             <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
                                             <SelectItem value="Rejeitado">Rejeitado</SelectItem>
                                             <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
+                                            <SelectItem value="Serviço de Bancada/Serra">Serviço de Bancada/Serra</SelectItem>
                                         </SelectContent>
                                       </Select>
                                 </TableCell>
