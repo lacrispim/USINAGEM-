@@ -97,33 +97,44 @@ export function OperatorPerformanceChart({
   onOperatorSelect,
 }: OperatorPerformanceChartProps) {
   
-  const { chartData, activePlanCategories } = useMemo(() => {
+  const { chartData, activeCategories } = useMemo(() => {
     const operatorStats: { [key: string]: any } = {};
     const categoriesFound = new Set<string>();
 
     const getOrCreate = (name: string) => {
         if (!operatorStats[name]) {
-            operatorStats[name] = { name, planTotal: 0, real: 0 };
+            operatorStats[name] = { name, planTotal: 0, realTotal: 0 };
         }
         return operatorStats[name];
     };
 
+    // Processar Realizado de Produção
     productionData.forEach(record => {
       const name = normalizeOperatorName(record.operatorId || record.tecnico || record['Técnicos'] || record['Técnico']);
       if (name) {
         const stats = getOrCreate(name);
-        stats.real += Number(record.machiningTime || 0) / 60;
+        const hours = Number(record.machiningTime || 0) / 60;
+        const catKey = 'PRODUCAO';
+        stats[`real_${catKey}`] = (stats[`real_${catKey}`] || 0) + hours;
+        stats.realTotal += hours;
+        categoriesFound.add(catKey);
       }
     });
 
+    // Processar Realizado de Perdas
     lossData.forEach(record => {
       const name = normalizeOperatorName(record.operatorId || record.tecnico || record['Técnicos'] || record['Técnico']);
       if (name) {
         const stats = getOrCreate(name);
-        stats.real += Number(record.timeLost || 0) / 60;
+        const hours = Number(record.timeLost || 0) / 60;
+        const catKey = getCategoryKey(record.lossReason || '');
+        stats[`real_${catKey}`] = (stats[`real_${catKey}`] || 0) + hours;
+        stats.realTotal += hours;
+        categoriesFound.add(catKey);
       }
     });
 
+    // Processar Planejado
     plannedData.forEach(record => {
       const name = normalizeOperatorName(record.tecnico || record['Técnicos'] || record['Técnico'] || record.operatorId);
       if (name) {
@@ -158,33 +169,30 @@ export function OperatorPerformanceChart({
         ...item,
         fillColor: OPERATOR_COLORS[item.name] || OPERATOR_COLORS['Outro'],
       }))
-      .sort((a, b) => (b.real + b.planTotal) - (a.real + a.planTotal));
+      .sort((a, b) => (b.realTotal + b.planTotal) - (a.realTotal + a.planTotal));
 
     const sortedCategories = Array.from(categoriesFound).sort((a, b) => {
         if (a === 'PRODUCAO') return -1;
         if (b === 'PRODUCAO') return 1;
-        if (a === 'LIMPEZA PLANEJADA') return 1;
-        if (b === 'LIMPEZA PLANEJADA') return -1;
         return a.localeCompare(b);
     });
 
     return { 
         chartData: sortedData, 
-        activePlanCategories: sortedCategories
+        activeCategories: sortedCategories
     };
   }, [productionData, lossData, plannedData]);
 
   const chartConfig = useMemo(() => {
-    const config: any = {
-        real: { label: 'Realizado (Real)' }
-    };
-    activePlanCategories.forEach(cat => {
-        config[`plan_${cat}`] = { label: CATEGORY_STYLES[cat]?.label || cat, color: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR };
+    const config: any = {};
+    activeCategories.forEach(cat => {
+        config[`plan_${cat}`] = { label: `${CATEGORY_STYLES[cat]?.label || cat} (Plan)`, color: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR };
+        config[`real_${cat}`] = { label: `${CATEGORY_STYLES[cat]?.label || cat} (Real)`, color: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR };
     });
     return config;
-  }, [activePlanCategories]);
+  }, [activeCategories]);
   
-  const maxVal = Math.max(...chartData.map(d => Math.max(d.planTotal, d.real)), 0);
+  const maxVal = Math.max(...chartData.map(d => Math.max(d.planTotal, d.realTotal)), 0);
   const xAxisDomainMax = Math.max(10, Math.ceil(maxVal) + 1);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -201,11 +209,11 @@ export function OperatorPerformanceChart({
                     <span className="font-bold">{p.planTotal.toFixed(1)}h</span>
                 </div>
                 <div className="pl-3 flex flex-col gap-0.5">
-                    {activePlanCategories.map(cat => {
+                    {activeCategories.map(cat => {
                         const val = p[`plan_${cat}`] || 0;
                         if (val <= 0) return null;
                         return (
-                            <div key={`plan-${cat}`} className="flex items-center gap-2">
+                            <div key={`plan-tip-${cat}`} className="flex items-center gap-2">
                                 <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR }} />
                                 <div className="flex justify-between flex-1">
                                     <span className="text-muted-foreground text-[10px]">{CATEGORY_STYLES[cat]?.label || cat}</span>
@@ -217,9 +225,26 @@ export function OperatorPerformanceChart({
                 </div>
             </div>
 
-            <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold">Realizado</span>
-                <span className="font-bold" style={{ color: p.fillColor }}>{p.real.toFixed(1)}h</span>
+            <div className="flex flex-col gap-1">
+                <div className="flex justify-between items-center">
+                    <span className="text-sm font-semibold">Realizado (Total)</span>
+                    <span className="font-bold" style={{ color: p.fillColor }}>{p.realTotal.toFixed(1)}h</span>
+                </div>
+                <div className="pl-3 flex flex-col gap-0.5">
+                    {activeCategories.map(cat => {
+                        const val = p[`real_${cat}`] || 0;
+                        if (val <= 0) return null;
+                        return (
+                            <div key={`real-tip-${cat}`} className="flex items-center gap-2">
+                                <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR }} />
+                                <div className="flex justify-between flex-1">
+                                    <span className="text-muted-foreground text-[10px]">{CATEGORY_STYLES[cat]?.label || cat}</span>
+                                    <span className="font-bold text-[10px]">{val.toFixed(1)}h</span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
           </div>
         </div>
@@ -232,12 +257,12 @@ export function OperatorPerformanceChart({
     <div className="flex items-center justify-center gap-x-4 gap-y-2 mt-4 flex-wrap border-t pt-4">
         <div className="flex items-center gap-1.5 mr-4">
             <div className="w-2.5 h-2.5 rounded-full border-2 border-muted-foreground" />
-            <span className="text-[9px] font-black uppercase text-foreground">Barra Sup: Plan (Dividido) | Barra Inf: Real</span>
+            <span className="text-[9px] font-black uppercase text-foreground">Barra Sup: Plan | Barra Inf: Real (Ambas Segmentadas)</span>
         </div>
-        {activePlanCategories.map(cat => (
+        {activeCategories.map(cat => (
             <div key={cat} className="flex items-center gap-1.5">
-                <div className={cn("w-2 h-2 rounded-sm", cat === 'LIMPEZA PLANEJADA' && "ring-1 ring-white")} style={{ backgroundColor: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR }} />
-                <span className={cn("text-[9px] font-bold uppercase text-muted-foreground", cat === 'LIMPEZA PLANEJADA' && "text-green-400 font-black")}>{CATEGORY_STYLES[cat]?.label || cat}</span>
+                <div className={cn("w-2 h-2 rounded-sm")} style={{ backgroundColor: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR }} />
+                <span className={cn("text-[9px] font-bold uppercase text-muted-foreground")}>{CATEGORY_STYLES[cat]?.label || cat}</span>
             </div>
         ))}
     </div>
@@ -264,18 +289,17 @@ export function OperatorPerformanceChart({
                   <Label value="Meta 8h" position="top" fill="#f97316" fontSize={10} fontWeight="bold" />
               </ReferenceLine>
               
-              {activePlanCategories.map((cat, idx) => (
+              {/* STACK PLANEJADO (SUPERIOR) */}
+              {activeCategories.map((cat, idx) => (
                 <Bar 
                     key={`plan-${cat}`} 
                     dataKey={`plan_${cat}`} 
-                    name={CATEGORY_STYLES[cat]?.label || cat}
                     stackId="planejado" 
                     fill={CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR}
                     barSize={15}
-                    radius={idx === activePlanCategories.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
-                    className={cn(cat === 'LIMPEZA PLANEJADA' && "brightness-110")}
+                    radius={idx === activeCategories.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
                 >
-                    {idx === activePlanCategories.length - 1 && (
+                    {idx === activeCategories.length - 1 && (
                         <LabelList 
                             dataKey="planTotal" 
                             position="right" 
@@ -287,12 +311,29 @@ export function OperatorPerformanceChart({
                 </Bar>
               ))}
 
-              <Bar dataKey="real" name="Realizado (Real)" barSize={15} radius={[0, 4, 4, 0]}>
-                   {chartData.map((entry, index) => (
-                    <Cell key={`cell-real-${index}`} cursor="pointer" fill={entry.fillColor} opacity={selectedOperator && selectedOperator !== 'all' ? (selectedOperator === entry.name ? 1 : 0.3) : 1} />
-                    ))}
-                    <LabelList dataKey="real" position="right" offset={8} className="fill-foreground text-[10px] font-bold" formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''} />
-              </Bar>
+              {/* STACK REALIZADO (INFERIOR) */}
+              {activeCategories.map((cat, idx) => (
+                <Bar 
+                    key={`real-${cat}`} 
+                    dataKey={`real_${cat}`} 
+                    stackId="realizado" 
+                    fill={CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR}
+                    opacity={0.8}
+                    barSize={15}
+                    radius={idx === activeCategories.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                >
+                    {idx === activeCategories.length - 1 && (
+                        <LabelList 
+                            dataKey="realTotal" 
+                            position="right" 
+                            offset={8} 
+                            className="fill-foreground text-[10px] font-bold" 
+                            formatter={(value: number) => value > 0 ? `${value.toFixed(1)}h` : ''} 
+                        />
+                    )}
+                </Bar>
+              ))}
+
               <Legend content={<CustomLegend />} />
             </BarChart>
           </ChartContainer>
