@@ -76,6 +76,7 @@ const lossCategories = [
   { value: 'AJUSTES CORRETIVOS DE PROCESSOS', label: 'Ajustes Corretivos' },
   { value: 'VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)', label: 'Velocidade Reduzida' },
   { value: 'RETRABALHO', label: 'Retrabalho' },
+  { value: 'SERVIÇOS DE BANCADA/SERRA', label: 'Serviços de Bancada/Serra' },
 ];
 
 const operatorList = [

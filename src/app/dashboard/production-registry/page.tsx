@@ -91,7 +91,8 @@ const lossReasonDetails = [
     { value: "PEQUENAS PARADAS", description: "PEQUENAS PARADAS NÃO PROGRAMADAS, ABAIXO DE 10 MINUTOS" },
     { value: "AJUSTES CORRETIVOS DE PROCESSOS", description: "AJUSTES NÃO PLANEJADOS NECESSÁRIOS PARA FABRICAR A PEÇA (SEM CONSIDERAR O SETUP)" },
     { value: "VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)", description: "MÁQUINA OPERANDO ABAIXO DO NOMINAL POR ALGUM PROBLEMA" },
-    { value: "RETRABALHO", description: "RETRABALHO DE OPERAÇÕES OU PEÇAS JÁ REALIZADAS" }
+    { value: "RETRABALHO", description: "RETRABALHO DE OPERAÇÕES OU PEÇAS JÁ REALIZADAS" },
+    { value: "SERVIÇOS DE BANCADA/SERRA", description: "ATIVIDADES DE BANCADA OU OPERAÇÃO DE SERRA" }
 ];
 
 const lossReasonOptions = lossReasonDetails.map(item => item.value);

@@ -49,7 +49,8 @@ const mplReasons = [
   "PEQUENAS PARADAS",
   "AJUSTES CORRETIVOS DE PROCESSOS",
   "VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)",
-  "RETRABALHO"
+  "RETRABALHO",
+  "SERVIÇOS DE BANCADA/SERRA"
 ].map(r => r.toUpperCase().trim());
 
 const chartConfig = {
