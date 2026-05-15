@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -21,7 +20,6 @@ import {
   Trash2,
   Cpu,
   Settings2,
-  CheckCircle2,
   Clock,
   PlusCircle,
   Move
@@ -63,7 +61,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
@@ -282,7 +279,6 @@ export default function ProgrammingPage() {
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
 
-  // Escuta registros de produção do Firestore (FONTE ÚNICA DO REALIZADO)
   const productionRecordsQuery = useMemoFirebase(() => 
     firestore ? query(collection(firestore, 'productionRecords')) : null
   , [firestore]);
@@ -430,7 +426,6 @@ export default function ProgrammingPage() {
       return { pPlan, hPlan };
     };
 
-    // 1. Processar dados do Realtime Database (PLANEJADO)
     planejamentoData.forEach(item => {
       const dateStr = item.dataExecucao || item['Data Execução'];
       if (!dateStr) return;
@@ -467,7 +462,6 @@ export default function ProgrammingPage() {
       }
     });
 
-    // 2. Processar registros do Firestore (REALIZADO - FONTE ÚNICA)
     if (firestoreProduction) {
       firestoreProduction.forEach(record => {
         const recordDate = record.date?.toDate ? record.date.toDate() : (record.date ? new Date(record.date) : null);
@@ -478,13 +472,22 @@ export default function ProgrammingPage() {
 
         const equip = String(record.machine || '').toUpperCase();
         
-        // Determinar turno aproximado pelo horário de criação
-        const hour = record.createdAt?.toDate ? record.createdAt.toDate().getHours() : 10;
-        let tIdx = 0; // 1º Turno (default)
-        if (hour >= 14 && hour < 22) tIdx = 1; // 2º Turno
-        else if (hour >= 22 || hour < 6) tIdx = 2; // 3º Turno
+        // Nova Lógica de Turnos baseada em Operadores
+        const operator = record.operatorId || '';
+        let tIdx = 0; // Default: 1º Turno
+        if (['Marcos Barbosa', 'Daniel Solivo'].includes(operator)) {
+          tIdx = 0; // 1º Turno
+        } else if (['Jair Melo', 'Nathan Xavier'].includes(operator)) {
+          tIdx = 1; // 2º Turno
+        } else if (['Gustavo Gozzi', 'Rodrigo Cantano'].includes(operator)) {
+          tIdx = 2; // 3º Turno
+        } else {
+          // Fallback para horário se for um técnico não listado
+          const hour = record.createdAt?.toDate ? record.createdAt.toDate().getHours() : 10;
+          if (hour >= 14 && hour < 22) tIdx = 1;
+          else if (hour >= 22 || hour < 6) tIdx = 2;
+        }
 
-        // Extrair número de operações se possível
         let ops = 0;
         const opsMatch = String(record.operationsNumber || '').match(/\d+/);
         ops = opsMatch ? parseInt(opsMatch[0]) : qty;
@@ -505,7 +508,7 @@ export default function ProgrammingPage() {
           let key = selectedWeekFilter !== 'all' ? format(recordDate, 'yyyy-MM-dd') : format(recordDate, 'yyyy-MM');
           let label = selectedWeekFilter !== 'all' ? format(recordDate, 'dd/MM', { locale: ptBR }) : format(recordDate, 'MMM yy', { locale: ptBR });
           const targetMap = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurMap : 
-                             (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
+                           (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
           if (targetMap) {
             if (!targetMap[key]) {
               targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 };
@@ -523,7 +526,7 @@ export default function ProgrammingPage() {
       centur: isDayView ? centurTurns : Object.values(centurMap).sort(sortFn), 
       centro: isDayView ? centroTurns : Object.values(centroMap).sort(sortFn) 
     }, isDayView };
-  }, [planejamentoData, firestoreProduction, selectedWeekFilter, selectedDateFilter, viewMetric]);
+  }, [planejamentoData, firestoreProduction, selectedWeekFilter, selectedDateFilter]);
 
   const handleShiftClick = (day: Date, turnoId: string) => {
     setEditingId(null);
@@ -624,8 +627,6 @@ export default function ProgrammingPage() {
 
   const renderEvent = (item: PlanejamentoItem) => {
     const qtdPlan = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
-    // O status completo no calendário agora pode ser puramente visual do planejador ou baseado em lógica externa
-    const isCompleted = false; // Removido do calendário para evitar confusão com o realizado real
     
     return (
       <TooltipProvider key={item.id}>
@@ -823,8 +824,10 @@ export default function ProgrammingPage() {
                 <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
               </div>
               <div className="bg-muted/10 p-3 rounded-lg border border-dashed">
-                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Peças Planejadas (Meta)</FormLabel><FormControl><Input type="number" className="h-8" {...field} /></FormControl></FormItem>)} />
-                <p className="text-[10px] text-muted-foreground mt-2 italic">* O realizado real é calculado automaticamente através dos apontamentos dos técnicos.</p>
+                <div className="grid grid-cols-1">
+                  <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Peças Planejadas (Meta)</FormLabel><FormControl><Input type="number" className="h-8" {...field} /></FormControl></FormItem>)} />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-2 italic">* O realizado real é calculado automaticamente através dos apontamentos dos técnicos no Firestore.</p>
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
