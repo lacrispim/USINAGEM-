@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -110,12 +111,6 @@ interface PlanejamentoItem {
   'Nome da Peça'?: string;
   quantidade?: number;
   Quantidade?: number;
-  quantidadeRealizada?: number;
-  'Quantidade Realizada'?: number;
-  operacoesRealizadas?: number;
-  'Operações Realizadas'?: number;
-  operacoesPorPeca?: number;
-  'Operações por Peça'?: number;
   tecnico?: string;
   Técnicos?: string;
   horasPlanejadas?: number | string;
@@ -175,9 +170,6 @@ const planningFormSchema = z.object({
   requisicao: z.string().min(1, 'Nº da Requisição é obrigatório.'),
   nomeDaPeca: z.string().min(1, 'Nome da peça é obrigatório.'),
   quantidade: z.coerce.number().min(0, 'Quantidade deve ser zero ou maior.'),
-  quantidadeRealizada: z.coerce.number().default(0),
-  operacoesRealizadas: z.coerce.number().default(0),
-  operacoesPorPeca: z.coerce.number().default(1),
   tecnico: z.string().min(1, 'Técnico é obrigatório.'),
   horasPlanejadas: z.coerce.number().default(0),
   turno: z.string(),
@@ -290,7 +282,7 @@ export default function ProgrammingPage() {
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
 
-  // Escuta registros de produção do Firestore para somar como Peças Finalizadas
+  // Escuta registros de produção do Firestore (FONTE ÚNICA DO REALIZADO)
   const productionRecordsQuery = useMemoFirebase(() => 
     firestore ? query(collection(firestore, 'productionRecords')) : null
   , [firestore]);
@@ -304,9 +296,6 @@ export default function ProgrammingPage() {
       requisicao: '',
       nomeDaPeca: '',
       quantidade: 0,
-      quantidadeRealizada: 0,
-      operacoesRealizadas: 0,
-      operacoesPorPeca: 1,
       tecnico: '',
       horasPlanejadas: 0,
       turno: '1',
@@ -428,32 +417,20 @@ export default function ProgrammingPage() {
     const centurMap: Record<string, any> = {};
     const centroMap: Record<string, any> = {};
 
-    const calculateItemVolumes = (item: PlanejamentoItem) => {
+    const calculatePlanVolumes = (item: PlanejamentoItem) => {
       const pPlan = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
-      const pReal = Number(item.quantidadeRealizada !== undefined ? item.quantidadeRealizada : item['Quantidade Realizada']) || 0;
-      const oReal = Number(item.operacoesRealizadas !== undefined ? item.operacoesRealizadas : (item['Operações Realizadas'] || 0)) || 0;
-      
-      let hPlan = 0, hReal = 0;
-      const scale = pPlan > 0 ? (pReal / pPlan) : (pReal > 0 ? 1 : 0);
-
+      let hPlan = 0;
       if (item.atividades && Array.isArray(item.atividades)) {
-          item.atividades.forEach(ativ => {
-              const pTime = Number(ativ.tempo) || 0;
-              hPlan += pTime;
-              hReal += pTime * Math.min(1, scale);
-          });
+          item.atividades.forEach(ativ => hPlan += (Number(ativ.tempo) || 0));
       } else {
-          const h = typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
+          hPlan = typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
               ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
               : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0);
-          hPlan = h;
-          hReal = h * Math.min(1, scale);
       }
-      
-      return { pPlan, pReal, oReal, hPlan, hReal };
+      return { pPlan, hPlan };
     };
 
-    // 1. Processar dados do Realtime Database (Planejamento)
+    // 1. Processar dados do Realtime Database (PLANEJADO)
     planejamentoData.forEach(item => {
       const dateStr = item.dataExecucao || item['Data Execução'];
       if (!dateStr) return;
@@ -461,7 +438,7 @@ export default function ProgrammingPage() {
       try { date = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { date = new Date(dateStr); }
       if (isNaN(date.getTime())) return;
 
-      const v = calculateItemVolumes(item);
+      const v = calculatePlanVolumes(item);
       const equip = String(item.equipamento || item.EQUIPAMENTO || '').toUpperCase();
       
       if (isDayView) {
@@ -472,10 +449,7 @@ export default function ProgrammingPage() {
                            (equip.includes('CENTRO') || equip.includes('D600')) ? centroTurns : null;
         if (targetArr && turnoIndex >= 0 && turnoIndex < 3) {
             targetArr[turnoIndex].pecas_plan += v.pPlan;
-            targetArr[turnoIndex].pecas_real += v.pReal;
-            targetArr[turnoIndex].ops_real += v.oReal;
             targetArr[turnoIndex].horas_plan += v.hPlan;
-            targetArr[turnoIndex].horas_real += v.hReal;
         }
       } else {
         if (selectedWeekFilter !== 'all' && getISOWeek(date) !== parseInt(selectedWeekFilter)) return;
@@ -488,15 +462,12 @@ export default function ProgrammingPage() {
             targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 };
           }
           targetMap[key].pecas_plan += v.pPlan;
-          targetMap[key].pecas_real += v.pReal;
-          targetMap[key].ops_real += v.oReal;
           targetMap[key].horas_plan += v.hPlan;
-          targetMap[key].horas_real += v.hReal;
         }
       }
     });
 
-    // 2. Processar registros do Firestore (Produção Real do Técnico)
+    // 2. Processar registros do Firestore (REALIZADO - FONTE ÚNICA)
     if (firestoreProduction) {
       firestoreProduction.forEach(record => {
         const recordDate = record.date?.toDate ? record.date.toDate() : (record.date ? new Date(record.date) : null);
@@ -518,6 +489,8 @@ export default function ProgrammingPage() {
         const opsMatch = String(record.operationsNumber || '').match(/\d+/);
         ops = opsMatch ? parseInt(opsMatch[0]) : qty;
 
+        const hReal = (Number(record.machiningTime) || 0) / 60;
+
         if (isDayView) {
           if (!isSameDay(recordDate, selectedDateFilter!)) return;
           const targetArr = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurTurns : 
@@ -525,6 +498,7 @@ export default function ProgrammingPage() {
           if (targetArr && tIdx >= 0 && tIdx < 3) {
             targetArr[tIdx].pecas_real += qty;
             targetArr[tIdx].ops_real += ops;
+            targetArr[tIdx].horas_real += hReal;
           }
         } else {
           if (selectedWeekFilter !== 'all' && getISOWeek(recordDate) !== parseInt(selectedWeekFilter)) return;
@@ -538,6 +512,7 @@ export default function ProgrammingPage() {
             }
             targetMap[key].pecas_real += qty;
             targetMap[key].ops_real += ops;
+            targetMap[key].horas_real += hReal;
           }
         }
       });
@@ -561,9 +536,6 @@ export default function ProgrammingPage() {
       requisicao: '',
       nomeDaPeca: '',
       quantidade: 0,
-      quantidadeRealizada: 0,
-      operacoesRealizadas: 0,
-      operacoesPorPeca: 1,
       tecnico: '',
       horasPlanejadas: 0,
       site: 'VALINHOS DOVE',
@@ -597,9 +569,6 @@ export default function ProgrammingPage() {
       requisicao: item.requisicao || item['Requisição'] || '',
       nomeDaPeca: item.nomeDaPeca || item['Nome da Peça'] || '',
       quantidade: Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0,
-      quantidadeRealizada: Number(item.quantidadeRealizada !== undefined ? item.quantidadeRealizada : item['Quantidade Realizada']) || 0,
-      operacoesRealizadas: Number(item.operacoesRealizadas !== undefined ? item.operacoesRealizadas : (item['Operações Realizadas'] || 0)) || 0,
-      operacoesPorPeca: Number(item.operacoesPorPeca !== undefined ? item.operacoesPorPeca : (item['Operações por Peça'] || 1)),
       tecnico: item.tecnico || item.Técnicos || '',
       horasPlanejadas: typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
         ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
@@ -632,9 +601,6 @@ export default function ProgrammingPage() {
         requisicao: values.requisicao,
         nomeDaPeca: values.nomeDaPeca,
         quantidade: values.quantidade,
-        quantidadeRealizada: values.quantidadeRealizada,
-        operacoesRealizadas: values.operacoesRealizadas,
-        operacoesPorPeca: values.operacoesPorPeca,
         tecnico: values.tecnico,
         horasPlanejadas: values.horasPlanejadas,
         Turno: values.turno,
@@ -658,8 +624,8 @@ export default function ProgrammingPage() {
 
   const renderEvent = (item: PlanejamentoItem) => {
     const qtdPlan = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
-    const qtdReal = Number(item.quantidadeRealizada !== undefined ? item.quantidadeRealizada : item['Quantidade Realizada']) || 0;
-    const isCompleted = qtdReal >= qtdPlan && qtdPlan > 0;
+    // O status completo no calendário agora pode ser puramente visual do planejador ou baseado em lógica externa
+    const isCompleted = false; // Removido do calendário para evitar confusão com o realizado real
     
     return (
       <TooltipProvider key={item.id}>
@@ -671,11 +637,10 @@ export default function ProgrammingPage() {
               onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}
               className={cn(
                 "mb-1 cursor-grab active:cursor-grabbing truncate rounded border p-1 text-[10px] leading-tight shadow-sm transition-all flex items-center gap-1 group/event",
-                isCompleted ? "border-green-500/50 bg-green-500/5" : "border-border bg-card hover:border-primary"
+                "border-border bg-card hover:border-primary"
               )}
             >
               <Move className="h-2 w-2 opacity-0 group-hover/event:opacity-40 transition-opacity" />
-              {isCompleted && <CheckCircle2 className="h-2 w-2 text-green-500 shrink-0" />}
               <span className="font-bold text-primary mr-1">{item.requisicao || item['Requisição']}</span>
               <span className="truncate">{item.nomeDaPeca || item['Nome da Peça']}</span>
             </div>
@@ -683,7 +648,7 @@ export default function ProgrammingPage() {
           <TooltipContent className="w-64 p-3" side="right">
             <div className="grid grid-cols-2 gap-2 text-xs">
                 <span className="text-muted-foreground">Equip:</span><span className="font-medium text-right">{item.equipamento || item.EQUIPAMENTO}</span>
-                <span className="text-muted-foreground">Produção:</span><span className="font-medium text-right">{qtdReal} / {qtdPlan} pçs</span>
+                <span className="text-muted-foreground">Meta Peças:</span><span className="font-medium text-right">{qtdPlan} pçs</span>
                 <span className="text-muted-foreground">Total Planejado:</span><span className="font-medium text-right">{(Number(item.horasPlanejadas || item['Horas Máquina']) || 0).toFixed(1)}h</span>
                 <span className="text-muted-foreground">Técnico:</span><span className="font-medium text-right truncate">{item.tecnico || item.Técnicos}</span>
                 <span className="text-[10px] text-muted-foreground col-span-2 pt-1 border-t italic">Segure e arraste para mudar a data ou turno</span>
@@ -857,10 +822,9 @@ export default function ProgrammingPage() {
                 <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Requisição</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
               </div>
-              <div className="grid grid-cols-3 gap-4 bg-muted/10 p-3 rounded-lg border border-dashed">
-                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Peças Plan.</FormLabel><FormControl><Input type="number" className="h-8" {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="quantidadeRealizada" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold text-green-500">Peças Fin.</FormLabel><FormControl><Input type="number" className="h-8 border-green-500/30" {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="operacoesRealizadas" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold text-purple-500">Ops. Realizadas</FormLabel><FormControl><Input type="number" className="h-8 border-purple-500/30" {...field} /></FormControl></FormItem>)} />
+              <div className="bg-muted/10 p-3 rounded-lg border border-dashed">
+                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Peças Planejadas (Meta)</FormLabel><FormControl><Input type="number" className="h-8" {...field} /></FormControl></FormItem>)} />
+                <p className="text-[10px] text-muted-foreground mt-2 italic">* O realizado real é calculado automaticamente através dos apontamentos dos técnicos.</p>
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
