@@ -280,19 +280,8 @@ export default function RecordsPage() {
     }
   };
 
-  const filteredPlanejamentoData = useMemo(() => {
-      const dateFilter = (recordDate: Date) => {
-        if (selectedDate) return recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
-        if (!selectedYear) return true;
-        const yearMatch = selectedYear === 'all' || getYear(recordDate) === parseInt(selectedYear, 10);
-        if (!yearMatch) return false;
-        if (selectedYear !== 'all') {
-            if (selectedWeek !== 'all') return getISOWeek(recordDate) === parseInt(selectedWeek, 10);
-            if (selectedMonth !== 'all') return getMonth(recordDate) === parseInt(selectedMonth, 10);
-        }
-        return true;
-      };
-
+  // Base data filtered by date/factory/category but NOT by operator (for comparison charts)
+  const basePlanejamentoData = useMemo(() => {
       return planejamentoData.filter(record => {
           const dateStr = record.dataExecucao || record['Data Execução'] || record['Data'];
           if (!dateStr) return false;
@@ -302,28 +291,50 @@ export default function RecordsPage() {
               if (isNaN(recordDate.getTime())) recordDate = new Date(dateStr);
               if (isNaN(recordDate.getTime())) return false;
           } catch { return false; }
-          if (!dateFilter(recordDate)) return false;
+          
+          const dateMatches = selectedDate ? (recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate)) : true;
+          if (!dateMatches) return false;
+
+          const yearMatches = (selectedYear && selectedYear !== 'all') ? getYear(recordDate) === parseInt(selectedYear) : true;
+          if (!yearMatches) return false;
+
+          if (selectedYear && selectedYear !== 'all') {
+              if (selectedWeek !== 'all' && getISOWeek(recordDate) !== parseInt(selectedWeek)) return false;
+              if (selectedMonth !== 'all' && getMonth(recordDate) !== parseInt(selectedMonth)) return false;
+          }
           
           const siteName = record.site || record['Site'];
           const normalizedSite = normalizeFactoryName(siteName);
           const factoryMatch = !selectedFactory || normalizedSite === selectedFactory;
           if (!factoryMatch) return false;
           
-          if (!operatorFilter(record)) return false;
           return lossCategoryFilter(record, true);
       });
-  }, [planejamentoData, selectedDate, selectedYear, selectedMonth, selectedWeek, selectedFactory, selectedOperator, selectedLossReason]);
+  }, [planejamentoData, selectedDate, selectedYear, selectedMonth, selectedWeek, selectedFactory, selectedLossReason]);
 
-  const operatorFilteredProductionRecords = useMemo(() => {
+  const baseProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
     if (selectedLossReason !== 'all' && selectedLossReason !== 'PRODUCAO') return [];
-    return productionRecords.filter(operatorFilter);
-  }, [productionRecords, selectedOperator, selectedLossReason]);
+    return productionRecords;
+  }, [productionRecords, selectedLossReason]);
+
+  const baseLossRecords = useMemo(() => {
+    if (!lossRecords) return [];
+    return lossRecords.filter(record => lossCategoryFilter(record, false));
+  }, [lossRecords, selectedLossReason]);
+
+  // Operator-specific filtered data for KPIs and Trends
+  const operatorFilteredProductionRecords = useMemo(() => {
+    return baseProductionRecords.filter(operatorFilter);
+  }, [baseProductionRecords, selectedOperator]);
 
   const operatorFilteredLossRecords = useMemo(() => {
-    if (!lossRecords) return [];
-    return lossRecords.filter(record => operatorFilter(record) && lossCategoryFilter(record, false));
-  }, [lossRecords, selectedOperator, selectedLossReason]);
+    return baseLossRecords.filter(operatorFilter);
+  }, [baseLossRecords, selectedOperator]);
+
+  const filteredPlanejamentoData = useMemo(() => {
+    return basePlanejamentoData.filter(operatorFilter);
+  }, [basePlanejamentoData, selectedOperator]);
 
   const plannedVsMachinedData = useMemo(() => {
     const dataMap: { [factory: string]: any } = {};
@@ -338,7 +349,7 @@ export default function RecordsPage() {
       return dataMap[factory];
     };
 
-    filteredPlanejamentoData.forEach(record => {
+    basePlanejamentoData.forEach(record => {
       const siteName = record.site || record['Site'];
       const factory = normalizeFactoryName(siteName);
       const d = getOrCreate(factory);
@@ -371,7 +382,7 @@ export default function RecordsPage() {
       }
     });
     
-    operatorFilteredProductionRecords.forEach(record => {
+    baseProductionRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.machiningTime) || 0) / 60;
         if (hours > 0) {
@@ -381,7 +392,7 @@ export default function RecordsPage() {
         }
     });
 
-    operatorFilteredLossRecords.forEach(record => {
+    baseLossRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const hours = (Number(record.timeLost) || 0) / 60;
         if (hours > 0) {
@@ -401,7 +412,7 @@ export default function RecordsPage() {
       }
   }).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
 
-  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords, selectedLossReason]);
+  }, [basePlanejamentoData, baseProductionRecords, baseLossRecords, selectedLossReason]);
 
   useEffect(() => {
     setSelectedMonth('all');
@@ -552,9 +563,9 @@ export default function RecordsPage() {
         </CardHeader>
         <CardContent>
           <OperatorPerformanceChart 
-            productionData={operatorFilteredProductionRecords}
-            lossData={operatorFilteredLossRecords}
-            plannedData={filteredPlanejamentoData}
+            productionData={baseProductionRecords}
+            lossData={baseLossRecords}
+            plannedData={basePlanejamentoData}
             loading={isLoading}
             selectedOperator={selectedOperator}
             onOperatorSelect={handleOperatorToggle}
