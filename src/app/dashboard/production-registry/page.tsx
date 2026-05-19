@@ -331,7 +331,7 @@ const ProductionFormContent = () => {
                                 <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
                                 <SelectItem value="Rejeitado">Rejeitado</SelectItem>
                                 <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
-                                <SelectItem value="Programa concluído">Programa concluído</SelectItem>
+                                <SelectItem value="PROGRAMA CONCLUÍDO">PROGRAMA CONCLUÍDO</SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -773,7 +773,7 @@ const statusColorMap: { [key: string]: string } = {
     'Inspeção/Qualidade': 'bg-purple-500',
     'Rejeitado': 'bg-red-500',
     'Serviços Externos': 'bg-blue-500',
-    'Programa concluído': 'bg-amber-700',
+    'PROGRAMA CONCLUÍDO': 'bg-amber-700',
 };
 
 export default function ProductionRegistryPage() {
@@ -1261,7 +1261,7 @@ export default function ProductionRegistryPage() {
                                           <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
                                           <SelectItem value="Rejeitado">Rejeitado</SelectItem>
                                           <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
-                                          <SelectItem value="Programa concluído">Programa concluído</SelectItem>
+                                          <SelectItem value="PROGRAMA CONCLUÍDO">PROGRAMA CONCLUÍDO</SelectItem>
                                       </SelectContent>
                                     </Select>
                                 </TableCell>
@@ -1293,7 +1293,7 @@ export default function ProductionRegistryPage() {
                                             <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
                                             <SelectItem value="Rejeitado">Rejeitado</SelectItem>
                                             <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
-                                            <SelectItem value="Programa concluído">Programa concluído</SelectItem>
+                                            <SelectItem value="PROGRAMA CONCLUÍDO">PROGRAMA CONCLUÍDO</SelectItem>
                                         </SelectContent>
                                       </Select>
                                 </TableCell>
