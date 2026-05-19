@@ -26,6 +26,7 @@ interface PlannedVsMachinedChartProps {
 // Motivos dinâmicos que não estiverem aqui usarão uma cor padrão.
 const CATEGORY_STYLES: Record<string, { label: string; color: string }> = {
     'PRODUCAO': { label: 'Usinagem', color: '#ffffff' },
+    'PROGRAMACAO': { label: 'Programação', color: '#a855f7' },
     'SETUP': { label: 'Setup', color: '#ef4444' },
     'TEMPO DE CAFÉ': { label: 'Café', color: '#eab308' },
     'LIMPEZA PLANEJADA': { label: 'Limpeza', color: '#22c55e' },
@@ -71,10 +72,12 @@ export function PlannedVsMachinedChart({
 
     const reasons = Array.from(keysSet);
     
-    // Ordenação: Produção primeiro, depois alfabética
+    // Ordenação: Produção primeiro, Programação segundo, depois alfabética
     return reasons.sort((a, b) => {
         if (a === 'PRODUCAO') return -1;
         if (b === 'PRODUCAO') return 1;
+        if (a === 'PROGRAMACAO') return -1;
+        if (b === 'PROGRAMACAO') return 1;
         return a.localeCompare(b);
     }).map(reason => ({
         key: reason,

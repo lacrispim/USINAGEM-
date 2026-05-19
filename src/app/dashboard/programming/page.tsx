@@ -153,7 +153,8 @@ const factoryList = [
 ];
 
 const lossOptions = [
-  { value: 'PRODUCAO', label: 'Produção Normal', color: '#a855f7' },
+  { value: 'PRODUCAO', label: 'Produção Normal', color: '#ffffff' },
+  { value: 'PROGRAMACAO', label: 'Programação', color: '#a855f7' },
   { value: 'SETUP', label: 'Setup', color: '#ef4444' },
   { value: 'DDS', label: 'Atividades ADM', color: '#f97316' },
   { value: 'CAFE', label: 'Parada para Café', color: '#eab308' },

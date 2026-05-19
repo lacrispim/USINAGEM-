@@ -43,6 +43,7 @@ const OPERATOR_COLORS: { [key: string]: string } = {
 
 const CATEGORY_STYLES: Record<string, { label: string; color: string }> = {
     'PRODUCAO': { label: 'Usinagem', color: '#ffffff' },
+    'PROGRAMACAO': { label: 'Programação', color: '#a855f7' },
     'SETUP': { label: 'Setup', color: '#ef4444' },
     'TEMPO DE CAFÉ': { label: 'Café', color: '#eab308' },
     'LIMPEZA PLANEJADA': { label: 'Limpeza', color: '#22c55e' },
@@ -79,6 +80,7 @@ const normalizeOperatorName = (name: any) => {
 const getCategoryKey = (reason: string): string => {
   const r = String(reason || '').toUpperCase().trim();
   if (r === '' || r === 'USINAGEM' || r === 'PRODUCAO' || r === 'PRODUÇÃO') return 'PRODUCAO';
+  if (r.includes('PROGRAMACAO') || r.includes('PROGRAMAÇÃO')) return 'PROGRAMACAO';
   if (r.includes('SETUP')) return 'SETUP';
   if (r.includes('CAFÉ') || r.includes('CAFE')) return 'TEMPO DE CAFÉ';
   if (r.includes('LIMPEZA')) return 'LIMPEZA PLANEJADA';
@@ -108,13 +110,17 @@ export function OperatorPerformanceChart({
         return operatorStats[name];
     };
 
-    // Processar Realizado de Produção
+    // Processar Realizado de Produção (Diferenciando por activityType)
     productionData.forEach(record => {
       const name = normalizeOperatorName(record.operatorId || record.tecnico || record['Técnicos'] || record['Técnico']);
       if (name) {
         const stats = getOrCreate(name);
         const hours = Number(record.machiningTime || 0) / 60;
-        const catKey = 'PRODUCAO';
+        
+        // Identifica se é Programação, Usinagem, etc.
+        const rawActivity = String(record.activityType || 'PRODUCAO').toUpperCase().trim();
+        const catKey = getCategoryKey(rawActivity);
+        
         stats[`real_${catKey}`] = (stats[`real_${catKey}`] || 0) + hours;
         stats.realTotal += hours;
         categoriesFound.add(catKey);
@@ -179,6 +185,8 @@ export function OperatorPerformanceChart({
     const sortedCategories = Array.from(categoriesFound).sort((a, b) => {
         if (a === 'PRODUCAO') return -1;
         if (b === 'PRODUCAO') return 1;
+        if (a === 'PROGRAMACAO') return -1;
+        if (b === 'PROGRAMACAO') return 1;
         return a.localeCompare(b);
     });
 

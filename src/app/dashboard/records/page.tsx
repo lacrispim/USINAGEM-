@@ -61,6 +61,7 @@ const months = [
 
 const lossCategories = [
   { value: 'PRODUCAO', label: 'Produção' },
+  { value: 'PROGRAMACAO', label: 'Programação' },
   { value: 'MANUTENÇÃO PLANEJADA', label: 'Manutenção Planejada' },
   { value: 'TEMPO DE CAFÉ', label: 'Tempo de Café' },
   { value: 'LIMPEZA PLANEJADA', label: 'Limpeza Planejada' },
@@ -121,6 +122,7 @@ const normalizeFactoryName = (name: any): string => {
 const getCategoryKey = (reason: string): string => {
   const r = String(reason || '').toUpperCase().trim();
   if (r === '' || r === 'USINAGEM' || r === 'PRODUCAO' || r === 'PRODUÇÃO') return 'PRODUCAO';
+  if (r.includes('PROGRAMACAO') || r.includes('PROGRAMAÇÃO')) return 'PROGRAMACAO';
   if (r.includes('SETUP')) return 'SETUP';
   if (r.includes('CAFÉ') || r.includes('CAFE')) return 'TEMPO DE CAFÉ';
   if (r.includes('LIMPEZA')) return 'LIMPEZA PLANEJADA';
@@ -314,7 +316,8 @@ export default function RecordsPage() {
 
   const baseProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
-    if (selectedLossReason !== 'all' && selectedLossReason !== 'PRODUCAO') return [];
+    // Agora filtramos por categoria específica de produção se houver
+    if (selectedLossReason !== 'all' && selectedLossReason !== 'PRODUCAO' && selectedLossReason !== 'PROGRAMACAO') return [];
     return productionRecords;
   }, [productionRecords, selectedLossReason]);
 
@@ -386,7 +389,11 @@ export default function RecordsPage() {
         const hours = (Number(record.machiningTime) || 0) / 60;
         if (hours > 0) {
             const d = getOrCreate(factory);
-            d.real_PRODUCAO = (d.real_PRODUCAO || 0) + hours;
+            const rawActivity = String(record.activityType || 'PRODUCAO').toUpperCase().trim();
+            const catKey = getCategoryKey(rawActivity);
+            
+            const key = `real_${catKey}`;
+            d[key] = (d[key] || 0) + hours;
             d.totalRealizado += hours;
         }
     });
