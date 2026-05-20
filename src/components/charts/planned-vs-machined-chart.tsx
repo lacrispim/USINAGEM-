@@ -43,6 +43,7 @@ const CATEGORY_STYLES: Record<string, { label: string; color: string }> = {
     'VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)': { label: 'Vel. Reduzida', color: '#4c1d95' },
     'RETRABALHO': { label: 'Retrabalho', color: '#111827' },
     'SERVIÇOS DE BANCADA/SERRA': { label: 'Bancada/Serra', color: '#fbbf24' },
+    'AUXÍLIO EM MAQUINA': { label: 'Auxílio Máquina', color: '#2dd4bf' },
 };
 
 const DEFAULT_COLOR = '#6b7280'; // Cinza para motivos específicos não mapeados

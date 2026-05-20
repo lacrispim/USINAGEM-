@@ -92,7 +92,8 @@ const lossReasonDetails = [
     { value: "AJUSTES CORRETIVOS DE PROCESSOS", description: "AJUSTES NÃO PLANEJADOS NECESSÁRIOS PARA FABRICAR A PEÇA (SEM CONSIDERAR O SETUP)" },
     { value: "VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)", description: "MÁQUINA OPERANDO ABAIXO DO NOMINAL POR ALGUM PROBLEMA" },
     { value: "RETRABALHO", description: "RETRABALHO DE OPERAÇÕES OU PEÇAS JÁ REALIZADAS" },
-    { value: "SERVIÇOS DE BANCADA/SERRA", description: "ATIVIDADES DE BANCADA OU OPERAÇÃO DE SERRA" }
+    { value: "SERVIÇOS DE BANCADA/SERRA", description: "ATIVIDADES DE BANCADA OU OPERAÇÃO DE SERRA" },
+    { value: "AUXÍLIO EM MAQUINA", description: "AJUDA EM OUTRA MÁQUINA OU OPERAÇÃO" }
 ];
 
 const lossReasonOptions = lossReasonDetails.map(item => item.value);
