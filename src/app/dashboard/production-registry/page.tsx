@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter, CalendarDays } from 'lucide-react';
+import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter, CalendarDays, Factory } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -789,6 +789,7 @@ export default function ProductionRegistryPage() {
   const [editedLossRecord, setEditedLossRecord] = useState<any | null>(null);
   
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
+  const [selectedFactory, setSelectedFactory] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [formsFilter, setFormsFilter] = useState<string>('');
@@ -823,19 +824,19 @@ export default function ProductionRegistryPage() {
       } else if (selectedMonth !== 'all') {
           const monthIdx = parseInt(selectedMonth);
           if (recordDate.getMonth() !== monthIdx) return false;
-          // Mostra apenas registros do ano atual ao filtrar por mês para simplificar
           if (recordDate.getFullYear() !== new Date().getFullYear()) return false;
       } else {
         if (recordDate < startOfLimit) return false;
       }
 
       const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
+      const factoryMatch = selectedFactory === 'all' || record.factory === selectedFactory;
       const formsMatch = !formsFilter || (record.formsNumber && 
         record.formsNumber.toLowerCase().includes(formsFilter.toLowerCase()));
 
-      return operatorMatch && formsMatch;
+      return operatorMatch && formsMatch && factoryMatch;
     });
-  }, [productionRecords, selectedOperator, selectedDate, selectedMonth, formsFilter, selectedCategory]);
+  }, [productionRecords, selectedOperator, selectedFactory, selectedDate, selectedMonth, formsFilter, selectedCategory]);
 
   const filteredLossRecords = useMemo(() => {
     if (!lossRecords) return [];
@@ -862,14 +863,15 @@ export default function ProductionRegistryPage() {
       }
 
       const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
+      const factoryMatch = selectedFactory === 'all' || record.factory === selectedFactory;
       const formsMatch = !formsFilter || (record.formsNumber && 
         record.formsNumber.toLowerCase().includes(formsFilter.toLowerCase()));
       
       const categoryMatch = selectedCategory === 'all' || record.lossReason === selectedCategory;
 
-      return operatorMatch && formsMatch && categoryMatch;
+      return operatorMatch && formsMatch && categoryMatch && factoryMatch;
     });
-  }, [lossRecords, selectedOperator, selectedDate, selectedMonth, formsFilter, selectedCategory]);
+  }, [lossRecords, selectedOperator, selectedFactory, selectedDate, selectedMonth, formsFilter, selectedCategory]);
 
   const handleDelete = async (collectionName: string, id: string) => {
     if (!firestore) return;
@@ -1141,6 +1143,25 @@ export default function ProductionRegistryPage() {
                     </Popover>
                 </div>
                 <div className="grid w-full sm:max-w-[180px] gap-1.5">
+                    <Label htmlFor="factory-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Fábrica</Label>
+                    <Select value={selectedFactory} onValueChange={setSelectedFactory}>
+                        <SelectTrigger id="factory-filter" className="h-8 text-xs font-bold">
+                            <div className='flex items-center gap-2'>
+                                <Factory className="h-3 w-3 text-muted-foreground" />
+                                <SelectValue placeholder="Todas" />
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todas as Fábricas</SelectItem>
+                            {factoryList.map((f) => (
+                                <SelectItem key={f} value={f}>
+                                    {f}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid w-full sm:max-w-[180px] gap-1.5">
                     <Label htmlFor="operator-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Técnico</Label>
                     <Select value={selectedOperator} onValueChange={setSelectedOperator}>
                         <SelectTrigger id="operator-filter" className="h-8 text-xs font-bold">
@@ -1159,10 +1180,11 @@ export default function ProductionRegistryPage() {
                         </SelectContent>
                     </Select>
                 </div>
-                {(selectedDate || selectedOperator !== 'all' || formsFilter || selectedCategory !== 'all' || selectedMonth !== 'all') && (
+                {(selectedDate || selectedOperator !== 'all' || selectedFactory !== 'all' || formsFilter || selectedCategory !== 'all' || selectedMonth !== 'all') && (
                   <Button variant="ghost" size="sm" onClick={() => {
                     setSelectedDate(undefined);
                     setSelectedOperator('all');
+                    setSelectedFactory('all');
                     setFormsFilter('');
                     setSelectedCategory('all');
                     setSelectedMonth('all');
