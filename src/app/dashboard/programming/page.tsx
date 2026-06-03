@@ -160,6 +160,7 @@ const lossOptions = [
   { value: 'CAFE', label: 'Parada para Café', color: '#eab308' },
   { value: 'LIMPEZA', label: 'Limpeza Planejada', color: '#22c55e' },
   { value: 'QUALIDADE', label: 'Inspeção / Qualidade', color: '#3b82f6' },
+  { value: 'AUXÍLIO AS FÁBRICAS', label: 'Auxílio as Fábricas', color: '#0ea5e9' },
 ];
 
 const planningFormSchema = z.object({

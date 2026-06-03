@@ -51,7 +51,8 @@ const mplReasons = [
   "VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)",
   "RETRABALHO",
   "SERVIÇOS DE BANCADA/SERRA",
-  "AUXÍLIO EM MAQUINA"
+  "AUXÍLIO EM MAQUINA",
+  "AUXÍLIO AS FÁBRICAS"
 ].map(r => r.toUpperCase().trim());
 
 const chartConfig = {

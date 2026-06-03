@@ -79,6 +79,7 @@ const lossCategories = [
   { value: 'RETRABALHO', label: 'Retrabalho' },
   { value: 'SERVIÇOS DE BANCADA/SERRA', label: 'Serviços de Bancada/Serra' },
   { value: 'AUXÍLIO EM MAQUINA', label: 'Auxílio em Máquina' },
+  { value: 'AUXÍLIO AS FÁBRICAS', label: 'Auxílio as Fábricas' },
 ];
 
 const operatorList = [

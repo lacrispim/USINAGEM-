@@ -61,6 +61,7 @@ const CATEGORY_STYLES: Record<string, { label: string; color: string }> = {
     'RETRABALHO': { label: 'Retrabalho', color: '#111827' },
     'SERVIÇOS DE BANCADA/SERRA': { label: 'Bancada/Serra', color: '#fbbf24' },
     'AUXÍLIO EM MAQUINA': { label: 'Auxílio Máquina', color: '#2dd4bf' },
+    'AUXÍLIO AS FÁBRICAS': { label: 'Aux. Fábricas', color: '#0ea5e9' },
 };
 
 const DEFAULT_COLOR = '#6b7280';
