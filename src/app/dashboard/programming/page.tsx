@@ -239,17 +239,18 @@ const PlanningChart = ({
               
               {metric === 'production' ? (
                 <>
+                  {/* Ordem: Peças Fin, Peças Plan, Ops Realizadas, Ops Plan */}
                   <Bar name="Peças Fin." dataKey="pecas_real" fill="#22c55e" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="pecas_real" position="top" className="fill-foreground text-[10px] font-bold" />
+                  </Bar>
+                  <Bar name="Peças Plan." dataKey="pecas_plan" fill="#6b7280" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="pecas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" />
                   </Bar>
                   <Bar name="Ops. Realizadas" dataKey="ops_real" fill="#a855f7" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="ops_real" position="top" className="fill-foreground text-[10px] font-bold" />
                   </Bar>
                   <Bar name="Ops. Plan." dataKey="ops_plan" fill="#f59e0b" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="ops_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" />
-                  </Bar>
-                  <Bar name="Peças Plan." dataKey="pecas_plan" fill="#6b7280" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="pecas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" />
                   </Bar>
                 </>
               ) : (
