@@ -536,6 +536,16 @@ export default function ProgrammingPage() {
     setSelectedDay(day);
     setSelectedTurno(turnoId);
     setSelectedTecnicoAtivo(tecnico || null);
+
+    const isSunday = day.getDay() === 0;
+    const defaultAtividades = [{ tipo: 'PRODUCAO', tempo: 0, site: 'VALINHOS DOVE' }];
+    
+    // Adicionar DDS e Café automaticamente (Exceto Domingo)
+    if (!isSunday) {
+        defaultAtividades.push({ tipo: 'DDS', tempo: 0.25, site: 'TORRE' }); // 15 min = 0.25h
+        defaultAtividades.push({ tipo: 'CAFE', tempo: 0.25, site: 'TORRE' }); // 15 min = 0.25h
+    }
+
     form.reset({
       dataExecucao: format(day, 'dd/MM/yyyy'),
       turno: turnoId,
@@ -544,10 +554,10 @@ export default function ProgrammingPage() {
       nomeDaPeca: '',
       quantidade: 0,
       tecnico: tecnico || '',
-      horasPlanejadas: 0,
+      horasPlanejadas: isSunday ? 0 : 0.5,
       site: 'VALINHOS DOVE',
       observacao: '',
-      atividades: [{ tipo: 'PRODUCAO', tempo: 0, site: 'VALINHOS DOVE' }],
+      atividades: defaultAtividades,
     });
     setIsDialogOpen(true);
   };
@@ -906,4 +916,3 @@ export default function ProgrammingPage() {
     </div>
   );
 }
-
