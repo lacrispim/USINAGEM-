@@ -307,18 +307,12 @@ export default function RecordsPage() {
               if (selectedMonth !== 'all' && getMonth(recordDate) !== parseInt(selectedMonth)) return false;
           }
           
-          const siteName = record.site || record['Site'];
-          const normalizedSite = normalizeFactoryName(siteName);
-          const factoryMatch = !selectedFactory || normalizedSite === selectedFactory;
-          if (!factoryMatch) return false;
-          
           return lossCategoryFilter(record, true);
       });
-  }, [planejamentoData, selectedDate, selectedYear, selectedMonth, selectedWeek, selectedFactory, selectedLossReason]);
+  }, [planejamentoData, selectedDate, selectedYear, selectedMonth, selectedWeek, selectedLossReason]);
 
   const baseProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
-    // Agora filtramos por categoria específica de produção se houver
     if (selectedLossReason !== 'all' && selectedLossReason !== 'PRODUCAO' && selectedLossReason !== 'PROGRAMACAO') return [];
     return productionRecords;
   }, [productionRecords, selectedLossReason]);
@@ -354,33 +348,39 @@ export default function RecordsPage() {
     };
 
     filteredPlanejamentoData.forEach(record => {
-      const siteName = record.site || record['Site'];
-      const factory = normalizeFactoryName(siteName);
-      const d = getOrCreate(factory);
-
       if (record.atividades && Array.isArray(record.atividades)) {
         record.atividades.forEach((ativ: any) => {
+          // Usar site da atividade se existir, senão site do record
+          const factory = normalizeFactoryName(ativ.site || record.site || record['Site']);
           const catKey = getCategoryKey(ativ.tipo);
+          
           if (selectedLossReason === 'all' || catKey === selectedLossReason) {
-            const time = Number(ativ.tempo) || 0;
-            const key = `plan_${catKey}`;
-            d[key] = (d[key] || 0) + time;
-            d.totalPlanejado += time;
+            if (!selectedFactory || factory === selectedFactory) {
+              const d = getOrCreate(factory);
+              const time = Number(ativ.tempo) || 0;
+              const key = `plan_${catKey}`;
+              d[key] = (d[key] || 0) + time;
+              d.totalPlanejado += time;
+            }
           }
         });
       } else {
-        const rawHours = record.horasPlanejadas || record['Horas Máquina'];
-        const machineHours = typeof rawHours === 'string' 
-          ? parseFloat(rawHours.replace(',', '.')) 
-          : (Number(rawHours) || 0);
-        
-        if (!isNaN(machineHours)) {
-          const rawReason = String(record.perdaPlanejada || record['Perdas planejadas'] || '').toUpperCase().trim();
-          const catKey = getCategoryKey(rawReason);
-          if (selectedLossReason === 'all' || catKey === selectedLossReason) {
-            const key = `plan_${catKey}`;
-            d[key] = (d[key] || 0) + machineHours;
-            d.totalPlanejado += machineHours;
+        const factory = normalizeFactoryName(record.site || record['Site']);
+        if (!selectedFactory || factory === selectedFactory) {
+          const rawHours = record.horasPlanejadas || record['Horas Máquina'];
+          const machineHours = typeof rawHours === 'string' 
+            ? parseFloat(rawHours.replace(',', '.')) 
+            : (Number(rawHours) || 0);
+          
+          if (!isNaN(machineHours)) {
+            const rawReason = String(record.perdaPlanejada || record['Perdas planejadas'] || '').toUpperCase().trim();
+            const catKey = getCategoryKey(rawReason);
+            if (selectedLossReason === 'all' || catKey === selectedLossReason) {
+              const d = getOrCreate(factory);
+              const key = `plan_${catKey}`;
+              d[key] = (d[key] || 0) + machineHours;
+              d.totalPlanejado += machineHours;
+            }
           }
         }
       }
@@ -388,28 +388,32 @@ export default function RecordsPage() {
     
     operatorFilteredProductionRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
-        const hours = (Number(record.machiningTime) || 0) / 60;
-        if (hours > 0) {
-            const d = getOrCreate(factory);
-            const rawActivity = String(record.activityType || 'PRODUCAO').toUpperCase().trim();
-            const catKey = getCategoryKey(rawActivity);
-            
-            const key = `real_${catKey}`;
-            d[key] = (d[key] || 0) + hours;
-            d.totalRealizado += hours;
+        if (!selectedFactory || factory === selectedFactory) {
+          const hours = (Number(record.machiningTime) || 0) / 60;
+          if (hours > 0) {
+              const d = getOrCreate(factory);
+              const rawActivity = String(record.activityType || 'PRODUCAO').toUpperCase().trim();
+              const catKey = getCategoryKey(rawActivity);
+              
+              const key = `real_${catKey}`;
+              d[key] = (d[key] || 0) + hours;
+              d.totalRealizado += hours;
+          }
         }
     });
 
     operatorFilteredLossRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
-        const hours = (Number(record.timeLost) || 0) / 60;
-        if (hours > 0) {
-            const d = getOrCreate(factory);
-            const reason = record.lossReason?.toUpperCase() || '';
-            const catKey = getCategoryKey(reason);
-            const key = `real_${catKey}`;
-            d[key] = (d[key] || 0) + hours;
-            d.totalRealizado += hours;
+        if (!selectedFactory || factory === selectedFactory) {
+          const hours = (Number(record.timeLost) || 0) / 60;
+          if (hours > 0) {
+              const d = getOrCreate(factory);
+              const reason = record.lossReason?.toUpperCase() || '';
+              const catKey = getCategoryKey(reason);
+              const key = `real_${catKey}`;
+              d[key] = (d[key] || 0) + hours;
+              d.totalRealizado += hours;
+          }
         }
     });
 
@@ -420,7 +424,7 @@ export default function RecordsPage() {
       }
   }).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
 
-  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords, selectedLossReason]);
+  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords, selectedLossReason, selectedFactory]);
 
   useEffect(() => {
     setSelectedMonth('all');
@@ -438,7 +442,7 @@ export default function RecordsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Visão Supervisor</h1>
-          <p className="text-muted-foreground">Monitoramento de produtividade e análise de dados.</p>
+          <p className="text-muted-foreground">Análise de produtividade, OEE e eficiência por técnico/fábrica.</p>
         </div>
         <Button asChild>
           <Link href="/dashboard/production-registry">
@@ -605,3 +609,4 @@ export default function RecordsPage() {
     </div>
   );
 }
+

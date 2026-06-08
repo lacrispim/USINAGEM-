@@ -22,7 +22,8 @@ import {
   Settings2,
   Clock,
   PlusCircle,
-  Move
+  Move,
+  User as UserIcon
 } from 'lucide-react';
 import { 
   format, 
@@ -91,6 +92,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 interface AtividadePlanejada {
   tipo: string;
   tempo: number;
+  site?: string;
 }
 
 interface PlanejamentoItem {
@@ -121,9 +123,9 @@ interface PlanejamentoItem {
 }
 
 const turnos = [
-  { id: '1', label: '1º Turno', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-  { id: '2', label: '2º Turno', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
-  { id: '3', label: '3º Turno', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+  { id: '1', label: '1º Turno', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', technicians: ["Marcos Barbosa", "Daniel Solivo"] },
+  { id: '2', label: '2º Turno', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20', technicians: ["Nathan Xavier", "Jair Melo"] },
+  { id: '3', label: '3º Turno', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', technicians: ["Gustavo Gozzi", "Rodrigo Cantano"] },
 ];
 
 const operatorList = [
@@ -173,7 +175,8 @@ const planningFormSchema = z.object({
   observacao: z.string().optional(),
   atividades: z.array(z.object({
     tipo: z.string().min(1, 'Tipo é obrigatório'),
-    tempo: z.coerce.number().min(0, 'Tempo deve ser zero ou maior')
+    tempo: z.coerce.number().min(0, 'Tempo deve ser zero ou maior'),
+    site: z.string().min(1, 'Fábrica da atividade é obrigatória')
   })).min(1, 'Adicione pelo menos uma atividade'),
 });
 
@@ -272,6 +275,7 @@ export default function ProgrammingPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
+  const [selectedTecnicoAtivo, setSelectedTecnicoAtivo] = useState<string | null>(null);
 
   const [selectedWeekFilter, setSelectedWeekFilter] = useState<string>('all');
   const [selectedDateFilter, setSelectedDateFilter] = useState<Date | undefined>(undefined);
@@ -296,7 +300,7 @@ export default function ProgrammingPage() {
       turno: '1',
       site: 'VALINHOS DOVE',
       observacao: '',
-      atividades: [{ tipo: 'PRODUCAO', tempo: 0 }],
+      atividades: [{ tipo: 'PRODUCAO', tempo: 0, site: 'VALINHOS DOVE' }],
     },
   });
 
@@ -373,19 +377,23 @@ export default function ProgrammingPage() {
     e.dataTransfer.setData('itemId', id);
   };
 
-  const handleDrop = async (e: React.DragEvent, day: Date, turnoId: string) => {
+  const handleDrop = async (e: React.DragEvent, day: Date, turnoId: string, tecnico?: string) => {
     e.preventDefault();
     const itemId = e.dataTransfer.getData('itemId') || draggedItemId;
     if (!itemId || !database) return;
 
     const newDateStr = format(day, 'dd/MM/yyyy');
     try {
-      await update(ref(database, `/Planejamento S/${itemId}`), {
+      const updatePayload: any = {
         dataExecucao: newDateStr,
         Turno: turnoId,
         turno: turnoId
-      });
-      toast({ title: "Planejamento Movido", description: `Movido para ${newDateStr} - ${turnoId}º Turno` });
+      };
+      if (tecnico) {
+        updatePayload.tecnico = tecnico;
+      }
+      await update(ref(database, `/Planejamento S/${itemId}`), updatePayload);
+      toast({ title: "Planejamento Movido", description: `Movido para ${newDateStr}` });
     } catch (error) {
       console.error(error);
       toast({ title: "Erro ao mover", variant: "destructive" });
@@ -523,10 +531,11 @@ export default function ProgrammingPage() {
     }, isDayView };
   }, [planejamentoData, firestoreProduction, selectedWeekFilter, selectedDateFilter]);
 
-  const handleShiftClick = (day: Date, turnoId: string) => {
+  const handleShiftClick = (day: Date, turnoId: string, tecnico?: string) => {
     setEditingId(null);
     setSelectedDay(day);
     setSelectedTurno(turnoId);
+    setSelectedTecnicoAtivo(tecnico || null);
     form.reset({
       dataExecucao: format(day, 'dd/MM/yyyy'),
       turno: turnoId,
@@ -534,11 +543,11 @@ export default function ProgrammingPage() {
       requisicao: '',
       nomeDaPeca: '',
       quantidade: 0,
-      tecnico: '',
+      tecnico: tecnico || '',
       horasPlanejadas: 0,
       site: 'VALINHOS DOVE',
       observacao: '',
-      atividades: [{ tipo: 'PRODUCAO', tempo: 0 }],
+      atividades: [{ tipo: 'PRODUCAO', tempo: 0, site: 'VALINHOS DOVE' }],
     });
     setIsDialogOpen(true);
   };
@@ -557,7 +566,8 @@ export default function ProgrammingPage() {
       tipo: (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase(),
       tempo: typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
         ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
-        : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0)
+        : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0),
+      site: item.site || item.Site || 'VALINHOS DOVE'
     }];
 
     form.reset({
@@ -660,7 +670,7 @@ export default function ProgrammingPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Planejamento de Produção</h1>
-          <p className="text-muted-foreground">Visualização semanal do plano mestre por turnos com suporte a Drag & Drop.</p>
+          <p className="text-muted-foreground">Gestão semanal detalhada por turnos e técnicos.</p>
         </div>
         <div className="flex items-center gap-2 bg-card p-1 rounded-lg border shadow-sm">
           <Button variant="ghost" size="icon" onClick={prevWeek}><ChevronLeft className="h-4 w-4" /></Button>
@@ -679,33 +689,64 @@ export default function ProgrammingPage() {
           ) : (
             <div className="grid grid-cols-7 gap-px bg-border overflow-hidden rounded-lg border shadow-lg">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
-                <div key={day} className="bg-muted/50 p-3 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground border-b">{day}</div>
+                <div key={day} className="bg-muted/50 p-3 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b">{day}</div>
               ))}
               {calendarDays.map((day) => {
                 const dayItems = getItemsForDay(day);
                 return (
-                  <div key={day.toString()} className={cn("min-h-[300px] bg-card p-2 flex flex-col gap-2", isToday(day) && "ring-1 ring-inset ring-primary z-10")}>
-                    <div className="flex items-center justify-between p-1">
-                      <span className={cn("text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full", isToday(day) ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{format(day, 'd')}</span>
-                      <span className="text-[10px] text-muted-foreground font-medium">{format(day, 'MMM', { locale: ptBR })}</span>
+                  <div key={day.toString()} className={cn("min-h-[500px] bg-card p-0 flex flex-col border-r last:border-r-0", isToday(day) && "ring-1 ring-inset ring-primary z-10")}>
+                    <div className="flex items-center justify-between p-2 border-b bg-muted/20">
+                      <span className={cn("text-xs font-black w-6 h-6 flex items-center justify-center rounded-full", isToday(day) ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{format(day, 'd')}</span>
+                      <span className="text-[9px] text-muted-foreground font-bold uppercase">{format(day, 'MMM', { locale: ptBR })}</span>
                     </div>
-                    <div className="flex-1 space-y-3 overflow-y-auto max-h-[350px] scrollbar-hide">
+                    
+                    <div className="flex-1 overflow-y-auto scrollbar-hide">
                       {turnos.map(turno => {
-                        const itemsInTurno = dayItems.filter(item => { 
-                          const shiftVal = String(item.Turno || item.turno || '1');
-                          return shiftVal === turno.id; 
-                        });
+                        // Agrupar itens por técnico dentro deste turno
+                        const techniciansInThisTurno = Array.from(new Set([
+                           ...turno.technicians,
+                           ...dayItems.filter(item => String(item.Turno || item.turno || '1') === turno.id).map(item => item.tecnico || item.Técnicos || '')
+                        ])).filter(Boolean);
+
                         return (
-                          <div 
-                            key={turno.id} 
-                            className="group/turno relative"
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={(e) => handleDrop(e, day, turno.id)}
-                          >
-                            <div onClick={() => handleShiftClick(day, turno.id)} className={cn("text-[9px] px-1.5 py-1 rounded border font-bold uppercase cursor-pointer hover:opacity-80 flex items-center justify-between transition-colors", turno.color)}>
-                              {turno.label}<Plus className="h-2.5 w-2.5 opacity-0 group-hover/turno:opacity-100" />
+                          <div key={turno.id} className="border-b last:border-b-0">
+                            <div className={cn("px-2 py-1 text-[8px] font-black uppercase tracking-tighter border-b", turno.color)}>
+                              {turno.label}
                             </div>
-                            <div className="min-h-[10px] mt-1.5">{itemsInTurno.map(item => renderEvent(item))}</div>
+                            <div className="p-1 space-y-2">
+                                {techniciansInThisTurno.map(tech => {
+                                   const itemsForTech = dayItems.filter(item => 
+                                      String(item.Turno || item.turno || '1') === turno.id && 
+                                      (item.tecnico === tech || item.Técnicos === tech)
+                                   );
+                                   
+                                   return (
+                                     <div key={tech} className="bg-muted/10 rounded border border-dashed p-1.5 min-h-[40px] group/tech">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <div className="flex items-center gap-1">
+                                                <UserIcon className="h-2 w-2 text-muted-foreground" />
+                                                <span className="text-[8px] font-bold text-muted-foreground uppercase truncate max-w-[60px]">{tech.split(' ')[0]}</span>
+                                            </div>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-3 w-3 opacity-0 group-hover/tech:opacity-100 transition-opacity"
+                                                onClick={() => handleShiftClick(day, turno.id, tech)}
+                                            >
+                                                <Plus className="h-2 w-2" />
+                                            </Button>
+                                        </div>
+                                        <div 
+                                          className="min-h-[10px]"
+                                          onDragOver={(e) => e.preventDefault()}
+                                          onDrop={(e) => handleDrop(e, day, turno.id, tech)}
+                                        >
+                                            {itemsForTech.map(item => renderEvent(item))}
+                                        </div>
+                                     </div>
+                                   );
+                                })}
+                            </div>
                           </div>
                         );
                       })}
@@ -751,7 +792,7 @@ export default function ProgrammingPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}</DialogTitle>
           </DialogHeader>
@@ -774,15 +815,15 @@ export default function ProgrammingPage() {
               <div className="space-y-4 rounded-lg border p-4 bg-muted/20">
                 <div className="flex items-center justify-between">
                     <Label className="font-bold uppercase text-[10px] tracking-widest text-primary">Atividades / Perdas Planejadas</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={() => append({ tipo: 'PRODUCAO', tempo: 0 })} className="h-7 text-[10px] font-bold"><PlusCircle className="h-3 w-3 mr-1" /> ADICIONAR ATIVIDADE</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ tipo: 'PRODUCAO', tempo: 0, site: form.getValues('site') || 'VALINHOS DOVE' })} className="h-7 text-[10px] font-bold"><PlusCircle className="h-3 w-3 mr-1" /> ADICIONAR ATIVIDADE</Button>
                 </div>
                 {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-3 items-end border-b pb-3 last:border-0 last:pb-0">
-                    <div className="flex-1">
+                  <div key={field.id} className="flex gap-2 items-end border-b pb-3 last:border-0 last:pb-0">
+                    <div className="flex-[1.5]">
                       <FormField control={form.control} name={`atividades.${index}.tipo`} render={({ field }) => (
                         <FormItem>
                           <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger></FormControl>
+                            <FormControl><SelectTrigger className="h-8 text-[10px]"><SelectValue placeholder="Tipo" /></SelectTrigger></FormControl>
                             <SelectContent>
                               {lossOptions.map(opt => (
                                 <SelectItem key={opt.value} value={opt.value}>
@@ -794,9 +835,21 @@ export default function ProgrammingPage() {
                         </FormItem>
                       )} />
                     </div>
-                    <div className="w-24">
+                    <div className="flex-[1.5]">
+                      <FormField control={form.control} name={`atividades.${index}.site`} render={({ field }) => (
+                        <FormItem>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger className="h-8 text-[10px]"><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                                {factoryList.map(f => <SelectItem key={f} value={f} className="text-[10px]">{f}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )} />
+                    </div>
+                    <div className="w-20">
                       <FormField control={form.control} name={`atividades.${index}.tempo`} render={({ field }) => (
-                        <FormItem><FormControl><Input type="number" step="0.1" placeholder="Horas" className="h-8 text-xs" {...field} /></FormControl></FormItem>
+                        <FormItem><FormControl><Input type="number" step="0.1" placeholder="Horas" className="h-8 text-[10px]" {...field} /></FormControl></FormItem>
                       )} />
                     </div>
                     {fields.length > 1 && (
@@ -811,8 +864,25 @@ export default function ProgrammingPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="site" render={({ field }) => (<FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel>Técnico</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel>Técnico Responsável</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                <FormField control={form.control} name="site" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Fábrica Principal (Referência)</FormLabel>
+                        <Select onValueChange={(val) => {
+                            field.onChange(val);
+                            // Atualizar site das atividades que ainda estão no padrão
+                            const currentAtivs = form.getValues('atividades');
+                            currentAtivs.forEach((_, idx) => {
+                                if (!form.getValues(`atividades.${idx}.site`)) {
+                                    form.setValue(`atividades.${idx}.site`, val);
+                                }
+                            });
+                        }} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                            <SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </FormItem>
+                )} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Requisição</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
@@ -827,7 +897,7 @@ export default function ProgrammingPage() {
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
                 {editingId && (<Button type="button" variant="destructive" onClick={handleDeleteItem}>Excluir</Button>)}
-                <Button type="submit">Salvar</Button>
+                <Button type="submit">Salvar Planejamento</Button>
               </DialogFooter>
             </form>
           </Form>
@@ -836,3 +906,4 @@ export default function ProgrammingPage() {
     </div>
   );
 }
+
