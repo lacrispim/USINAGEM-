@@ -26,14 +26,11 @@ import {
 } from 'lucide-react';
 import { 
   format, 
-  addMonths, 
-  subMonths, 
-  startOfMonth, 
-  endOfMonth, 
+  addWeeks, 
+  subWeeks, 
   startOfWeek, 
   endOfWeek, 
   eachDayOfInterval, 
-  isSameMonth, 
   isSameDay, 
   parse, 
   isToday,
@@ -268,7 +265,7 @@ export default function ProgrammingPage() {
   
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMetric, setViewMetric] = useState<'production' | 'hours'>('production');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -345,19 +342,17 @@ export default function ProgrammingPage() {
     return () => unsubscribe();
   }, [database]);
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(monthStart);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
 
   const calendarDays = eachDayOfInterval({
-    start: calendarStart,
-    end: calendarEnd,
+    start: weekStart,
+    end: weekEnd,
   });
 
-  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
-  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
-  const goToToday = () => setCurrentMonth(new Date());
+  const nextWeek = () => setCurrentDate(prev => addWeeks(prev, 1));
+  const prevWeek = () => setCurrentDate(prev => subWeeks(prev, 1));
+  const goToToday = () => setCurrentDate(new Date());
 
   const getItemsForDay = (day: Date) => {
     return planejamentoData.filter(item => {
@@ -474,17 +469,15 @@ export default function ProgrammingPage() {
 
         const equip = String(record.machine || '').toUpperCase();
         
-        // Nova Lógica de Turnos baseada em Operadores
         const operator = record.operatorId || '';
-        let tIdx = 0; // Default: 1º Turno
+        let tIdx = 0;
         if (['Marcos Barbosa', 'Daniel Solivo'].includes(operator)) {
-          tIdx = 0; // 1º Turno
+          tIdx = 0;
         } else if (['Jair Melo', 'Nathan Xavier'].includes(operator)) {
-          tIdx = 1; // 2º Turno
+          tIdx = 1;
         } else if (['Gustavo Gozzi', 'Rodrigo Cantano'].includes(operator)) {
-          tIdx = 2; // 3º Turno
+          tIdx = 2;
         } else {
-          // Fallback para horário se for um técnico não listado
           const hour = record.createdAt?.toDate ? record.createdAt.toDate().getHours() : 10;
           if (hour >= 14 && hour < 22) tIdx = 1;
           else if (hour >= 22 || hour < 6) tIdx = 2;
@@ -667,12 +660,12 @@ export default function ProgrammingPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Planejamento de Produção</h1>
-          <p className="text-muted-foreground">Visualização mensal do plano mestre por turnos com suporte a Drag & Drop.</p>
+          <p className="text-muted-foreground">Visualização semanal do plano mestre por turnos com suporte a Drag & Drop.</p>
         </div>
         <div className="flex items-center gap-2 bg-card p-1 rounded-lg border shadow-sm">
-          <Button variant="ghost" size="icon" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
-          <div className="min-w-[140px] text-center font-bold capitalize">{format(currentMonth, 'MMMM yyyy', { locale: ptBR })}</div>
-          <Button variant="ghost" size="icon" onClick={nextMonth}><ChevronRight className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={prevWeek}><ChevronLeft className="h-4 w-4" /></Button>
+          <div className="min-w-[140px] text-center font-bold capitalize">{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</div>
+          <Button variant="ghost" size="icon" onClick={nextWeek}><ChevronRight className="h-4 w-4" /></Button>
           <Button variant="secondary" size="sm" onClick={goToToday}>Hoje</Button>
         </div>
       </div>
@@ -680,23 +673,23 @@ export default function ProgrammingPage() {
       <Card className="border-none shadow-none bg-transparent">
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex h-[600px] items-center justify-center gap-2 bg-card rounded-lg border">
+            <div className="flex h-[400px] items-center justify-center gap-2 bg-card rounded-lg border">
               <Loader className="h-8 w-8 animate-spin" /><span className="font-medium">Carregando...</span>
             </div>
           ) : (
             <div className="grid grid-cols-7 gap-px bg-border overflow-hidden rounded-lg border shadow-lg">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
-                <div key={day} className="bg-muted/50 p-2 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground">{day}</div>
+                <div key={day} className="bg-muted/50 p-3 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground border-b">{day}</div>
               ))}
               {calendarDays.map((day) => {
                 const dayItems = getItemsForDay(day);
-                const isCurrentMonth = isSameMonth(day, monthStart);
                 return (
-                  <div key={day.toString()} className={cn("min-h-[160px] bg-card p-1 flex flex-col gap-1", !isCurrentMonth && "bg-muted/30 opacity-50", isToday(day) && "ring-1 ring-inset ring-primary z-10")}>
+                  <div key={day.toString()} className={cn("min-h-[300px] bg-card p-2 flex flex-col gap-2", isToday(day) && "ring-1 ring-inset ring-primary z-10")}>
                     <div className="flex items-center justify-between p-1">
-                      <span className={cn("text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full", isToday(day) ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{format(day, 'd')}</span>
+                      <span className={cn("text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full", isToday(day) ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{format(day, 'd')}</span>
+                      <span className="text-[10px] text-muted-foreground font-medium">{format(day, 'MMM', { locale: ptBR })}</span>
                     </div>
-                    <div className="flex-1 space-y-2 overflow-y-auto max-h-[180px] scrollbar-hide">
+                    <div className="flex-1 space-y-3 overflow-y-auto max-h-[350px] scrollbar-hide">
                       {turnos.map(turno => {
                         const itemsInTurno = dayItems.filter(item => { 
                           const shiftVal = String(item.Turno || item.turno || '1');
@@ -709,10 +702,10 @@ export default function ProgrammingPage() {
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={(e) => handleDrop(e, day, turno.id)}
                           >
-                            <div onClick={() => handleShiftClick(day, turno.id)} className={cn("text-[8px] px-1 py-0.5 rounded border font-bold uppercase cursor-pointer hover:opacity-80 flex items-center justify-between transition-colors", turno.color)}>
-                              {turno.label}<Plus className="h-2 w-2 opacity-0 group-hover/turno:opacity-100" />
+                            <div onClick={() => handleShiftClick(day, turno.id)} className={cn("text-[9px] px-1.5 py-1 rounded border font-bold uppercase cursor-pointer hover:opacity-80 flex items-center justify-between transition-colors", turno.color)}>
+                              {turno.label}<Plus className="h-2.5 w-2.5 opacity-0 group-hover/turno:opacity-100" />
                             </div>
-                            <div className="min-h-[5px] mt-1">{itemsInTurno.map(item => renderEvent(item))}</div>
+                            <div className="min-h-[10px] mt-1.5">{itemsInTurno.map(item => renderEvent(item))}</div>
                           </div>
                         );
                       })}
