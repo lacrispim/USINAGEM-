@@ -52,7 +52,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter
-} from "@/dialog";
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,

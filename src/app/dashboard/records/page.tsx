@@ -37,7 +37,6 @@ import { OperatorPerformanceChart } from '@/components/charts/operator-performan
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { Confetti } from '@/components/ui/confetti';
 import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
 import { MonthlyOeeEvolutionChart } from '@/components/charts/monthly-oee-evolution-chart';
 import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
@@ -137,7 +136,6 @@ const getCategoryKey = (reason: string): string => {
 export default function RecordsPage() {
   const firestore = useFirestore();
   const database = useDatabase();
-  const [showConfetti, setShowConfetti] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
@@ -153,7 +151,6 @@ export default function RecordsPage() {
   useEffect(() => {
     setIsClient(true);
     setSelectedYear(String(new Date().getFullYear()));
-    setShowConfetti(true);
   }, []);
 
   useEffect(() => {
@@ -438,7 +435,6 @@ export default function RecordsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {showConfetti && <Confetti onComplete={() => setShowConfetti(false)} />}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Visão Supervisor</h1>
@@ -609,4 +605,3 @@ export default function RecordsPage() {
     </div>
   );
 }
-
