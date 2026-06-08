@@ -52,7 +52,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter
-} from "@/components/ui/dialog";
+} from "@/dialog";
 import {
   Form,
   FormControl,
@@ -107,6 +107,10 @@ interface PlanejamentoItem {
   'Nome da Peça'?: string;
   quantidade?: number;
   Quantidade?: number;
+  operacoesPlanejadas?: number;
+  'Operações Planejadas'?: number;
+  operacoesRealizadas?: number;
+  'Operações Realizadas'?: number;
   tecnico?: string;
   Técnicos?: string;
   horasPlanejadas?: number | string;
@@ -168,6 +172,8 @@ const planningFormSchema = z.object({
   requisicao: z.string().min(1, 'Nº da Requisição é obrigatório.'),
   nomeDaPeca: z.string().min(1, 'Nome da peça é obrigatório.'),
   quantidade: z.coerce.number().min(0, 'Quantidade deve ser zero ou maior.'),
+  operacoesPlanejadas: z.coerce.number().min(0).default(0),
+  operacoesRealizadas: z.coerce.number().min(0).default(0),
   tecnico: z.string().min(1, 'Técnico é obrigatório.'),
   horasPlanejadas: z.coerce.number().default(0),
   turno: z.string(),
@@ -239,6 +245,9 @@ const PlanningChart = ({
                   <Bar name="Ops. Realizadas" dataKey="ops_real" fill="#a855f7" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="ops_real" position="top" className="fill-foreground text-[10px] font-bold" />
                   </Bar>
+                  <Bar name="Ops. Plan." dataKey="ops_plan" fill="#f59e0b" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="ops_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" />
+                  </Bar>
                   <Bar name="Peças Plan." dataKey="pecas_plan" fill="#6b7280" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="pecas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" />
                   </Bar>
@@ -295,6 +304,8 @@ export default function ProgrammingPage() {
       requisicao: '',
       nomeDaPeca: '',
       quantidade: 0,
+      operacoesPlanejadas: 0,
+      operacoesRealizadas: 0,
       tecnico: '',
       horasPlanejadas: 0,
       turno: '1',
@@ -405,14 +416,14 @@ export default function ProgrammingPage() {
     const isDayView = !!selectedDateFilter;
 
     const centurTurns = [
-      { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
-      { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
-      { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 }
+      { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 },
+      { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 },
+      { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 }
     ];
     const centroTurns = [
-      { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
-      { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 },
-      { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 }
+      { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 },
+      { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 },
+      { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 }
     ];
 
     const centurMap: Record<string, any> = {};
@@ -420,6 +431,7 @@ export default function ProgrammingPage() {
 
     const calculatePlanVolumes = (item: PlanejamentoItem) => {
       const pPlan = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
+      const oPlan = Number(item.operacoesPlanejadas !== undefined ? item.operacoesPlanejadas : (item['Operações Planejadas'] || 0)) || 0;
       let hPlan = 0;
       if (item.atividades && Array.isArray(item.atividades)) {
           item.atividades.forEach(ativ => hPlan += (Number(ativ.tempo) || 0));
@@ -428,7 +440,7 @@ export default function ProgrammingPage() {
               ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
               : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0);
       }
-      return { pPlan, hPlan };
+      return { pPlan, hPlan, oPlan };
     };
 
     planejamentoData.forEach(item => {
@@ -450,6 +462,7 @@ export default function ProgrammingPage() {
         if (targetArr && turnoIndex >= 0 && turnoIndex < 3) {
             targetArr[turnoIndex].pecas_plan += v.pPlan;
             targetArr[turnoIndex].horas_plan += v.hPlan;
+            targetArr[turnoIndex].ops_plan += v.oPlan;
         }
       } else {
         if (selectedWeekFilter !== 'all' && getISOWeek(date) !== parseInt(selectedWeekFilter)) return;
@@ -459,10 +472,11 @@ export default function ProgrammingPage() {
                            (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
         if (targetMap) {
           if (!targetMap[key]) {
-            targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 };
+            targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 };
           }
           targetMap[key].pecas_plan += v.pPlan;
           targetMap[key].horas_plan += v.hPlan;
+          targetMap[key].ops_plan += v.oPlan;
         }
       }
     });
@@ -514,7 +528,7 @@ export default function ProgrammingPage() {
                            (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
           if (targetMap) {
             if (!targetMap[key]) {
-              targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, horas_plan: 0, horas_real: 0 };
+              targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 };
             }
             targetMap[key].pecas_real += qty;
             targetMap[key].ops_real += ops;
@@ -540,10 +554,9 @@ export default function ProgrammingPage() {
     const isSunday = day.getDay() === 0;
     const defaultAtividades = [{ tipo: 'PRODUCAO', tempo: 0, site: 'VALINHOS DOVE' }];
     
-    // Adicionar DDS e Café automaticamente (Exceto Domingo)
     if (!isSunday) {
-        defaultAtividades.push({ tipo: 'DDS', tempo: 0.25, site: 'TORRE' }); // 15 min = 0.25h
-        defaultAtividades.push({ tipo: 'CAFE', tempo: 0.25, site: 'TORRE' }); // 15 min = 0.25h
+        defaultAtividades.push({ tipo: 'DDS', tempo: 0.25, site: 'TORRE' });
+        defaultAtividades.push({ tipo: 'CAFE', tempo: 0.25, site: 'TORRE' });
     }
 
     form.reset({
@@ -553,6 +566,8 @@ export default function ProgrammingPage() {
       requisicao: '',
       nomeDaPeca: '',
       quantidade: 0,
+      operacoesPlanejadas: 0,
+      operacoesRealizadas: 0,
       tecnico: tecnico || '',
       horasPlanejadas: isSunday ? 0 : 0.5,
       site: 'VALINHOS DOVE',
@@ -587,6 +602,8 @@ export default function ProgrammingPage() {
       requisicao: item.requisicao || item['Requisição'] || '',
       nomeDaPeca: item.nomeDaPeca || item['Nome da Peça'] || '',
       quantidade: Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0,
+      operacoesPlanejadas: Number(item.operacoesPlanejadas !== undefined ? item.operacoesPlanejadas : (item['Operações Planejadas'] || 0)) || 0,
+      operacoesRealizadas: Number(item.operacoesRealizadas !== undefined ? item.operacoesRealizadas : (item['Operações Realizadas'] || 0)) || 0,
       tecnico: item.tecnico || item.Técnicos || '',
       horasPlanejadas: typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
         ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
@@ -619,6 +636,8 @@ export default function ProgrammingPage() {
         requisicao: values.requisicao,
         nomeDaPeca: values.nomeDaPeca,
         quantidade: values.quantidade,
+        operacoesPlanejadas: values.operacoesPlanejadas,
+        operacoesRealizadas: values.operacoesRealizadas,
         tecnico: values.tecnico,
         horasPlanejadas: values.horasPlanejadas,
         Turno: values.turno,
@@ -712,7 +731,6 @@ export default function ProgrammingPage() {
                     
                     <div className="flex-1 overflow-y-auto scrollbar-hide">
                       {turnos.map(turno => {
-                        // Agrupar itens por técnico dentro deste turno
                         const techniciansInThisTurno = Array.from(new Set([
                            ...turno.technicians,
                            ...dayItems.filter(item => String(item.Turno || item.turno || '1') === turno.id).map(item => item.tecnico || item.Técnicos || '')
@@ -880,7 +898,6 @@ export default function ProgrammingPage() {
                         <FormLabel>Fábrica Principal (Referência)</FormLabel>
                         <Select onValueChange={(val) => {
                             field.onChange(val);
-                            // Atualizar site das atividades que ainda estão no padrão
                             const currentAtivs = form.getValues('atividades');
                             currentAtivs.forEach((_, idx) => {
                                 if (!form.getValues(`atividades.${idx}.site`)) {
@@ -898,11 +915,32 @@ export default function ProgrammingPage() {
                 <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Requisição</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
               </div>
-              <div className="bg-muted/10 p-3 rounded-lg border border-dashed">
-                <div className="grid grid-cols-1">
-                  <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Peças Planejadas (Meta)</FormLabel><FormControl><Input type="number" className="h-8" {...field} /></FormControl></FormItem>)} />
+              <div className="bg-muted/10 p-4 rounded-lg border border-dashed grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <FormField control={form.control} name="quantidade" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] uppercase font-bold text-primary">Peças Planejadas (Meta)</FormLabel>
+                      <FormControl><Input type="number" className="h-8" {...field} /></FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="operacoesPlanejadas" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] uppercase font-bold text-primary">Ops. Planejadas (Meta)</FormLabel>
+                      <FormControl><Input type="number" className="h-8" {...field} /></FormControl>
+                    </FormItem>
+                  )} />
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-2 italic">* O realizado real é calculado automaticamente através dos apontamentos dos técnicos no Firestore.</p>
+                <div className="space-y-4 border-l pl-4">
+                  <div className="h-full flex flex-col justify-end">
+                    <FormField control={form.control} name="operacoesRealizadas" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Ops. Realizadas (Ajuste)</FormLabel>
+                        <FormControl><Input type="number" className="h-8" {...field} /></FormControl>
+                      </FormItem>
+                    )} />
+                    <p className="text-[9px] text-muted-foreground mt-2 italic">* O realizado real é sincronizado automaticamente através dos apontamentos no Firestore.</p>
+                  </div>
+                </div>
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
