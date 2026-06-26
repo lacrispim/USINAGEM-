@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -6,7 +5,6 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Legend
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -151,7 +149,7 @@ export function AvailableVsActualChart({
           <div className="h-[600px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig}>
-                <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 120 }} barGap={4}>
+                <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 40 }} barGap={4}>
                   <CartesianGrid vertical={false} />
                   <XAxis 
                     dataKey="name" 

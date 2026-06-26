@@ -3,35 +3,42 @@
 
 Este é um projeto desenvolvido no Firebase Studio para monitoramento e análise de registros de usinagem, controle de produção e indicadores de performance (OEE).
 
-## 🚀 Como Resolver o Erro de "Authentication failed" no Git
+## 🚀 Como Resolver o Erro de Autenticação e Socket no Git
 
-Se você recebeu o erro `remote: No anonymous write access` ou `fatal: Authentication failed`, siga estes passos para conseguir fazer o **Git Push**:
+Se você está recebendo o erro `connect ENOENT /tmp/vscode-git...` ou `Authentication failed`, siga este guia para destravar o seu ambiente:
 
-1. **Gere um Token no GitHub:**
-   - Acesse seu GitHub e vá em **Settings** (Configurações).
-   - No menu lateral esquerdo, clique em **Developer Settings** (lá no final).
-   - Clique em **Personal access tokens** > **Tokens (classic)**.
-   - Clique no botão **Generate new token (classic)**.
-   - Dê um nome (ex: "Firebase Studio").
-   - Marque a caixa **`repo`** (isso é obrigatório).
-   - Clique em "Generate token" no final da página.
-   - **COPIE o código gerado** (ele começa com `ghp_`). Você não conseguirá vê-lo novamente!
+### 1. Corrigindo o erro de "Socket" (ENOENT)
+Este erro significa que o editor perdeu a conexão com o Git. Para resolver:
+- **Feche o terminal** atual e abra um novo.
+- Se não funcionar, clique no ícone de "Relógio/Sincronização" no canto inferior esquerdo e tente novamente.
+- Em último caso, **recarregue a página do Firebase Studio**.
 
-2. **Use o Token como Senha:**
-   - No Firebase Studio (ou no seu terminal), quando ele pedir sua senha para o GitHub, **não use sua senha do e-mail**.
-   - **Cole o Token** que você copiou no campo de senha.
+### 2. Configurando o Token do GitHub (Obrigatório)
+O GitHub não aceita sua senha comum. Você **precisa** de um Token (PAT):
+1. Acesse: **GitHub** > **Settings** > **Developer Settings** > **Personal access tokens** > **Tokens (classic)**.
+2. Clique em **Generate new token (classic)**.
+3. Marque a caixa **`repo`** (essencial para fazer push).
+4. **COPIE o código `ghp_...`** (você não o verá novamente).
 
-3. **Dica para o erro de Socket (`connect ENOENT`):**
-   - Este erro geralmente acontece quando a conexão entre o editor e o GitHub se perde. Após configurar o Token, tente salvar as alterações novamente no painel lateral do Firebase Studio.
+### 3. Usando o Token no Terminal
+Se o editor não pedir a senha ou der erro direto, use o terminal para forçar a configuração:
+```bash
+# Rode este comando para limpar credenciais antigas que podem estar dando erro
+git config --global --unset credential.helper
 
-## Funcionalidades Principais
+# Tente fazer o push novamente
+git push
+```
+Quando ele pedir o **Username**, digite seu e-mail/usuário.
+Quando ele pedir a **Password**, **COLE O TOKEN** (não vai aparecer nada enquanto você cola, é normal, apenas dê Enter).
 
-- **Registro de Produção:** Apontamento de atividades, tempos e status de fabricação.
-- **Programação em Tempo Real:** Gestão semanal com caixas exclusivas por técnico e turno.
-- **Visão Supervisor:**
-  - Unificação de unidades fabris (ex: Valinhos Dove/Sabonete).
-  - Análise de Planejado vs Realizado.
-  - Gráfico de Capacidade Disponível vs Realizada (Dados de Junho).
+---
+
+## Funcionalidades Recentes
+
+- **Visão Supervisor Unificada:** As unidades Valinhos Dove e Sabonete agora são exibidas como uma única barra consolidada para facilitar a análise.
+- **Gráficos de Capacidade:** Novo gráfico "Disponível vs Realizado" com dados orçamentários de Junho.
+- **Programação por Técnico:** Caixas exclusivas para cada operador por turno com preenchimento automático de Café e DDS.
 
 ---
 *Desenvolvido como protótipo de alta fidelidade para gestão industrial.*
