@@ -135,7 +135,6 @@ export function AvailableVsActualChart({
         <div className="flex justify-between items-start">
           <div>
             <CardTitle>Disponível vs Realizado</CardTitle>
-            <CardDescription>Comparativo entre capacidade instalada (Junho) e horas trabalhadas.</CardDescription>
           </div>
           <div className="text-right">
              <p className="text-2xl font-bold text-blue-500">{totals.totalDisponivel.toFixed(1)}h</p>
