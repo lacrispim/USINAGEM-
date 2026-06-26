@@ -42,6 +42,7 @@ import { MonthlyOeeEvolutionChart } from '@/components/charts/monthly-oee-evolut
 import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
 import { StatusByFormChart } from '@/components/charts/status-by-form-chart';
 import { DailyPdlMplLossChart } from '@/components/charts/daily-pdl-mpl-loss-chart';
+import { AvailableVsActualChart } from '@/components/charts/available-vs-actual-chart';
 
 const months = [
     { value: '0', label: 'Janeiro' },
@@ -90,6 +91,18 @@ const operatorList = [
     "Jair Melo",
     "Marcos Barbosa"
 ];
+
+// Valores de capacidade para Junho (index 5)
+const availableHoursJune: Record<string, number> = {
+  'AGUAÍ': 285,
+  'INDAIATUBA': 68,
+  'IGARASSU': 107,
+  'GARANHUNS': 94,
+  'SUAPE': 113,
+  'VINHEDO': 112,
+  'VALINHOS DOVE': 166,
+  'POUSO ALEGRE': 124,
+};
 
 const normalizeOperatorName = (name: any) => {
   if (!name) return '';
@@ -347,7 +360,6 @@ export default function RecordsPage() {
     filteredPlanejamentoData.forEach(record => {
       if (record.atividades && Array.isArray(record.atividades)) {
         record.atividades.forEach((ativ: any) => {
-          // Usar site da atividade se existir, senão site do record
           const factory = normalizeFactoryName(ativ.site || record.site || record['Site']);
           const catKey = getCategoryKey(ativ.tipo);
           
@@ -415,13 +427,15 @@ export default function RecordsPage() {
     });
 
     return Object.keys(dataMap).map(factory => {
+      const isJune = selectedMonth === '5' || selectedMonth === 'all';
       return {
           name: factory,
           ...dataMap[factory],
+          totalDisponivel: isJune ? (availableHoursJune[factory] || 0) : 0
       }
   }).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
 
-  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords, selectedLossReason, selectedFactory]);
+  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords, selectedLossReason, selectedFactory, selectedMonth]);
 
   useEffect(() => {
     setSelectedMonth('all');
@@ -582,6 +596,7 @@ export default function RecordsPage() {
       </Card>
 
       <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
+      <AvailableVsActualChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
       
       <OeeLossWaterfallChart productionData={operatorFilteredProductionRecords} lossData={operatorFilteredLossRecords} loading={isLoading} />
       <DailyPdlMplLossChart lossData={operatorFilteredLossRecords} loading={isLoading} />
