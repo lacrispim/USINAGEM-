@@ -147,15 +147,25 @@ export function AvailableVsActualChart({
         {loading ? (
           <div className="flex h-[400px] w-full items-center justify-center"><Loader className="h-8 w-8 animate-spin" /></div>
         ) : (
-          <div className="h-[500px] w-full">
+          <div className="h-[600px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig}>
-                <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 80 }} barGap={4}>
+                <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 120 }} barGap={4}>
                   <CartesianGrid vertical={false} />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={35} angle={-45} textAnchor="end" interval={0} height={100} className="text-[10px] font-bold uppercase" />
+                  <XAxis 
+                    dataKey="name" 
+                    tickLine={false} 
+                    axisLine={false} 
+                    tickMargin={35} 
+                    angle={-45} 
+                    textAnchor="end" 
+                    interval={0} 
+                    height={120} 
+                    className="text-[10px] font-bold uppercase" 
+                  />
                   <YAxis unit="h" tickLine={false} axisLine={false} />
                   <ChartTooltip content={<CustomTooltip />} />
-                  <Legend verticalAlign="top" height={36} />
+                  <Legend verticalAlign="bottom" height={48} />
                   
                   <Bar name="Disponível" dataKey="totalDisponivel" fill={AVAILABLE_COLOR} radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="totalDisponivel" position="top" className="fill-blue-400 text-[10px] font-bold" formatter={(v: number) => v > 0 ? `${v}h` : ''} />
