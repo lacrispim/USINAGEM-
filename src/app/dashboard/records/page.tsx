@@ -100,7 +100,7 @@ const availableHoursJune: Record<string, number> = {
   'GARANHUNS': 94,
   'SUAPE': 113,
   'VINHEDO': 112,
-  'VALINHOS DOVE': 166,
+  'VALINHOS (DOVE/SABONETE)': 166,
   'POUSO ALEGRE': 124,
 };
 
@@ -123,8 +123,7 @@ const normalizeFactoryName = (name: any): string => {
   if (n.includes('VINHEDO')) return 'VINHEDO';
   if (n.includes('AGUAI') || n.includes('AGUAÍ')) return 'AGUAÍ';
   if (n.includes('GARANHUNS') || n.includes('GARANHUS')) return 'GARANHUNS';
-  if (n.includes('VALINHOS DOVE')) return 'VALINHOS DOVE';
-  if (n.includes('VALINHOS SABONETE')) return 'VALINHOS SABONETE';
+  if (n.includes('VALINHOS DOVE') || n.includes('VALINHOS SABONETE')) return 'VALINHOS (DOVE/SABONETE)';
   if (n.includes('POUSO ALEGRE')) return 'POUSO ALEGRE';
   if (n.includes('INDAIATUBA')) return 'INDAIATUBA';
   if (n.includes('SUAPE')) return 'SUAPE';
