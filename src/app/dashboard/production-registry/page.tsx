@@ -125,7 +125,7 @@ const factoryList = [
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
   date: z.string().min(1, 'A data da produção é obrigatória.'),
-  factory: z.string().optional(),
+  factory: z.string().min(1, 'A seleção da fábrica é obrigatória.'),
   formsNumber: z.string().optional(),
   activityType: z.string().optional(),
   machine: z.string().optional(),
@@ -144,7 +144,7 @@ const lossFormSchema = z.object({
   machine: z.string().optional(),
   lossReason: z.string().optional(),
   deadPartsQuantity: z.coerce.number().optional(),
-  factory: z.string().optional(),
+  factory: z.string().min(1, 'A seleção da fábrica é obrigatória.'),
   timeLost: z.coerce.number().optional(),
   observations: z.string().optional(),
   formsNumber: z.string().optional(),
@@ -293,14 +293,14 @@ const ProductionFormContent = () => {
                     name="factory"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Fábrica</FormLabel>
+                        <FormLabel>Fábrica *</FormLabel>
                         <Select
                             onValueChange={field.onChange}
                             value={field.value}
                         >
                             <FormControl>
                             <SelectTrigger>
-                                <SelectValue placeholder="Selecione a fábrica" />
+                                <SelectValue placeholder="Selecione a fábrica (obrigatório)" />
                             </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -627,14 +627,14 @@ const LossFormContent = () => {
                       name="factory"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Fábrica</FormLabel>
+                          <FormLabel>Fábrica *</FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Selecione a fábrica" />
+                                <SelectValue placeholder="Selecione a fábrica (obrigatório)" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
