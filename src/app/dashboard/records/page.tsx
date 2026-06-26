@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -92,7 +93,6 @@ const operatorList = [
     "Marcos Barbosa"
 ];
 
-// Valores de capacidade para Junho (index 5)
 const availableHoursJune: Record<string, number> = {
   'AGUAÍ': 285,
   'INDAIATUBA': 68,
@@ -123,7 +123,7 @@ const normalizeFactoryName = (name: any): string => {
   if (n.includes('VINHEDO')) return 'VINHEDO';
   if (n.includes('AGUAI') || n.includes('AGUAÍ')) return 'AGUAÍ';
   if (n.includes('GARANHUNS') || n.includes('GARANHUS')) return 'GARANHUNS';
-  if (n.includes('VALINHOS DOVE') || n.includes('VALINHOS SABONETE')) return 'VALINHOS (DOVE/SABONETE)';
+  if (n.includes('VALINHOS DOVE') || n.includes('VALINHOS SABONETE') || n.includes('VALINHOS (DOVE/SABONETE)')) return 'VALINHOS (DOVE/SABONETE)';
   if (n.includes('POUSO ALEGRE')) return 'POUSO ALEGRE';
   if (n.includes('INDAIATUBA')) return 'INDAIATUBA';
   if (n.includes('SUAPE')) return 'SUAPE';
@@ -231,9 +231,8 @@ export default function RecordsPage() {
       where('date', '>=', startDate),
       where('date', '<=', endDate)
     ];
-    if (selectedFactory) constraints.push(where('factory', '==', selectedFactory));
     return query(collection(firestore, 'productionRecords'), ...constraints);
-  }, [firestore, startDate, endDate, selectedFactory]);
+  }, [firestore, startDate, endDate]);
 
   const { data: productionRecords, isLoading: loadingProduction } = useCollection(productionRecordsQuery);
 
@@ -243,9 +242,8 @@ export default function RecordsPage() {
       where('date', '>=', startDate),
       where('date', '<=', endDate)
     ];
-    if (selectedFactory) constraints.push(where('factory', '==', selectedFactory));
     return query(collection(firestore, 'lossRecords'), ...constraints);
-  }, [firestore, startDate, endDate, selectedFactory]);
+  }, [firestore, startDate, endDate]);
 
   const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossRecordsQuery);
     
@@ -363,32 +361,28 @@ export default function RecordsPage() {
           const catKey = getCategoryKey(ativ.tipo);
           
           if (selectedLossReason === 'all' || catKey === selectedLossReason) {
-            if (!selectedFactory || factory === selectedFactory) {
-              const d = getOrCreate(factory);
-              const time = Number(ativ.tempo) || 0;
-              const key = `plan_${catKey}`;
-              d[key] = (d[key] || 0) + time;
-              d.totalPlanejado += time;
-            }
+            const d = getOrCreate(factory);
+            const time = Number(ativ.tempo) || 0;
+            const key = `plan_${catKey}`;
+            d[key] = (d[key] || 0) + time;
+            d.totalPlanejado += time;
           }
         });
       } else {
         const factory = normalizeFactoryName(record.site || record['Site']);
-        if (!selectedFactory || factory === selectedFactory) {
-          const rawHours = record.horasPlanejadas || record['Horas Máquina'];
-          const machineHours = typeof rawHours === 'string' 
-            ? parseFloat(rawHours.replace(',', '.')) 
-            : (Number(rawHours) || 0);
-          
-          if (!isNaN(machineHours)) {
-            const rawReason = String(record.perdaPlanejada || record['Perdas planejadas'] || '').toUpperCase().trim();
-            const catKey = getCategoryKey(rawReason);
-            if (selectedLossReason === 'all' || catKey === selectedLossReason) {
-              const d = getOrCreate(factory);
-              const key = `plan_${catKey}`;
-              d[key] = (d[key] || 0) + machineHours;
-              d.totalPlanejado += machineHours;
-            }
+        const rawHours = record.horasPlanejadas || record['Horas Máquina'];
+        const machineHours = typeof rawHours === 'string' 
+          ? parseFloat(rawHours.replace(',', '.')) 
+          : (Number(rawHours) || 0);
+        
+        if (!isNaN(machineHours)) {
+          const rawReason = String(record.perdaPlanejada || record['Perdas planejadas'] || '').toUpperCase().trim();
+          const catKey = getCategoryKey(rawReason);
+          if (selectedLossReason === 'all' || catKey === selectedLossReason) {
+            const d = getOrCreate(factory);
+            const key = `plan_${catKey}`;
+            d[key] = (d[key] || 0) + machineHours;
+            d.totalPlanejado += machineHours;
           }
         }
       }
@@ -396,32 +390,28 @@ export default function RecordsPage() {
     
     operatorFilteredProductionRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
-        if (!selectedFactory || factory === selectedFactory) {
-          const hours = (Number(record.machiningTime) || 0) / 60;
-          if (hours > 0) {
-              const d = getOrCreate(factory);
-              const rawActivity = String(record.activityType || 'PRODUCAO').toUpperCase().trim();
-              const catKey = getCategoryKey(rawActivity);
-              
-              const key = `real_${catKey}`;
-              d[key] = (d[key] || 0) + hours;
-              d.totalRealizado += hours;
-          }
+        const hours = (Number(record.machiningTime) || 0) / 60;
+        if (hours > 0) {
+            const d = getOrCreate(factory);
+            const rawActivity = String(record.activityType || 'PRODUCAO').toUpperCase().trim();
+            const catKey = getCategoryKey(rawActivity);
+            
+            const key = `real_${catKey}`;
+            d[key] = (d[key] || 0) + hours;
+            d.totalRealizado += hours;
         }
     });
 
     operatorFilteredLossRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
-        if (!selectedFactory || factory === selectedFactory) {
-          const hours = (Number(record.timeLost) || 0) / 60;
-          if (hours > 0) {
-              const d = getOrCreate(factory);
-              const reason = record.lossReason?.toUpperCase() || '';
-              const catKey = getCategoryKey(reason);
-              const key = `real_${catKey}`;
-              d[key] = (d[key] || 0) + hours;
-              d.totalRealizado += hours;
-          }
+        const hours = (Number(record.timeLost) || 0) / 60;
+        if (hours > 0) {
+            const d = getOrCreate(factory);
+            const reason = record.lossReason?.toUpperCase() || '';
+            const catKey = getCategoryKey(reason);
+            const key = `real_${catKey}`;
+            d[key] = (d[key] || 0) + hours;
+            d.totalRealizado += hours;
         }
     });
 
@@ -434,7 +424,7 @@ export default function RecordsPage() {
       }
   }).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
 
-  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords, selectedLossReason, selectedFactory, selectedMonth]);
+  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords, selectedLossReason, selectedMonth]);
 
   useEffect(() => {
     setSelectedMonth('all');

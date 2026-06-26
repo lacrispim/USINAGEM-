@@ -3,39 +3,35 @@
 
 Este é um projeto desenvolvido no Firebase Studio para monitoramento e análise de registros de usinagem, controle de produção e indicadores de performance (OEE).
 
-## Como Acessar a Aplicação
+## 🚀 Como Resolver o Erro de "Authentication failed" no Git
 
-Para acessar o dashboard, siga estes passos:
-1. **Cadastro:** Na primeira vez, acesse a página de `/signup` para criar seu usuário com e-mail e senha.
-2. **Login:** Após cadastrado, use suas credenciais na página de `/login`.
-3. **Esqueci a Senha:** Se precisar redefinir, utilize a página de `/forgot-password`.
+Se você recebeu o erro `remote: No anonymous write access` ou `fatal: Authentication failed`, siga estes passos para conseguir fazer o **Git Push**:
 
-## Conexão com GitHub e Vercel
+1. **Gere um Token no GitHub:**
+   - Acesse seu GitHub e vá em **Settings** (Configurações).
+   - No menu lateral esquerdo, clique em **Developer Settings** (lá no final).
+   - Clique em **Personal access tokens** > **Tokens (classic)**.
+   - Clique no botão **Generate new token (classic)**.
+   - Dê um nome (ex: "Firebase Studio").
+   - Marque a caixa **`repo`** (isso é obrigatório).
+   - Clique em "Generate token" no final da página.
+   - **COPIE o código gerado** (ele começa com `ghp_`). Você não conseguirá vê-lo novamente!
 
-Se você está tendo problemas para enviar informações para o Vercel:
-- **Diferença entre Pull e Push:** O comando `git pull` traz as informações do site para o seu computador. O comando **`git push`** é o que envia suas alterações do computador para o GitHub/Vercel.
-- **Autenticação (Token):** O GitHub **NÃO** aceita a sua senha do e-mail para operações de envio (Push).
-- **Solução (PAT):** Você deve gerar um **Personal Access Token (PAT)** no GitHub:
-  1. No GitHub, vá em *Settings* > *Developer Settings* > *Personal access tokens*.
-  2. Gere um token (classic) com a permissão `repo`.
-  3. Use este código como sua "senha" ao conectar o Firebase Studio ou ao fazer um `push`.
+2. **Use o Token como Senha:**
+   - No Firebase Studio (ou no seu terminal), quando ele pedir sua senha para o GitHub, **não use sua senha do e-mail**.
+   - **Cole o Token** que você copiou no campo de senha.
+
+3. **Dica para o erro de Socket (`connect ENOENT`):**
+   - Este erro geralmente acontece quando a conexão entre o editor e o GitHub se perde. Após configurar o Token, tente salvar as alterações novamente no painel lateral do Firebase Studio.
 
 ## Funcionalidades Principais
 
-- **Registro de Produção:** Apontamento de atividades, tempos e status de fabricação (limite padrão de visualização de 30 dias).
-- **Registro de Perdas:** Monitoramento de paradas (PDL/MPL) e motivos de inatividade.
-- **Visão Supervisor (Dashboard):**
-  - Análise de Planejado vs Realizado (DDS/ADM, Setup, Usinagem).
-  - Evolução Mensal - MMPCODE (OEE) para D600 e Centur 30.
-  - Performance de técnicos e máquinas.
-- **Programação em Tempo Real:** Integração com Firebase Realtime Database para visualização do plano semanal.
-
-## Tecnologias Utilizadas
-
-- **Frontend:** Next.js (App Router), React, Tailwind CSS.
-- **UI Components:** ShadCN UI, Lucide Icons.
-- **Gráficos:** Recharts.
-- **Backend:** Firebase Auth, Firestore, Realtime Database.
+- **Registro de Produção:** Apontamento de atividades, tempos e status de fabricação.
+- **Programação em Tempo Real:** Gestão semanal com caixas exclusivas por técnico e turno.
+- **Visão Supervisor:**
+  - Unificação de unidades fabris (ex: Valinhos Dove/Sabonete).
+  - Análise de Planejado vs Realizado.
+  - Gráfico de Capacidade Disponível vs Realizada (Dados de Junho).
 
 ---
 *Desenvolvido como protótipo de alta fidelidade para gestão industrial.*

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -31,6 +32,7 @@ const CATEGORY_STYLES: Record<string, { label: string; color: string }> = {
     'DDS, APONTAMENTO HORAS, ATIVIDADE ADM': { label: 'Ativ. ADM', color: '#f97316' },
     'INSPEÇÃO & VALIDAÇÃO DAS PEÇAS': { label: 'Qualidade', color: '#3b82f6' },
     'MANUTENÇÃO PLANEJADA': { label: 'Manutenção', color: '#7c3aed' },
+    'AUXÍLIO AS FÁBRICAS': { label: 'Aux. Fábricas', color: '#0ea5e9' },
 };
 
 const DEFAULT_COLOR = '#6b7280';
