@@ -240,7 +240,6 @@ const PlanningChart = ({
               
               {metric === 'production' ? (
                 <>
-                  {/* Ordem: Peças Fin, Peças Plan, Ops Realizadas, Ops Plan */}
                   <Bar name="Peças Fin." dataKey="pecas_real" fill="#22c55e" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="pecas_real" position="top" className="fill-foreground text-[10px] font-bold" />
                   </Bar>
