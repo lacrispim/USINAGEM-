@@ -34,6 +34,7 @@ const OPERATOR_COLORS: { [key: string]: string } = {
   'Nathan Xavier': 'hsl(var(--chart-5))',
   'Jair Melo': 'hsl(var(--chart-7))',
   'Marcos Barbosa': 'hsl(var(--chart-8))',
+  'Alisson Franca': 'hsl(215 80% 60%)',
   'Outro': 'hsl(var(--chart-6))',
 };
 

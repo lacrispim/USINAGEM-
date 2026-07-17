@@ -100,6 +100,7 @@ const lossReasonDetails = [
 const lossReasonOptions = lossReasonDetails.map(item => item.value);
 
 const operatorList = [
+    "Alisson Franca",
     "Daniel Solivo",
     "Rodrigo Cantano",
     "Gustavo Gozzi",

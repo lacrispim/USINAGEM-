@@ -83,6 +83,7 @@ const lossCategories = [
 ];
 
 const operatorList = [
+    "Alisson Franca",
     "Daniel Solivo",
     "Rodrigo Cantano",
     "Gustavo Gozzi",
@@ -106,6 +107,7 @@ const availableHoursJune: Record<string, number> = {
 const normalizeOperatorName = (name: any) => {
   if (!name) return '';
   const n = String(name).toLowerCase().trim();
+  if (n.includes('alisson')) return 'Alisson Franca';
   if (n.includes('gustavo')) return 'Gustavo Gozzi';
   if (n.includes('daniel')) return 'Daniel Solivo';
   if (n.includes('rodrigo')) return 'Rodrigo Cantano';

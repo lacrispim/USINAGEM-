@@ -133,6 +133,7 @@ const turnos = [
 ];
 
 const operatorList = [
+    "Alisson Franca",
     "Daniel Solivo",
     "Rodrigo Cantano",
     "Gustavo Gozzi",
