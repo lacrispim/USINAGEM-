@@ -14,12 +14,10 @@ import {
   Loader, 
   Plus,
   Trash2,
-  Cpu,
   Settings2,
   PlusCircle,
-  Move,
   User as UserIcon,
-  Factory
+  Cpu
 } from 'lucide-react';
 import { 
   format, 
@@ -47,7 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter
-} from "@/dialog";
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -166,7 +164,6 @@ type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
 export default function ProgrammingPage() {
   const database = useDatabase();
-  const firestore = useFirestore();
   const { toast } = useToast();
   
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
@@ -177,7 +174,6 @@ export default function ProgrammingPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
-  const [selectedTecnicoAtivo, setSelectedTecnicoAtivo] = useState<string | null>(null);
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
 
@@ -299,7 +295,6 @@ export default function ProgrammingPage() {
     setEditingId(null);
     setSelectedDay(day);
     setSelectedTurno(turnoId);
-    setSelectedTecnicoAtivo(tecnico || null);
 
     const isSunday = day.getDay() === 0;
     const defaultAtividades = [{ tipo: 'PRODUCAO', tempo: 0, site: 'VALINHOS DOVE' }];
@@ -506,12 +501,24 @@ export default function ProgrammingPage() {
                                       (item.tecnico === tech || item.Técnicos === tech)
                                    );
                                    
+                                   const totalHoursForTech = itemsForTech.reduce((acc, item) => {
+                                      const raw = item.horasPlanejadas || item['Horas Máquina'];
+                                      return acc + (typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : (Number(raw) || 0));
+                                   }, 0);
+
                                    return (
                                      <div key={tech} className="bg-muted/10 rounded border border-dashed p-1.5 min-h-[40px] group/tech">
                                         <div className="flex items-center justify-between mb-1">
-                                            <div className="flex items-center gap-1">
-                                                <UserIcon className="h-2 w-2 text-muted-foreground" />
-                                                <span className="text-[8px] font-bold text-muted-foreground uppercase truncate max-w-[60px]">{tech.split(' ')[0]}</span>
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-1">
+                                                    <UserIcon className="h-2 w-2 text-muted-foreground" />
+                                                    <span className="text-[8px] font-bold text-muted-foreground uppercase truncate max-w-[60px]">{tech.split(' ')[0]}</span>
+                                                </div>
+                                                {totalHoursForTech > 0 && (
+                                                  <span className={cn("text-[7px] font-black px-1 rounded-sm w-fit", totalHoursForTech > 8 ? "bg-red-500/20 text-red-400" : "bg-primary/20 text-primary")}>
+                                                    TOTAL: {totalHoursForTech.toFixed(1)}h
+                                                  </span>
+                                                )}
                                             </div>
                                             <Button 
                                                 variant="ghost" 
@@ -633,9 +640,10 @@ export default function ProgrammingPage() {
                     </FormItem>
                 )} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Requisição / Forms</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+              <div className="grid grid-cols-3 gap-4">
+                <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Nº Forms</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Meta (Peças)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
