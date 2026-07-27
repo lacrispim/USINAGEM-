@@ -2,8 +2,9 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useDatabase } from '@/firebase';
+import { useDatabase, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { ref, onValue, push, set, update, remove } from 'firebase/database';
+import { collection, query, where } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -31,7 +32,9 @@ import {
   eachDayOfInterval, 
   isSameDay, 
   parse, 
-  isToday
+  isToday,
+  startOfDay,
+  endOfDay
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -176,6 +179,7 @@ type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
 export default function ProgrammingPage() {
   const database = useDatabase();
+  const firestore = useFirestore();
   const { toast } = useToast();
   
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
@@ -188,6 +192,21 @@ export default function ProgrammingPage() {
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
+
+  // Buscar registros reais de produção para comparação
+  const productionQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(
+      collection(firestore, 'productionRecords'),
+      where('date', '>=', startOfDay(weekStart)),
+      where('date', '<=', endOfDay(weekEnd))
+    );
+  }, [firestore, weekStart, weekEnd]);
+
+  const { data: productionRecords } = useCollection(productionQuery);
 
   const form = useForm<PlanningFormValues>({
     resolver: zodResolver(planningFormSchema),
@@ -248,9 +267,6 @@ export default function ProgrammingPage() {
     return () => unsubscribe();
   }, [database]);
 
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
-
   const calendarDays = eachDayOfInterval({
     start: weekStart,
     end: weekEnd,
@@ -274,17 +290,30 @@ export default function ProgrammingPage() {
     });
   };
 
+  const getProductionForDay = (day: Date) => {
+    if (!productionRecords) return [];
+    return productionRecords.filter(record => {
+      if (!record.date) return false;
+      const recordDate = record.date.toDate ? record.date.toDate() : new Date(record.date);
+      return isSameDay(recordDate, day);
+    });
+  };
+
   const { weeklyChartData, uniqueRequisitions } = useMemo(() => {
     const reqSet = new Set<string>();
     
     const data = calendarDays.map(day => {
       const items = getItemsForDay(day);
+      const productionItems = getProductionForDay(day);
+      
       const dayData: any = {
         name: format(day, 'EEE', { locale: ptBR }),
         fullDate: format(day, 'dd/MM/yyyy'),
-        total: 0
+        totalPlan: 0,
+        totalReal: 0
       };
 
+      // Processar Planejado
       items.forEach(item => {
         const req = item.requisicao || item['Requisição'] || 'S/N';
         const rawHours = item.horasPlanejadas || item['Horas Máquina'];
@@ -293,8 +322,22 @@ export default function ProgrammingPage() {
           : (Number(rawHours) || 0);
         
         if (hours > 0) {
-            dayData[req] = (dayData[req] || 0) + hours;
-            dayData.total += hours;
+            const key = `P_${req}`;
+            dayData[key] = (dayData[key] || 0) + hours;
+            dayData.totalPlan += hours;
+            reqSet.add(req);
+        }
+      });
+
+      // Processar Realizado
+      productionItems.forEach(record => {
+        const req = record.formsNumber || 'S/N';
+        const hours = (Number(record.machiningTime) || 0) / 60;
+        
+        if (hours > 0) {
+            const key = `R_${req}`;
+            dayData[key] = (dayData[key] || 0) + hours;
+            dayData.totalReal += hours;
             reqSet.add(req);
         }
       });
@@ -306,7 +349,7 @@ export default function ProgrammingPage() {
         weeklyChartData: data, 
         uniqueRequisitions: Array.from(reqSet).sort() 
     };
-  }, [calendarDays, planejamentoData]);
+  }, [calendarDays, planejamentoData, productionRecords]);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedItemId(id);
@@ -493,6 +536,56 @@ export default function ProgrammingPage() {
     );
   };
 
+  const CustomChartTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      
+      const planEntries = payload.filter((p: any) => p.dataKey.startsWith('P_'));
+      const realEntries = payload.filter((p: any) => p.dataKey.startsWith('R_'));
+
+      return (
+        <div className="rounded-lg border bg-background p-3 shadow-lg min-w-[16rem]">
+          <p className="font-bold text-sm mb-2 border-b pb-1">{label} - {data.fullDate}</p>
+          
+          <div className="space-y-4">
+            <div>
+                <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Planejado (Total: {data.totalPlan.toFixed(1)}h)</p>
+                <div className="space-y-1">
+                    {planEntries.map((entry: any) => (
+                        <div key={entry.dataKey} className="flex justify-between items-center gap-4">
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                <span className="text-[10px] text-foreground">Forms {entry.dataKey.replace('P_', '')}:</span>
+                            </div>
+                            <span className="text-[10px] font-black">{Number(entry.value).toFixed(1)}h</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {data.totalReal > 0 && (
+                <div>
+                    <p className="text-[10px] font-black uppercase text-blue-400 mb-1">Realizado (Total: {data.totalReal.toFixed(1)}h)</p>
+                    <div className="space-y-1">
+                        {realEntries.map((entry: any) => (
+                            <div key={entry.dataKey} className="flex justify-between items-center gap-4">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full opacity-60" style={{ backgroundColor: entry.color }} />
+                                    <span className="text-[10px] text-foreground">Forms {entry.dataKey.replace('R_', '')}:</span>
+                                </div>
+                                <span className="text-[10px] font-black text-blue-400">{Number(entry.value).toFixed(1)}h</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -598,22 +691,31 @@ export default function ProgrammingPage() {
         </CardContent>
       </Card>
 
-      {/* GRÁFICO DE CARGA HORÁRIA POR DIA SEGMENTADO POR REQUISIÇÃO */}
+      {/* GRÁFICO COMPARATIVO PLANEJADO VS REALIZADO */}
       <div className="mt-8">
         <Card>
           <CardHeader>
-            <CardTitle>Carga Horária Diária por Requisição</CardTitle>
-            <CardDescription>
-              Total de horas planejadas por dia, divididas por número de Forms.
-            </CardDescription>
+            <div className="flex items-center justify-between">
+                <div>
+                    <CardTitle>Planejado vs Realizado por Requisição</CardTitle>
+                    <CardDescription>
+                      Comparativo de horas planejadas (Plan) e registradas pelos técnicos (Real) por dia.
+                    </CardDescription>
+                </div>
+                <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-6 bg-muted-foreground opacity-30" /> Planejado</div>
+                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-6 bg-blue-500 opacity-60" /> Realizado</div>
+                </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-[400px] w-full">
-              {weeklyChartData.some(d => d.total > 0) ? (
+              {weeklyChartData.some(d => d.totalPlan > 0 || d.totalReal > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={weeklyChartData}
-                      margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+                      margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+                      barGap={4}
                     >
                       <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.1} />
                       <XAxis
@@ -630,57 +732,56 @@ export default function ProgrammingPage() {
                       />
                       <RechartsTooltip 
                          cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
-                         content={({ active, payload, label }) => {
-                            if (active && payload && payload.length) {
-                              const data = payload[0].payload;
-                              const relevantPayload = payload.filter((p: any) => Number(p.value) > 0);
-                              return (
-                                <div className="rounded-lg border bg-background p-2 shadow-sm min-w-[12rem]">
-                                  <p className="font-bold text-sm mb-2 border-b pb-1">{label} - {data.fullDate}</p>
-                                  <div className="space-y-1">
-                                    {relevantPayload.map((entry: any) => (
-                                        <div key={entry.dataKey} className="flex justify-between items-center gap-4">
-                                          <div className="flex items-center gap-1.5">
-                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                                            <span className="text-[10px] text-muted-foreground">Forms {entry.dataKey}:</span>
-                                          </div>
-                                          <span className="text-[10px] font-black">{Number(entry.value).toFixed(1)}h</span>
-                                        </div>
-                                    ))}
-                                    <div className="flex justify-between items-center pt-1 border-t mt-1">
-                                      <span className="text-[10px] font-bold">Total do Dia:</span>
-                                      <span className="text-[10px] font-black">{data.total.toFixed(1)}h</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                         }}
+                         content={<CustomChartTooltip />}
                       />
-                      {uniqueRequisitions.map((req, idx) => (
-                        <Bar 
-                            key={req} 
-                            dataKey={req} 
-                            stackId="a" 
-                            fill={REQ_COLORS[idx % REQ_COLORS.length]} 
-                            radius={idx === uniqueRequisitions.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                        >
-                            {idx === uniqueRequisitions.length - 1 && (
-                                <LabelList
-                                  dataKey="total"
-                                  position="top"
-                                  formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''}
-                                  className="fill-foreground text-[10px] font-bold"
-                                />
-                            )}
-                        </Bar>
-                      ))}
+                      
+                      {uniqueRequisitions.map((req, idx) => {
+                        const color = REQ_COLORS[idx % REQ_COLORS.length];
+                        return (
+                          <React.Fragment key={req}>
+                            {/* Barra Planejada (Esquerda) */}
+                            <Bar 
+                                dataKey={`P_${req}`} 
+                                stackId="plan" 
+                                fill={color} 
+                                radius={[idx === uniqueRequisitions.length - 1 ? 4 : 0, idx === uniqueRequisitions.length - 1 ? 4 : 0, 0, 0]}
+                                barSize={20}
+                            >
+                                {idx === uniqueRequisitions.length - 1 && (
+                                    <LabelList
+                                      dataKey="totalPlan"
+                                      position="top"
+                                      formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''}
+                                      className="fill-muted-foreground text-[8px] font-bold"
+                                    />
+                                )}
+                            </Bar>
+                            {/* Barra Realizada (Direita) */}
+                            <Bar 
+                                dataKey={`R_${req}`} 
+                                stackId="real" 
+                                fill={color} 
+                                opacity={0.6}
+                                radius={[idx === uniqueRequisitions.length - 1 ? 4 : 0, idx === uniqueRequisitions.length - 1 ? 4 : 0, 0, 0]}
+                                barSize={20}
+                            >
+                                {idx === uniqueRequisitions.length - 1 && (
+                                    <LabelList
+                                      dataKey="totalReal"
+                                      position="top"
+                                      formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''}
+                                      className="fill-blue-400 text-[8px] font-bold"
+                                    />
+                                )}
+                            </Bar>
+                          </React.Fragment>
+                        );
+                      })}
                     </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex h-full items-center justify-center text-muted-foreground text-sm italic">
-                  Nenhum planejamento encontrado para esta semana.
+                  Nenhum dado encontrado para esta semana.
                 </div>
               )}
             </div>
