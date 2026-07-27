@@ -87,10 +87,6 @@ interface PlanejamentoItem {
   'Nome da Peça'?: string;
   quantidade?: number;
   Quantidade?: number;
-  operacoesPlanejadas?: number;
-  'Operações Planejadas'?: number;
-  operacoesRealizadas?: number;
-  'Operações Realizadas'?: number;
   tecnico?: string;
   Técnicos?: string;
   horasPlanejadas?: number | string;
@@ -153,8 +149,6 @@ const planningFormSchema = z.object({
   requisicao: z.string().min(1, 'Nº da Requisição é obrigatório.'),
   nomeDaPeca: z.string().min(1, 'Nome da peça é obrigatório.'),
   quantidade: z.coerce.number().min(0, 'Quantidade deve ser zero ou maior.'),
-  operacoesPlanejadas: z.coerce.number().min(0).default(0),
-  operacoesRealizadas: z.coerce.number().min(0).default(0),
   tecnico: z.string().min(1, 'Técnico é obrigatório.'),
   horasPlanejadas: z.coerce.number().default(0),
   turno: z.string(),
@@ -194,8 +188,6 @@ export default function ProgrammingPage() {
       requisicao: '',
       nomeDaPeca: '',
       quantidade: 0,
-      operacoesPlanejadas: 0,
-      operacoesRealizadas: 0,
       tecnico: '',
       horasPlanejadas: 0,
       turno: '1',
@@ -323,8 +315,6 @@ export default function ProgrammingPage() {
       requisicao: '',
       nomeDaPeca: '',
       quantidade: 0,
-      operacoesPlanejadas: 0,
-      operacoesRealizadas: 0,
       tecnico: tecnico || '',
       horasPlanejadas: isSunday ? 0 : 0.5,
       site: 'VALINHOS DOVE',
@@ -359,8 +349,6 @@ export default function ProgrammingPage() {
       requisicao: item.requisicao || item['Requisição'] || '',
       nomeDaPeca: item.nomeDaPeca || item['Nome da Peça'] || '',
       quantidade: Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0,
-      operacoesPlanejadas: Number(item.operacoesPlanejadas !== undefined ? item.operacoesPlanejadas : (item['Operações Planejadas'] || 0)) || 0,
-      operacoesRealizadas: Number(item.operacoesRealizadas !== undefined ? item.operacoesRealizadas : (item['Operações Realizadas'] || 0)) || 0,
       tecnico: item.tecnico || item.Técnicos || '',
       horasPlanejadas: typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
         ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
@@ -393,8 +381,6 @@ export default function ProgrammingPage() {
         requisicao: values.requisicao,
         nomeDaPeca: values.nomeDaPeca,
         quantidade: values.quantidade,
-        operacoesPlanejadas: values.operacoesPlanejadas,
-        operacoesRealizadas: values.operacoesRealizadas,
         tecnico: values.tecnico,
         horasPlanejadas: values.horasPlanejadas,
         Turno: values.turno,
@@ -636,36 +622,10 @@ export default function ProgrammingPage() {
                     </FormItem>
                 )} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Requisição</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-              </div>
-              <div className="bg-muted/10 p-4 rounded-lg border border-dashed grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <FormField control={form.control} name="quantidade" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] uppercase font-bold text-primary">Peças Planejadas (Meta)</FormLabel>
-                      <FormControl><Input type="number" className="h-8" {...field} /></FormControl>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="operacoesPlanejadas" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] uppercase font-bold text-primary">Ops. Planejadas (Meta)</FormLabel>
-                      <FormControl><Input type="number" className="h-8" {...field} /></FormControl>
-                    </FormItem>
-                  )} />
-                </div>
-                <div className="space-y-4 border-l pl-4">
-                  <div className="h-full flex flex-col justify-end">
-                    <FormField control={form.control} name="operacoesRealizadas" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Ops. Realizadas (Ajuste)</FormLabel>
-                        <FormControl><Input type="number" className="h-8" {...field} /></FormControl>
-                      </FormItem>
-                    )} />
-                    <p className="text-[9px] text-muted-foreground mt-2 italic">* O realizado real é sincronizado automaticamente através dos apontamentos no Firestore.</p>
-                  </div>
-                </div>
+                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel>Qtd. Peças</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
