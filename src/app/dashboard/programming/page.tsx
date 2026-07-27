@@ -149,7 +149,6 @@ const lossOptions = [
   { value: 'AUXÍLIO AS FÁBRICAS', label: 'Auxílio as Fábricas', color: '#0ea5e9' },
 ];
 
-// Paleta de cores para as requisições no gráfico
 const REQ_COLORS = [
     '#3b82f6', '#f97316', '#a855f7', '#22c55e', '#ef4444', 
     '#eab308', '#0ea5e9', '#ec4899', '#14b8a6', '#6366f1',
@@ -195,7 +194,6 @@ export default function ProgrammingPage() {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
 
-  // Buscar registros reais de produção para comparação
   const productionQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
@@ -312,7 +310,6 @@ export default function ProgrammingPage() {
         totalReal: 0
       };
 
-      // Processar Planejado
       items.forEach(item => {
         const req = item.requisicao || item['Requisição'] || 'S/N';
         const rawHours = item.horasPlanejadas || item['Horas Máquina'];
@@ -328,7 +325,6 @@ export default function ProgrammingPage() {
         }
       });
 
-      // Processar Realizado
       productionItems.forEach(record => {
         const req = record.formsNumber || 'S/N';
         const hours = (Number(record.machiningTime) || 0) / 60;
@@ -690,7 +686,6 @@ export default function ProgrammingPage() {
         </CardContent>
       </Card>
 
-      {/* GRÁFICO COMPARATIVO PLANEJADO VS REALIZADO */}
       <div className="mt-8">
         <Card>
           <CardHeader>
@@ -708,13 +703,13 @@ export default function ProgrammingPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[400px] w-full">
+            <div className="h-[500px] w-full">
               {weeklyChartData.some(d => d.totalPlan > 0 || d.totalReal > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={weeklyChartData}
                       margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
-                      barGap={4}
+                      barGap={8}
                     >
                       <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.1} />
                       <XAxis
@@ -744,8 +739,14 @@ export default function ProgrammingPage() {
                                 stackId="plan" 
                                 fill={color} 
                                 radius={[idx === uniqueRequisitions.length - 1 ? 4 : 0, idx === uniqueRequisitions.length - 1 ? 4 : 0, 0, 0]}
-                                barSize={20}
+                                barSize={40}
                             >
+                                <LabelList 
+                                    dataKey={`P_${req}`} 
+                                    position="inside" 
+                                    formatter={(v: any) => v > 0.6 ? req : ''} 
+                                    className="fill-white text-[9px] font-black"
+                                />
                                 {idx === uniqueRequisitions.length - 1 && (
                                     <LabelList
                                       dataKey="totalPlan"
@@ -762,8 +763,14 @@ export default function ProgrammingPage() {
                                 fill={color} 
                                 opacity={0.6}
                                 radius={[idx === uniqueRequisitions.length - 1 ? 4 : 0, idx === uniqueRequisitions.length - 1 ? 4 : 0, 0, 0]}
-                                barSize={20}
+                                barSize={40}
                             >
+                                <LabelList 
+                                    dataKey={`R_${req}`} 
+                                    position="inside" 
+                                    formatter={(v: any) => v > 0.6 ? req : ''} 
+                                    className="fill-white text-[9px] font-black"
+                                />
                                 {idx === uniqueRequisitions.length - 1 && (
                                     <LabelList
                                       dataKey="totalReal"
@@ -840,9 +847,10 @@ export default function ProgrammingPage() {
                             <SelectContent>
                                 {factoryList.map(f => <SelectItem key={f} value={f} className="text-[10px]">{f}</SelectItem>)}
                             </SelectContent>
-                          </Select>
-                        </FormItem>
-                      )} />
+                          </FormItem>
+                        </Select>
+                      </FormItem>
+                    )} />
                     </div>
                     <div className="w-20">
                       <FormField control={form.control} name={`atividades.${index}.tempo`} render={({ field }) => (
