@@ -268,31 +268,32 @@ export default function ProgrammingPage() {
   };
 
   const weeklyChartData = useMemo(() => {
-    const grouped: Record<string, any> = {};
-    calendarDays.forEach(day => {
+    return calendarDays.map(day => {
       const items = getItemsForDay(day);
+      const dayData = {
+        name: format(day, 'EEE', { locale: ptBR }),
+        fullDate: format(day, 'dd/MM/yyyy'),
+        shift1: 0,
+        shift2: 0,
+        shift3: 0,
+        total: 0
+      };
+
       items.forEach(item => {
-        const req = item.requisicao || item['Requisição'] || 'S/N';
         const shiftId = String(item.Turno || item.turno || '1');
         const rawHours = item.horasPlanejadas || item['Horas Máquina'];
         const hours = typeof rawHours === 'string' 
           ? parseFloat(rawHours.replace(',', '.')) 
           : (Number(rawHours) || 0);
         
-        if (!grouped[req]) {
-          grouped[req] = { name: req, total: 0, shift1: 0, shift2: 0, shift3: 0 };
-        }
-        
-        grouped[req].total += hours;
-        if (shiftId === '1') grouped[req].shift1 += hours;
-        else if (shiftId === '2') grouped[req].shift2 += hours;
-        else if (shiftId === '3') grouped[req].shift3 += hours;
+        if (shiftId === '1') dayData.shift1 += hours;
+        else if (shiftId === '2') dayData.shift2 += hours;
+        else if (shiftId === '3') dayData.shift3 += hours;
+        dayData.total += hours;
       });
-    });
 
-    return Object.values(grouped)
-      .sort((a: any, b: any) => b.total - a.total)
-      .slice(0, 15);
+      return dayData;
+    });
   }, [calendarDays, planejamentoData]);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -585,18 +586,18 @@ export default function ProgrammingPage() {
         </CardContent>
       </Card>
 
-      {/* NOVO GRÁFICO DE TEMPO PLANEJADO POR REQUISIÇÃO (EMPILHADO POR TURNO) */}
+      {/* GRÁFICO DE CARGA HORÁRIA POR DIA (UMA BARRA POR DIA) */}
       <div className="mt-8">
         <Card>
           <CardHeader>
-            <CardTitle>Tempo Planejado por Requisição (Justapostas por Turno)</CardTitle>
+            <CardTitle>Carga Horária Planejada por Dia</CardTitle>
             <CardDescription>
-              Total de horas planejadas por Forms na semana, divididas pela participação de cada turno.
+              Total de horas planejadas por dia da semana, distribuídas pelos turnos.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[400px] w-full">
-              {weeklyChartData.length > 0 ? (
+              {weeklyChartData.some(d => d.total > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <ChartContainer config={{ 
                     shift1: { label: '1º Turno', color: '#3b82f6' },
@@ -605,26 +606,29 @@ export default function ProgrammingPage() {
                   }}>
                     <BarChart
                       data={weeklyChartData}
-                      layout="vertical"
-                      margin={{ top: 5, right: 60, left: 40, bottom: 5 }}
+                      margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
                     >
-                      <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.1} />
-                      <XAxis type="number" hide />
-                      <YAxis
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.1} />
+                      <XAxis
                         dataKey="name"
-                        type="category"
                         tickLine={false}
                         axisLine={false}
-                        className="text-[10px] font-bold"
-                        width={80}
+                        className="text-[10px] font-black uppercase"
+                      />
+                      <YAxis
+                        unit="h"
+                        tickLine={false}
+                        axisLine={false}
+                        className="text-[10px]"
                       />
                       <RechartsTooltip 
                          cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
                          content={({ active, payload, label }) => {
                             if (active && payload && payload.length) {
+                              const data = payload[0].payload;
                               return (
                                 <div className="rounded-lg border bg-background p-2 shadow-sm min-w-[12rem]">
-                                  <p className="font-bold text-sm mb-2 border-b pb-1">Forms: {label}</p>
+                                  <p className="font-bold text-sm mb-2 border-b pb-1">{label} - {data.fullDate}</p>
                                   <div className="space-y-1">
                                     {payload.map((entry: any) => (
                                       entry.value > 0 && (
@@ -638,8 +642,8 @@ export default function ProgrammingPage() {
                                       )
                                     ))}
                                     <div className="flex justify-between items-center pt-1 border-t mt-1">
-                                      <span className="text-[10px] font-bold">Total:</span>
-                                      <span className="text-[10px] font-black">{payload.reduce((acc: number, curr: any) => acc + curr.value, 0).toFixed(1)}h</span>
+                                      <span className="text-[10px] font-bold">Total do Dia:</span>
+                                      <span className="text-[10px] font-black">{data.total.toFixed(1)}h</span>
                                     </div>
                                   </div>
                                 </div>
@@ -651,11 +655,11 @@ export default function ProgrammingPage() {
                       <Legend verticalAlign="top" height={36}/>
                       <Bar name="1º Turno" dataKey="shift1" stackId="a" fill="#3b82f6" />
                       <Bar name="2º Turno" dataKey="shift2" stackId="a" fill="#f97316" />
-                      <Bar name="3º Turno" dataKey="shift3" stackId="a" fill="#a855f7" radius={[0, 4, 4, 0]}>
+                      <Bar name="3º Turno" dataKey="shift3" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]}>
                         <LabelList
                           dataKey="total"
-                          position="right"
-                          formatter={(v: number) => `${v.toFixed(1)}h`}
+                          position="top"
+                          formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''}
                           className="fill-foreground text-[10px] font-bold"
                         />
                       </Bar>
@@ -777,4 +781,3 @@ export default function ProgrammingPage() {
     </div>
   );
 }
-
