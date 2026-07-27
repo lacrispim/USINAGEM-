@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -48,7 +47,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter
-} from "@/components/ui/dialog";
+} from "@/dialog";
 import {
   Form,
   FormControl,
@@ -405,7 +404,6 @@ export default function ProgrammingPage() {
   }
 
   const renderEvent = (item: PlanejamentoItem) => {
-    const qtdPlan = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
     const rawHours = item.horasPlanejadas || item['Horas Máquina'];
     const totalHours = typeof rawHours === 'string' 
       ? parseFloat(rawHours.replace(',', '.')) 
@@ -413,7 +411,6 @@ export default function ProgrammingPage() {
 
     const firstType = item.atividades && item.atividades.length > 0 ? item.atividades[0].tipo : (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO');
     const typeColor = lossOptions.find(o => o.value === firstType.toUpperCase())?.color || '#ffffff';
-    const isMultiple = item.atividades && item.atividades.length > 1;
     
     return (
       <TooltipProvider key={item.id}>
@@ -440,21 +437,14 @@ export default function ProgrammingPage() {
               <div className="flex items-center gap-1 opacity-70">
                 <span className="truncate">{item.nomeDaPeca || item['Nome da Peça']}</span>
               </div>
-              <div className="flex items-center gap-1 mt-0.5 text-[8px] font-black uppercase text-muted-foreground/50">
-                 <Factory className="h-2 w-2" />
-                 <span className="truncate">{item.site || item.Site || 'N/A'}</span>
-              </div>
-              {isMultiple && <div className="text-[7px] font-bold text-primary/40 uppercase mt-auto">+ Atividades</div>}
             </div>
           </TooltipTrigger>
           <TooltipContent className="w-64 p-3" side="right">
             <div className="grid grid-cols-2 gap-2 text-xs">
                 <span className="text-muted-foreground">Equip:</span><span className="font-medium text-right">{item.equipamento || item.EQUIPAMENTO}</span>
                 <span className="text-muted-foreground">Site:</span><span className="font-medium text-right">{item.site || item.Site}</span>
-                <span className="text-muted-foreground">Meta Peças:</span><span className="font-medium text-right">{qtdPlan} pçs</span>
                 <span className="text-muted-foreground">Total Planejado:</span><span className="font-medium text-right">{totalHours.toFixed(1)}h</span>
                 <span className="text-muted-foreground">Técnico:</span><span className="font-medium text-right truncate">{item.tecnico || item.Técnicos}</span>
-                <span className="text-[10px] text-muted-foreground col-span-2 pt-1 border-t italic">Segure e arraste para mudar a data ou turno</span>
             </div>
           </TooltipContent>
         </Tooltip>
@@ -515,23 +505,13 @@ export default function ProgrammingPage() {
                                       String(item.Turno || item.turno || '1') === turno.id && 
                                       (item.tecnico === tech || item.Técnicos === tech)
                                    );
-
-                                   const totalTechHours = itemsForTech.reduce((acc, curr) => {
-                                       const raw = curr.horasPlanejadas || curr['Horas Máquina'];
-                                       return acc + (typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : (Number(raw) || 0));
-                                   }, 0);
                                    
                                    return (
                                      <div key={tech} className="bg-muted/10 rounded border border-dashed p-1.5 min-h-[40px] group/tech">
                                         <div className="flex items-center justify-between mb-1">
-                                            <div className="flex flex-col gap-0.5">
-                                                <div className="flex items-center gap-1">
-                                                    <UserIcon className="h-2 w-2 text-muted-foreground" />
-                                                    <span className="text-[8px] font-bold text-muted-foreground uppercase truncate max-w-[60px]">{tech.split(' ')[0]}</span>
-                                                </div>
-                                                <span className={cn("text-[7px] font-black uppercase px-1 rounded-full w-fit", totalTechHours > 8 ? "bg-red-500/20 text-red-500" : "bg-primary/10 text-primary")}>
-                                                    Total: {totalTechHours.toFixed(1)}h
-                                                </span>
+                                            <div className="flex items-center gap-1">
+                                                <UserIcon className="h-2 w-2 text-muted-foreground" />
+                                                <span className="text-[8px] font-bold text-muted-foreground uppercase truncate max-w-[60px]">{tech.split(' ')[0]}</span>
                                             </div>
                                             <Button 
                                                 variant="ghost" 
@@ -631,17 +611,13 @@ export default function ProgrammingPage() {
                     )}
                   </div>
                 ))}
-                <div className="flex justify-between items-center pt-2">
-                    <span className="text-[10px] font-bold uppercase text-muted-foreground">Total Acumulado:</span>
-                    <span className="text-sm font-black text-primary">{form.getValues('horasPlanejadas').toFixed(1)}h</span>
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel>Técnico Responsável</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                 <FormField control={form.control} name="site" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Fábrica Principal (Referência)</FormLabel>
+                        <FormLabel>Fábrica Principal</FormLabel>
                         <Select onValueChange={(val) => {
                             field.onChange(val);
                             const currentAtivs = form.getValues('atividades');
@@ -657,10 +633,9 @@ export default function ProgrammingPage() {
                     </FormItem>
                 )} />
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Requisição</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Requisição / Forms</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel>Qtd. Peças</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
