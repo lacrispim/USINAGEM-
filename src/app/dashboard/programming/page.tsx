@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -18,7 +19,8 @@ import {
   Settings2,
   PlusCircle,
   Move,
-  User as UserIcon
+  User as UserIcon,
+  Factory
 } from 'lucide-react';
 import { 
   format, 
@@ -103,7 +105,7 @@ interface PlanejamentoItem {
 }
 
 const turnos = [
-  { id: '1', label: '1º Turno', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', technicians: ["Marcos Barbosa", "Daniel Solivo"] },
+  { id: '1', label: '1º Turno', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson Franca"] },
   { id: '2', label: '2º Turno', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20', technicians: ["Nathan Xavier", "Jair Melo"] },
   { id: '3', label: '3º Turno', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', technicians: ["Gustavo Gozzi", "Rodrigo Cantano"] },
 ];
@@ -408,6 +410,10 @@ export default function ProgrammingPage() {
     const totalHours = typeof rawHours === 'string' 
       ? parseFloat(rawHours.replace(',', '.')) 
       : (Number(rawHours) || 0);
+
+    const firstType = item.atividades && item.atividades.length > 0 ? item.atividades[0].tipo : (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO');
+    const typeColor = lossOptions.find(o => o.value === firstType.toUpperCase())?.color || '#ffffff';
+    const isMultiple = item.atividades && item.atividades.length > 1;
     
     return (
       <TooltipProvider key={item.id}>
@@ -421,6 +427,7 @@ export default function ProgrammingPage() {
                 "mb-1 cursor-grab active:cursor-grabbing rounded border p-1.5 text-[10px] leading-tight shadow-sm transition-all flex flex-col gap-1 group/event",
                 "border-border bg-card hover:border-primary"
               )}
+              style={{ borderLeft: `3px solid ${typeColor}` }}
             >
               <div className="flex items-center justify-between gap-1 w-full">
                 <span className="font-bold text-primary truncate max-w-[70%]" title={item.requisicao || item['Requisição']}>
@@ -431,14 +438,19 @@ export default function ProgrammingPage() {
                 </span>
               </div>
               <div className="flex items-center gap-1 opacity-70">
-                <Move className="h-2 w-2 shrink-0 opacity-20" />
                 <span className="truncate">{item.nomeDaPeca || item['Nome da Peça']}</span>
               </div>
+              <div className="flex items-center gap-1 mt-0.5 text-[8px] font-black uppercase text-muted-foreground/50">
+                 <Factory className="h-2 w-2" />
+                 <span className="truncate">{item.site || item.Site || 'N/A'}</span>
+              </div>
+              {isMultiple && <div className="text-[7px] font-bold text-primary/40 uppercase mt-auto">+ Atividades</div>}
             </div>
           </TooltipTrigger>
           <TooltipContent className="w-64 p-3" side="right">
             <div className="grid grid-cols-2 gap-2 text-xs">
                 <span className="text-muted-foreground">Equip:</span><span className="font-medium text-right">{item.equipamento || item.EQUIPAMENTO}</span>
+                <span className="text-muted-foreground">Site:</span><span className="font-medium text-right">{item.site || item.Site}</span>
                 <span className="text-muted-foreground">Meta Peças:</span><span className="font-medium text-right">{qtdPlan} pçs</span>
                 <span className="text-muted-foreground">Total Planejado:</span><span className="font-medium text-right">{totalHours.toFixed(1)}h</span>
                 <span className="text-muted-foreground">Técnico:</span><span className="font-medium text-right truncate">{item.tecnico || item.Técnicos}</span>
@@ -503,13 +515,23 @@ export default function ProgrammingPage() {
                                       String(item.Turno || item.turno || '1') === turno.id && 
                                       (item.tecnico === tech || item.Técnicos === tech)
                                    );
+
+                                   const totalTechHours = itemsForTech.reduce((acc, curr) => {
+                                       const raw = curr.horasPlanejadas || curr['Horas Máquina'];
+                                       return acc + (typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : (Number(raw) || 0));
+                                   }, 0);
                                    
                                    return (
                                      <div key={tech} className="bg-muted/10 rounded border border-dashed p-1.5 min-h-[40px] group/tech">
                                         <div className="flex items-center justify-between mb-1">
-                                            <div className="flex items-center gap-1">
-                                                <UserIcon className="h-2 w-2 text-muted-foreground" />
-                                                <span className="text-[8px] font-bold text-muted-foreground uppercase truncate max-w-[60px]">{tech.split(' ')[0]}</span>
+                                            <div className="flex flex-col gap-0.5">
+                                                <div className="flex items-center gap-1">
+                                                    <UserIcon className="h-2 w-2 text-muted-foreground" />
+                                                    <span className="text-[8px] font-bold text-muted-foreground uppercase truncate max-w-[60px]">{tech.split(' ')[0]}</span>
+                                                </div>
+                                                <span className={cn("text-[7px] font-black uppercase px-1 rounded-full w-fit", totalTechHours > 8 ? "bg-red-500/20 text-red-500" : "bg-primary/10 text-primary")}>
+                                                    Total: {totalTechHours.toFixed(1)}h
+                                                </span>
                                             </div>
                                             <Button 
                                                 variant="ghost" 
