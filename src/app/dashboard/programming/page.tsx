@@ -700,26 +700,30 @@ export default function ProgrammingPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[500px] w-full">
+            <div className="h-[600px] w-full">
               {weeklyChartData.some(d => d.totalPlan > 0 || d.totalReal > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={weeklyChartData}
-                      margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+                      layout="vertical"
+                      margin={{ top: 20, right: 60, left: 40, bottom: 20 }}
                       barGap={8}
                     >
-                      <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.1} />
+                      <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.1} />
                       <XAxis
-                        dataKey="name"
-                        tickLine={false}
-                        axisLine={false}
-                        className="text-[10px] font-black uppercase"
-                      />
-                      <YAxis
+                        type="number"
                         unit="h"
                         tickLine={false}
                         axisLine={false}
                         className="text-[10px]"
+                      />
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        tickLine={false}
+                        axisLine={false}
+                        width={60}
+                        className="text-[10px] font-black uppercase"
                       />
                       <RechartsTooltip 
                          cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
@@ -730,13 +734,13 @@ export default function ProgrammingPage() {
                         const color = REQ_COLORS[idx % REQ_COLORS.length];
                         return (
                           <React.Fragment key={req}>
-                            {/* Barra Planejada (Esquerda) */}
+                            {/* Barra Planejada (Superior) */}
                             <Bar 
                                 dataKey={`P_${req}`} 
                                 stackId="plan" 
                                 fill={color} 
-                                radius={[idx === uniqueRequisitions.length - 1 ? 4 : 0, idx === uniqueRequisitions.length - 1 ? 4 : 0, 0, 0]}
-                                barSize={40}
+                                radius={[0, idx === uniqueRequisitions.length - 1 ? 4 : 0, idx === uniqueRequisitions.length - 1 ? 4 : 0, 0]}
+                                barSize={25}
                             >
                                 <LabelList 
                                     dataKey={`P_${req}`} 
@@ -747,20 +751,21 @@ export default function ProgrammingPage() {
                                 {idx === uniqueRequisitions.length - 1 && (
                                     <LabelList
                                       dataKey="totalPlan"
-                                      position="top"
+                                      position="right"
+                                      offset={8}
                                       formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''}
                                       className="fill-muted-foreground text-[8px] font-bold"
                                     />
                                 )}
                             </Bar>
-                            {/* Barra Realizada (Direita) */}
+                            {/* Barra Realizada (Inferior) */}
                             <Bar 
                                 dataKey={`R_${req}`} 
                                 stackId="real" 
                                 fill={color} 
                                 opacity={0.6}
-                                radius={[idx === uniqueRequisitions.length - 1 ? 4 : 0, idx === uniqueRequisitions.length - 1 ? 4 : 0, 0, 0]}
-                                barSize={40}
+                                radius={[0, idx === uniqueRequisitions.length - 1 ? 4 : 0, idx === uniqueRequisitions.length - 1 ? 4 : 0, 0]}
+                                barSize={25}
                             >
                                 <LabelList 
                                     dataKey={`R_${req}`} 
@@ -771,7 +776,8 @@ export default function ProgrammingPage() {
                                 {idx === uniqueRequisitions.length - 1 && (
                                     <LabelList
                                       dataKey="totalReal"
-                                      position="top"
+                                      position="right"
+                                      offset={8}
                                       formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''}
                                       className="fill-blue-400 text-[8px] font-bold"
                                     />
