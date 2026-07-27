@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useDatabase, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useEffect, useState, useMemo } from 'react';
+import { useDatabase } from '@/firebase';
 import { ref, onValue, push, set, update, remove } from 'firebase/database';
-import { collection, query } from 'firebase/firestore';
 import {
   Card,
   CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
 } from '@/components/ui/card';
 import { 
   ChevronLeft, 
@@ -67,6 +69,8 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip, LabelList } from 'recharts';
+import { ChartContainer } from '@/components/ui/chart';
 
 interface AtividadePlanejada {
   tipo: string;
@@ -261,6 +265,27 @@ export default function ProgrammingPage() {
       }
     });
   };
+
+  const weeklyChartData = useMemo(() => {
+    const grouped: Record<string, number> = {};
+    calendarDays.forEach(day => {
+      const items = getItemsForDay(day);
+      items.forEach(item => {
+        const req = item.requisicao || item['Requisição'] || 'S/N';
+        const rawHours = item.horasPlanejadas || item['Horas Máquina'];
+        const hours = typeof rawHours === 'string' 
+          ? parseFloat(rawHours.replace(',', '.')) 
+          : (Number(rawHours) || 0);
+        
+        grouped[req] = (grouped[req] || 0) + hours;
+      });
+    });
+
+    return Object.entries(grouped)
+      .map(([name, hours]) => ({ name, hours }))
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 15);
+  }, [calendarDays, planejamentoData]);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedItemId(id);
@@ -551,6 +576,73 @@ export default function ProgrammingPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* NOVO GRÁFICO DE TEMPO PLANEJADO POR REQUISIÇÃO */}
+      <div className="mt-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Tempo Planejado por Requisição (Semana Atual)</CardTitle>
+            <CardDescription>
+              Total de horas planejadas para cada número de Forms na semana exibida acima.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px] w-full">
+              {weeklyChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ChartContainer config={{ hours: { label: 'Horas Planejadas', color: '#ffffff' } }}>
+                    <BarChart
+                      data={weeklyChartData}
+                      layout="vertical"
+                      margin={{ top: 5, right: 50, left: 40, bottom: 5 }}
+                    >
+                      <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.1} />
+                      <XAxis type="number" hide />
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        tickLine={false}
+                        axisLine={false}
+                        className="text-[10px] font-bold"
+                        width={80}
+                      />
+                      <RechartsTooltip 
+                         cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
+                         content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="rounded-lg border bg-background p-2 shadow-sm min-w-[10rem]">
+                                  <p className="font-bold text-sm mb-1">Requisição: {label}</p>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-muted-foreground">Planejado:</span>
+                                    <span className="text-xs font-black">{Number(payload[0].value).toFixed(1)}h</span>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                         }}
+                      />
+                      <Bar dataKey="hours" fill="#ffffff" radius={[0, 4, 4, 0]} barSize={25}>
+                        <LabelList
+                          dataKey="hours"
+                          position="right"
+                          formatter={(v: number) => `${v.toFixed(1)}h`}
+                          className="fill-foreground text-[10px] font-bold"
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ChartContainer>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-muted-foreground text-sm italic">
+                  Nenhum planejamento encontrado para esta semana.
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
