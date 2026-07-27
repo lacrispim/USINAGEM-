@@ -534,14 +534,12 @@ export default function ProgrammingPage() {
   const CustomChartTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
-      
       const planEntries = payload.filter((p: any) => p.dataKey.startsWith('P_'));
       const realEntries = payload.filter((p: any) => p.dataKey.startsWith('R_'));
 
       return (
         <div className="rounded-lg border bg-background p-3 shadow-lg min-w-[16rem]">
           <p className="font-bold text-sm mb-2 border-b pb-1">{label} - {data.fullDate}</p>
-          
           <div className="space-y-4">
             <div>
                 <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Planejado (Total: {data.totalPlan.toFixed(1)}h)</p>
@@ -557,7 +555,6 @@ export default function ProgrammingPage() {
                     ))}
                 </div>
             </div>
-
             {data.totalReal > 0 && (
                 <div>
                     <p className="text-[10px] font-black uppercase text-blue-400 mb-1">Realizado (Total: {data.totalReal.toFixed(1)}h)</p>
@@ -847,10 +844,9 @@ export default function ProgrammingPage() {
                             <SelectContent>
                                 {factoryList.map(f => <SelectItem key={f} value={f} className="text-[10px]">{f}</SelectItem>)}
                             </SelectContent>
-                          </FormItem>
-                        </Select>
-                      </FormItem>
-                    )} />
+                          </Select>
+                        </FormItem>
+                      )} />
                     </div>
                     <div className="w-20">
                       <FormField control={form.control} name={`atividades.${index}.tempo`} render={({ field }) => (
