@@ -147,6 +147,13 @@ const lossOptions = [
   { value: 'AUXÍLIO AS FÁBRICAS', label: 'Auxílio as Fábricas', color: '#0ea5e9' },
 ];
 
+// Paleta de cores para as requisições no gráfico
+const REQ_COLORS = [
+    '#3b82f6', '#f97316', '#a855f7', '#22c55e', '#ef4444', 
+    '#eab308', '#0ea5e9', '#ec4899', '#14b8a6', '#6366f1',
+    '#8b5cf6', '#d946ef', '#f43f5e', '#10b981', '#f59e0b'
+];
+
 const planningFormSchema = z.object({
   dataExecucao: z.string().min(1, 'Data é obrigatória.'),
   equipamento: z.string().min(1, 'Equipamento é obrigatório.'),
@@ -267,33 +274,38 @@ export default function ProgrammingPage() {
     });
   };
 
-  const weeklyChartData = useMemo(() => {
-    return calendarDays.map(day => {
+  const { weeklyChartData, uniqueRequisitions } = useMemo(() => {
+    const reqSet = new Set<string>();
+    
+    const data = calendarDays.map(day => {
       const items = getItemsForDay(day);
-      const dayData = {
+      const dayData: any = {
         name: format(day, 'EEE', { locale: ptBR }),
         fullDate: format(day, 'dd/MM/yyyy'),
-        shift1: 0,
-        shift2: 0,
-        shift3: 0,
         total: 0
       };
 
       items.forEach(item => {
-        const shiftId = String(item.Turno || item.turno || '1');
+        const req = item.requisicao || item['Requisição'] || 'S/N';
         const rawHours = item.horasPlanejadas || item['Horas Máquina'];
         const hours = typeof rawHours === 'string' 
           ? parseFloat(rawHours.replace(',', '.')) 
           : (Number(rawHours) || 0);
         
-        if (shiftId === '1') dayData.shift1 += hours;
-        else if (shiftId === '2') dayData.shift2 += hours;
-        else if (shiftId === '3') dayData.shift3 += hours;
-        dayData.total += hours;
+        if (hours > 0) {
+            dayData[req] = (dayData[req] || 0) + hours;
+            dayData.total += hours;
+            reqSet.add(req);
+        }
       });
 
       return dayData;
     });
+
+    return { 
+        weeklyChartData: data, 
+        uniqueRequisitions: Array.from(reqSet).sort() 
+    };
   }, [calendarDays, planejamentoData]);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -586,24 +598,19 @@ export default function ProgrammingPage() {
         </CardContent>
       </Card>
 
-      {/* GRÁFICO DE CARGA HORÁRIA POR DIA (UMA BARRA POR DIA) */}
+      {/* GRÁFICO DE CARGA HORÁRIA POR DIA SEGMENTADO POR REQUISIÇÃO */}
       <div className="mt-8">
         <Card>
           <CardHeader>
-            <CardTitle>Carga Horária Planejada por Dia</CardTitle>
+            <CardTitle>Carga Horária Diária por Requisição</CardTitle>
             <CardDescription>
-              Total de horas planejadas por dia da semana, distribuídas pelos turnos.
+              Total de horas planejadas por dia, divididas por número de Forms.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[400px] w-full">
               {weeklyChartData.some(d => d.total > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <ChartContainer config={{ 
-                    shift1: { label: '1º Turno', color: '#3b82f6' },
-                    shift2: { label: '2º Turno', color: '#f97316' },
-                    shift3: { label: '3º Turno', color: '#a855f7' }
-                  }}>
                     <BarChart
                       data={weeklyChartData}
                       margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
@@ -626,20 +633,19 @@ export default function ProgrammingPage() {
                          content={({ active, payload, label }) => {
                             if (active && payload && payload.length) {
                               const data = payload[0].payload;
+                              const relevantPayload = payload.filter((p: any) => Number(p.value) > 0);
                               return (
                                 <div className="rounded-lg border bg-background p-2 shadow-sm min-w-[12rem]">
                                   <p className="font-bold text-sm mb-2 border-b pb-1">{label} - {data.fullDate}</p>
                                   <div className="space-y-1">
-                                    {payload.map((entry: any) => (
-                                      entry.value > 0 && (
-                                        <div key={entry.name} className="flex justify-between items-center gap-4">
+                                    {relevantPayload.map((entry: any) => (
+                                        <div key={entry.dataKey} className="flex justify-between items-center gap-4">
                                           <div className="flex items-center gap-1.5">
                                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                                            <span className="text-[10px] text-muted-foreground">{entry.name}:</span>
+                                            <span className="text-[10px] text-muted-foreground">Forms {entry.dataKey}:</span>
                                           </div>
                                           <span className="text-[10px] font-black">{Number(entry.value).toFixed(1)}h</span>
                                         </div>
-                                      )
                                     ))}
                                     <div className="flex justify-between items-center pt-1 border-t mt-1">
                                       <span className="text-[10px] font-bold">Total do Dia:</span>
@@ -652,19 +658,25 @@ export default function ProgrammingPage() {
                             return null;
                          }}
                       />
-                      <Legend verticalAlign="top" height={36}/>
-                      <Bar name="1º Turno" dataKey="shift1" stackId="a" fill="#3b82f6" />
-                      <Bar name="2º Turno" dataKey="shift2" stackId="a" fill="#f97316" />
-                      <Bar name="3º Turno" dataKey="shift3" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]}>
-                        <LabelList
-                          dataKey="total"
-                          position="top"
-                          formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''}
-                          className="fill-foreground text-[10px] font-bold"
-                        />
-                      </Bar>
+                      {uniqueRequisitions.map((req, idx) => (
+                        <Bar 
+                            key={req} 
+                            dataKey={req} 
+                            stackId="a" 
+                            fill={REQ_COLORS[idx % REQ_COLORS.length]} 
+                            radius={idx === uniqueRequisitions.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        >
+                            {idx === uniqueRequisitions.length - 1 && (
+                                <LabelList
+                                  dataKey="total"
+                                  position="top"
+                                  formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''}
+                                  className="fill-foreground text-[10px] font-bold"
+                                />
+                            )}
+                        </Bar>
+                      ))}
                     </BarChart>
-                  </ChartContainer>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex h-full items-center justify-center text-muted-foreground text-sm italic">
