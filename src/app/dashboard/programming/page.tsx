@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -69,7 +70,7 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip, LabelList } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip, LabelList, Legend } from 'recharts';
 import { ChartContainer } from '@/components/ui/chart';
 
 interface AtividadePlanejada {
@@ -106,9 +107,9 @@ interface PlanejamentoItem {
 }
 
 const turnos = [
-  { id: '1', label: '1º Turno', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson Franca"] },
-  { id: '2', label: '2º Turno', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20', technicians: ["Nathan Xavier", "Jair Melo"] },
-  { id: '3', label: '3º Turno', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', technicians: ["Gustavo Gozzi", "Rodrigo Cantano"] },
+  { id: '1', label: '1º Turno', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', chartColor: '#3b82f6', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson Franca"] },
+  { id: '2', label: '2º Turno', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20', chartColor: '#f97316', technicians: ["Nathan Xavier", "Jair Melo"] },
+  { id: '3', label: '3º Turno', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', chartColor: '#a855f7', technicians: ["Gustavo Gozzi", "Rodrigo Cantano"] },
 ];
 
 const operatorList = [
@@ -150,7 +151,7 @@ const planningFormSchema = z.object({
   dataExecucao: z.string().min(1, 'Data é obrigatória.'),
   equipamento: z.string().min(1, 'Equipamento é obrigatório.'),
   requisicao: z.string().min(1, 'Nº da Requisição é obrigatório.'),
-  nomeDaPeca: z.string().min(1, 'Nome da peça é obrigatório.'),
+  nomeDaPeca: z.string().min(1, 'Nome da peça é obrigatória.'),
   quantidade: z.coerce.number().min(0, 'Quantidade deve ser zero ou maior.'),
   tecnico: z.string().min(1, 'Técnico é obrigatório.'),
   horasPlanejadas: z.coerce.number().default(0),
@@ -267,23 +268,30 @@ export default function ProgrammingPage() {
   };
 
   const weeklyChartData = useMemo(() => {
-    const grouped: Record<string, number> = {};
+    const grouped: Record<string, any> = {};
     calendarDays.forEach(day => {
       const items = getItemsForDay(day);
       items.forEach(item => {
         const req = item.requisicao || item['Requisição'] || 'S/N';
+        const shiftId = String(item.Turno || item.turno || '1');
         const rawHours = item.horasPlanejadas || item['Horas Máquina'];
         const hours = typeof rawHours === 'string' 
           ? parseFloat(rawHours.replace(',', '.')) 
           : (Number(rawHours) || 0);
         
-        grouped[req] = (grouped[req] || 0) + hours;
+        if (!grouped[req]) {
+          grouped[req] = { name: req, total: 0, shift1: 0, shift2: 0, shift3: 0 };
+        }
+        
+        grouped[req].total += hours;
+        if (shiftId === '1') grouped[req].shift1 += hours;
+        else if (shiftId === '2') grouped[req].shift2 += hours;
+        else if (shiftId === '3') grouped[req].shift3 += hours;
       });
     });
 
-    return Object.entries(grouped)
-      .map(([name, hours]) => ({ name, hours }))
-      .sort((a, b) => b.hours - a.hours)
+    return Object.values(grouped)
+      .sort((a: any, b: any) => b.total - a.total)
       .slice(0, 15);
   }, [calendarDays, planejamentoData]);
 
@@ -442,7 +450,7 @@ export default function ProgrammingPage() {
               onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}
               className={cn(
                 "mb-1 cursor-grab active:cursor-grabbing rounded border p-1.5 text-[10px] leading-tight shadow-sm transition-all flex flex-col gap-1 group/event",
-                "border-border bg-card hover:border-primary"
+                "border-border bg-card hover:border-primary shrink-0 min-w-[80px] max-w-[120px]"
               )}
               style={{ borderLeft: `3px solid ${typeColor}` }}
             >
@@ -555,7 +563,7 @@ export default function ProgrammingPage() {
                                             </Button>
                                         </div>
                                         <div 
-                                          className="min-h-[10px]"
+                                          className="min-h-[10px] flex flex-row flex-wrap gap-1"
                                           onDragOver={(e) => e.preventDefault()}
                                           onDrop={(e) => handleDrop(e, day, turno.id, tech)}
                                         >
@@ -577,24 +585,28 @@ export default function ProgrammingPage() {
         </CardContent>
       </Card>
 
-      {/* NOVO GRÁFICO DE TEMPO PLANEJADO POR REQUISIÇÃO */}
+      {/* NOVO GRÁFICO DE TEMPO PLANEJADO POR REQUISIÇÃO (EMPILHADO POR TURNO) */}
       <div className="mt-8">
         <Card>
           <CardHeader>
-            <CardTitle>Tempo Planejado por Requisição (Semana Atual)</CardTitle>
+            <CardTitle>Tempo Planejado por Requisição (Justapostas por Turno)</CardTitle>
             <CardDescription>
-              Total de horas planejadas para cada número de Forms na semana exibida acima.
+              Total de horas planejadas por Forms na semana, divididas pela participação de cada turno.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[400px] w-full">
               {weeklyChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <ChartContainer config={{ hours: { label: 'Horas Planejadas', color: '#ffffff' } }}>
+                  <ChartContainer config={{ 
+                    shift1: { label: '1º Turno', color: '#3b82f6' },
+                    shift2: { label: '2º Turno', color: '#f97316' },
+                    shift3: { label: '3º Turno', color: '#a855f7' }
+                  }}>
                     <BarChart
                       data={weeklyChartData}
                       layout="vertical"
-                      margin={{ top: 5, right: 50, left: 40, bottom: 5 }}
+                      margin={{ top: 5, right: 60, left: 40, bottom: 5 }}
                     >
                       <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.1} />
                       <XAxis type="number" hide />
@@ -611,11 +623,24 @@ export default function ProgrammingPage() {
                          content={({ active, payload, label }) => {
                             if (active && payload && payload.length) {
                               return (
-                                <div className="rounded-lg border bg-background p-2 shadow-sm min-w-[10rem]">
-                                  <p className="font-bold text-sm mb-1">Requisição: {label}</p>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-xs text-muted-foreground">Planejado:</span>
-                                    <span className="text-xs font-black">{Number(payload[0].value).toFixed(1)}h</span>
+                                <div className="rounded-lg border bg-background p-2 shadow-sm min-w-[12rem]">
+                                  <p className="font-bold text-sm mb-2 border-b pb-1">Forms: {label}</p>
+                                  <div className="space-y-1">
+                                    {payload.map((entry: any) => (
+                                      entry.value > 0 && (
+                                        <div key={entry.name} className="flex justify-between items-center gap-4">
+                                          <div className="flex items-center gap-1.5">
+                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                            <span className="text-[10px] text-muted-foreground">{entry.name}:</span>
+                                          </div>
+                                          <span className="text-[10px] font-black">{Number(entry.value).toFixed(1)}h</span>
+                                        </div>
+                                      )
+                                    ))}
+                                    <div className="flex justify-between items-center pt-1 border-t mt-1">
+                                      <span className="text-[10px] font-bold">Total:</span>
+                                      <span className="text-[10px] font-black">{payload.reduce((acc: number, curr: any) => acc + curr.value, 0).toFixed(1)}h</span>
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -623,9 +648,12 @@ export default function ProgrammingPage() {
                             return null;
                          }}
                       />
-                      <Bar dataKey="hours" fill="#ffffff" radius={[0, 4, 4, 0]} barSize={25}>
+                      <Legend verticalAlign="top" height={36}/>
+                      <Bar name="1º Turno" dataKey="shift1" stackId="a" fill="#3b82f6" />
+                      <Bar name="2º Turno" dataKey="shift2" stackId="a" fill="#f97316" />
+                      <Bar name="3º Turno" dataKey="shift3" stackId="a" fill="#a855f7" radius={[0, 4, 4, 0]}>
                         <LabelList
-                          dataKey="hours"
+                          dataKey="total"
                           position="right"
                           formatter={(v: number) => `${v.toFixed(1)}h`}
                           className="fill-foreground text-[10px] font-bold"
@@ -749,3 +777,4 @@ export default function ProgrammingPage() {
     </div>
   );
 }
+
