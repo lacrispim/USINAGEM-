@@ -745,7 +745,7 @@ export default function ProgrammingPage() {
                                 <LabelList 
                                     dataKey={`P_${req}`} 
                                     position="inside" 
-                                    formatter={(v: any) => v > 0.6 ? req : ''} 
+                                    formatter={(v: any) => v > 0.4 ? req : ''} 
                                     className="fill-white text-[9px] font-black"
                                 />
                                 {idx === uniqueRequisitions.length - 1 && (
@@ -770,7 +770,7 @@ export default function ProgrammingPage() {
                                 <LabelList 
                                     dataKey={`R_${req}`} 
                                     position="inside" 
-                                    formatter={(v: any) => v > 0.6 ? req : ''} 
+                                    formatter={(v: any) => v > 0.4 ? req : ''} 
                                     className="fill-white text-[9px] font-black"
                                 />
                                 {idx === uniqueRequisitions.length - 1 && (
