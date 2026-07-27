@@ -404,6 +404,10 @@ export default function ProgrammingPage() {
 
   const renderEvent = (item: PlanejamentoItem) => {
     const qtdPlan = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
+    const rawHours = item.horasPlanejadas || item['Horas Máquina'];
+    const totalHours = typeof rawHours === 'string' 
+      ? parseFloat(rawHours.replace(',', '.')) 
+      : (Number(rawHours) || 0);
     
     return (
       <TooltipProvider key={item.id}>
@@ -414,20 +418,29 @@ export default function ProgrammingPage() {
               onDragStart={(e) => handleDragStart(e, item.id)}
               onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}
               className={cn(
-                "mb-1 cursor-grab active:cursor-grabbing truncate rounded border p-1 text-[10px] leading-tight shadow-sm transition-all flex items-center gap-1 group/event",
+                "mb-1 cursor-grab active:cursor-grabbing rounded border p-1.5 text-[10px] leading-tight shadow-sm transition-all flex flex-col gap-1 group/event",
                 "border-border bg-card hover:border-primary"
               )}
             >
-              <Move className="h-2 w-2 opacity-0 group-hover/event:opacity-40 transition-opacity" />
-              <span className="font-bold text-primary mr-1">{item.requisicao || item['Requisição']}</span>
-              <span className="truncate">{item.nomeDaPeca || item['Nome da Peça']}</span>
+              <div className="flex items-center justify-between gap-1 w-full">
+                <span className="font-bold text-primary truncate max-w-[70%]" title={item.requisicao || item['Requisição']}>
+                  {item.requisicao || item['Requisição']}
+                </span>
+                <span className="bg-muted px-1 rounded-sm font-black text-[9px] shrink-0">
+                  {totalHours.toFixed(1)}h
+                </span>
+              </div>
+              <div className="flex items-center gap-1 opacity-70">
+                <Move className="h-2 w-2 shrink-0 opacity-20" />
+                <span className="truncate">{item.nomeDaPeca || item['Nome da Peça']}</span>
+              </div>
             </div>
           </TooltipTrigger>
           <TooltipContent className="w-64 p-3" side="right">
             <div className="grid grid-cols-2 gap-2 text-xs">
                 <span className="text-muted-foreground">Equip:</span><span className="font-medium text-right">{item.equipamento || item.EQUIPAMENTO}</span>
                 <span className="text-muted-foreground">Meta Peças:</span><span className="font-medium text-right">{qtdPlan} pçs</span>
-                <span className="text-muted-foreground">Total Planejado:</span><span className="font-medium text-right">{(Number(item.horasPlanejadas || item['Horas Máquina']) || 0).toFixed(1)}h</span>
+                <span className="text-muted-foreground">Total Planejado:</span><span className="font-medium text-right">{totalHours.toFixed(1)}h</span>
                 <span className="text-muted-foreground">Técnico:</span><span className="font-medium text-right truncate">{item.tecnico || item.Técnicos}</span>
                 <span className="text-[10px] text-muted-foreground col-span-2 pt-1 border-t italic">Segure e arraste para mudar a data ou turno</span>
             </div>
