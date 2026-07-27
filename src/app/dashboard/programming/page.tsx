@@ -1,26 +1,21 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useDatabase, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { ref, onValue, push, set, update, remove } from 'firebase/database';
 import { collection, query } from 'firebase/firestore';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import { 
   ChevronLeft, 
   ChevronRight, 
   Loader, 
-  Calendar as CalendarIcon,
   Plus,
   Trash2,
   Cpu,
   Settings2,
-  Clock,
   PlusCircle,
   Move,
   User as UserIcon
@@ -34,8 +29,7 @@ import {
   eachDayOfInterval, 
   isSameDay, 
   parse, 
-  isToday,
-  getISOWeek
+  isToday
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -73,21 +67,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  ResponsiveContainer, 
-  BarChart,
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as RechartsTooltip, 
-  Legend,
-  LabelList,
-} from 'recharts';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface AtividadePlanejada {
   tipo: string;
@@ -189,88 +169,6 @@ const planningFormSchema = z.object({
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
-const PlanningChart = ({ 
-  data, 
-  title, 
-  isDayView, 
-  metric, 
-}: { 
-  data: any[], 
-  title: string, 
-  isDayView: boolean, 
-  metric: 'production' | 'hours',
-}) => {
-  if (!data || data.length === 0) return (
-    <Card className="flex h-[300px] items-center justify-center border-dashed">
-      <p className="text-muted-foreground text-xs uppercase font-bold tracking-widest">{title}: Sem dados</p>
-    </Card>
-  );
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-bold uppercase tracking-tight">{title}</CardTitle>
-        <CardDescription className="text-[10px]">
-          {isDayView ? "Visão por Turno" : `Consolidado ${metric === 'production' ? 'de Produção' : 'de Horas'}`}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[400px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barGap={8} margin={{ top: 30, right: 30, left: 10, bottom: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
-              <XAxis 
-                dataKey="label" 
-                className="text-[10px] font-bold uppercase" 
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis 
-                stroke="hsl(var(--muted-foreground))" 
-                className="text-[10px]" 
-                axisLine={false} 
-                tickLine={false}
-              />
-              <RechartsTooltip 
-                contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                itemStyle={{ fontSize: '12px' }}
-              />
-              <Legend verticalAlign="bottom" height={36}/>
-              
-              {metric === 'production' ? (
-                <>
-                  <Bar name="Peças Fin." dataKey="pecas_real" fill="#22c55e" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="pecas_real" position="top" className="fill-foreground text-[10px] font-bold" />
-                  </Bar>
-                  <Bar name="Peças Plan." dataKey="pecas_plan" fill="#6b7280" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="pecas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" />
-                  </Bar>
-                  <Bar name="Ops. Realizadas" dataKey="ops_real" fill="#a855f7" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="ops_real" position="top" className="fill-foreground text-[10px] font-bold" />
-                  </Bar>
-                  <Bar name="Ops. Plan." dataKey="ops_plan" fill="#f59e0b" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="ops_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" />
-                  </Bar>
-                </>
-              ) : (
-                <>
-                  <Bar name="Horas Realizadas" dataKey="horas_real" fill="#3b82f6" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="horas_real" position="top" className="fill-foreground text-[10px] font-bold" formatter={(val: number) => `${val.toFixed(1)}h`} />
-                  </Bar>
-                  <Bar name="Horas Planejadas" dataKey="horas_plan" fill="#6b7280" opacity={0.6} radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="horas_plan" position="top" className="fill-muted-foreground text-[10px] font-bold" formatter={(val: number) => `${val.toFixed(1)}h`} />
-                  </Bar>
-                </>
-              )}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 export default function ProgrammingPage() {
   const database = useDatabase();
   const firestore = useFirestore();
@@ -279,7 +177,6 @@ export default function ProgrammingPage() {
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMetric, setViewMetric] = useState<'production' | 'hours'>('production');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -287,15 +184,7 @@ export default function ProgrammingPage() {
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
   const [selectedTecnicoAtivo, setSelectedTecnicoAtivo] = useState<string | null>(null);
 
-  const [selectedWeekFilter, setSelectedWeekFilter] = useState<string>('all');
-  const [selectedDateFilter, setSelectedDateFilter] = useState<Date | undefined>(undefined);
-
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-
-  const productionRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'productionRecords')) : null
-  , [firestore]);
-  const { data: firestoreProduction } = useCollection(productionRecordsQuery);
 
   const form = useForm<PlanningFormValues>({
     resolver: zodResolver(planningFormSchema),
@@ -412,139 +301,6 @@ export default function ProgrammingPage() {
     }
     setDraggedItemId(null);
   };
-
-  const { chartData, isDayView: calculatedIsDayView } = useMemo(() => {
-    const isDayView = !!selectedDateFilter;
-
-    const centurTurns = [
-      { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 },
-      { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 },
-      { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 }
-    ];
-    const centroTurns = [
-      { label: '1º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 },
-      { label: '2º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 },
-      { label: '3º TURNO', pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 }
-    ];
-
-    const centurMap: Record<string, any> = {};
-    const centroMap: Record<string, any> = {};
-
-    const calculatePlanVolumes = (item: PlanejamentoItem) => {
-      const pPlan = Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0;
-      const oPlan = Number(item.operacoesPlanejadas !== undefined ? item.operacoesPlanejadas : (item['Operações Planejadas'] || 0)) || 0;
-      let hPlan = 0;
-      if (item.atividades && Array.isArray(item.atividades)) {
-          item.atividades.forEach(ativ => hPlan += (Number(ativ.tempo) || 0));
-      } else {
-          hPlan = typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
-              ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
-              : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0);
-      }
-      return { pPlan, hPlan, oPlan };
-    };
-
-    planejamentoData.forEach(item => {
-      const dateStr = item.dataExecucao || item['Data Execução'];
-      if (!dateStr) return;
-      let date;
-      try { date = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { date = new Date(dateStr); }
-      if (isNaN(date.getTime())) return;
-
-      const v = calculatePlanVolumes(item);
-      const equip = String(item.equipamento || item.EQUIPAMENTO || '').toUpperCase();
-      
-      if (isDayView) {
-        if (!isSameDay(date, selectedDateFilter!)) return;
-        const shiftVal = item.Turno || item.turno || '1';
-        const turnoIndex = (parseInt(String(shiftVal)) || 1) - 1;
-        const targetArr = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurTurns : 
-                           (equip.includes('CENTRO') || equip.includes('D600')) ? centroTurns : null;
-        if (targetArr && turnoIndex >= 0 && turnoIndex < 3) {
-            targetArr[turnoIndex].pecas_plan += v.pPlan;
-            targetArr[turnoIndex].horas_plan += v.hPlan;
-            targetArr[turnoIndex].ops_plan += v.oPlan;
-        }
-      } else {
-        if (selectedWeekFilter !== 'all' && getISOWeek(date) !== parseInt(selectedWeekFilter)) return;
-        let key = selectedWeekFilter !== 'all' ? format(date, 'yyyy-MM-dd') : format(date, 'yyyy-MM');
-        let label = selectedWeekFilter !== 'all' ? format(date, 'dd/MM', { locale: ptBR }) : format(date, 'MMM yy', { locale: ptBR });
-        const targetMap = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurMap : 
-                           (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
-        if (targetMap) {
-          if (!targetMap[key]) {
-            targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 };
-          }
-          targetMap[key].pecas_plan += v.pPlan;
-          targetMap[key].horas_plan += v.hPlan;
-          targetMap[key].ops_plan += v.oPlan;
-        }
-      }
-    });
-
-    if (firestoreProduction) {
-      firestoreProduction.forEach(record => {
-        const recordDate = record.date?.toDate ? record.date.toDate() : (record.date ? new Date(record.date) : null);
-        if (!recordDate || isNaN(recordDate.getTime())) return;
-
-        const qty = Number(record.quantityProduced) || 0;
-        if (qty <= 0) return;
-
-        const equip = String(record.machine || '').toUpperCase();
-        
-        const operator = record.operatorId || '';
-        let tIdx = 0;
-        if (['Marcos Barbosa', 'Daniel Solivo'].includes(operator)) {
-          tIdx = 0;
-        } else if (['Jair Melo', 'Nathan Xavier'].includes(operator)) {
-          tIdx = 1;
-        } else if (['Gustavo Gozzi', 'Rodrigo Cantano'].includes(operator)) {
-          tIdx = 2;
-        } else {
-          const hour = record.createdAt?.toDate ? record.createdAt.toDate().getHours() : 10;
-          if (hour >= 14 && hour < 22) tIdx = 1;
-          else if (hour >= 22 || hour < 6) tIdx = 2;
-        }
-
-        let ops = 0;
-        const opsMatch = String(record.operationsNumber || '').match(/\d+/);
-        ops = opsMatch ? parseInt(opsMatch[0]) : qty;
-
-        const hReal = (Number(record.machiningTime) || 0) / 60;
-
-        if (isDayView) {
-          if (!isSameDay(recordDate, selectedDateFilter!)) return;
-          const targetArr = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurTurns : 
-                             (equip.includes('CENTRO') || equip.includes('D600')) ? centroTurns : null;
-          if (targetArr && tIdx >= 0 && tIdx < 3) {
-            targetArr[tIdx].pecas_real += qty;
-            targetArr[tIdx].ops_real += ops;
-            targetArr[tIdx].horas_real += hReal;
-          }
-        } else {
-          if (selectedWeekFilter !== 'all' && getISOWeek(recordDate) !== parseInt(selectedWeekFilter)) return;
-          let key = selectedWeekFilter !== 'all' ? format(recordDate, 'yyyy-MM-dd') : format(recordDate, 'yyyy-MM');
-          let label = selectedWeekFilter !== 'all' ? format(recordDate, 'dd/MM', { locale: ptBR }) : format(recordDate, 'MMM yy', { locale: ptBR });
-          const targetMap = (equip.includes('CENTUR') || equip.includes('TORNO')) ? centurMap : 
-                           (equip.includes('CENTRO') || equip.includes('D600')) ? centroMap : null;
-          if (targetMap) {
-            if (!targetMap[key]) {
-              targetMap[key] = { key, label, pecas_plan: 0, pecas_real: 0, ops_real: 0, ops_plan: 0, horas_plan: 0, horas_real: 0 };
-            }
-            targetMap[key].pecas_real += qty;
-            targetMap[key].ops_real += ops;
-            targetMap[key].horas_real += hReal;
-          }
-        }
-      });
-    }
-
-    const sortFn = (a: any, b: any) => a.key.localeCompare(b.key);
-    return { chartData: { 
-      centur: isDayView ? centurTurns : Object.values(centurMap).sort(sortFn), 
-      centro: isDayView ? centroTurns : Object.values(centroMap).sort(sortFn) 
-    }, isDayView };
-  }, [planejamentoData, firestoreProduction, selectedWeekFilter, selectedDateFilter]);
 
   const handleShiftClick = (day: Date, turnoId: string, tecnico?: string) => {
     setEditingId(null);
@@ -787,38 +543,6 @@ export default function ProgrammingPage() {
           )}
         </CardContent>
       </Card>
-
-      <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-8">
-        <h2 className="text-xl font-bold tracking-tight">Gráficos de Consolidado</h2>
-        <div className="flex flex-wrap items-center gap-3 bg-card p-3 rounded-lg border shadow-sm">
-          <Tabs value={viewMetric} onValueChange={(val: any) => setViewMetric(val)}>
-            <TabsList className="h-8">
-              <TabsTrigger value="production" className="text-[10px] font-bold">PRODUÇÃO</TabsTrigger>
-              <TabsTrigger value="hours" className="text-[10px] font-bold flex items-center gap-1"><Clock className="h-3 w-3" /> HORAS</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Popover>
-              <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("h-8 text-xs font-bold", !selectedDateFilter && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-3 w-3" />{selectedDateFilter ? format(selectedDateFilter, "dd/MM/yyyy") : "Dia"}
-                  </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDateFilter} onSelect={(date) => { setSelectedDateFilter(date); if (date) setSelectedWeekFilter('all'); }} initialFocus /></PopoverContent>
-          </Popover>
-          <Select value={selectedWeekFilter} onValueChange={(val) => { setSelectedWeekFilter(val); if (val !== 'all') setSelectedDateFilter(undefined); }}>
-            <SelectTrigger className="w-[100px] h-8 text-xs font-bold"><SelectValue placeholder="Semana" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {Array.from({ length: 53 }, (_, i) => i + 1).map(week => (<SelectItem key={week} value={String(week)}>S{week}</SelectItem>))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <PlanningChart data={chartData.centur} title="Torno Centur 30" isDayView={calculatedIsDayView} metric={viewMetric} />
-        <PlanningChart data={chartData.centro} title="Centro D600" isDayView={calculatedIsDayView} metric={viewMetric} />
-      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
