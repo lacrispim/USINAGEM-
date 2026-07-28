@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,9 +23,8 @@ import {
 } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useDatabase } from '@/firebase';
 import { ref, onValue } from 'firebase/database';
-import { collection, query, where } from 'firebase/firestore';
-import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
-import { getYear, getMonth, format, startOfDay, endOfDay, getISOWeek, parse, endOfMonth, startOfISOWeek, endOfISOWeek, setISOWeek } from 'date-fns';
+import { collection, query, where, limit } from 'firebase/firestore';
+import { getYear, getMonth, format, startOfDay, endOfDay, getISOWeek, endOfMonth, startOfISOWeek, endOfISOWeek, setISOWeek } from 'date-fns';
 import {
   Select,
   SelectContent,
@@ -33,16 +33,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { OperatorPerformanceChart } from '@/components/charts/operator-performance-chart';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
-import { MonthlyOeeEvolutionChart } from '@/components/charts/monthly-oee-evolution-chart';
-import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
-import { DailyPdlMplLossChart } from '@/components/charts/daily-pdl-mpl-loss-chart';
-import { AvailableVsActualChart } from '@/components/charts/available-vs-actual-chart';
-import { TimePerRequisitionChart } from '@/components/charts/time-per-requisition-chart';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Carregamento dinâmico de gráficos para performance
+const MachiningTimeTrendChart = dynamic(() => import('@/components/charts/machining-time-trend-chart').then(m => m.MachiningTimeTrendChart), { ssr: false, loading: () => <Skeleton className="h-[350px] w-full" /> });
+const OperatorPerformanceChart = dynamic(() => import('@/components/charts/operator-performance-chart').then(m => m.OperatorPerformanceChart), { ssr: false, loading: () => <Skeleton className="h-[450px] w-full" /> });
+const PlannedVsMachinedChart = dynamic(() => import('@/components/charts/planned-vs-machined-chart').then(m => m.PlannedVsMachinedChart), { ssr: false, loading: () => <Skeleton className="h-[600px] w-full" /> });
+const MonthlyOeeEvolutionChart = dynamic(() => import('@/components/charts/monthly-oee-evolution-chart').then(m => m.MonthlyOeeEvolutionChart), { ssr: false, loading: () => <Skeleton className="h-[500px] w-full" /> });
+const OeeLossWaterfallChart = dynamic(() => import('@/components/charts/oee-loss-waterfall-chart').then(m => m.OeeLossWaterfallChart), { ssr: false, loading: () => <Skeleton className="h-[350px] w-full" /> });
+const DailyPdlMplLossChart = dynamic(() => import('@/components/charts/daily-pdl-mpl-loss-chart').then(m => m.DailyPdlMplLossChart), { ssr: false, loading: () => <Skeleton className="h-[350px] w-full" /> });
+const AvailableVsActualChart = dynamic(() => import('@/components/charts/available-vs-actual-chart').then(m => m.AvailableVsActualChart), { ssr: false, loading: () => <Skeleton className="h-[600px] w-full" /> });
+const TimePerRequisitionChart = dynamic(() => import('@/components/charts/time-per-requisition-chart').then(m => m.TimePerRequisitionChart), { ssr: false, loading: () => <Skeleton className="h-[500px] w-full" /> });
 
 const months = [
     { value: '0', label: 'Janeiro' },
@@ -154,7 +158,6 @@ export default function RecordsPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedWeek, setSelectedWeek] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedFactory, setSelectedFactory] = useState<string | null>(null);
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
   const [selectedLossReason, setSelectedLossReason] = useState<string>('all');
 
@@ -230,7 +233,8 @@ export default function RecordsPage() {
     if (!firestore || !startDate || !endDate) return null;
     const constraints = [
       where('date', '>=', startDate),
-      where('date', '<=', endDate)
+      where('date', '<=', endDate),
+      limit(500) // Otimização: limite de busca
     ];
     return query(collection(firestore, 'productionRecords'), ...constraints);
   }, [firestore, startDate, endDate]);
@@ -241,7 +245,8 @@ export default function RecordsPage() {
     if (!firestore || !startDate || !endDate) return null;
     const constraints = [
       where('date', '>=', startDate),
-      where('date', '<=', endDate)
+      where('date', '<=', endDate),
+      limit(500) // Otimização: limite de busca
     ];
     return query(collection(firestore, 'lossRecords'), ...constraints);
   }, [firestore, startDate, endDate]);
@@ -563,7 +568,6 @@ export default function RecordsPage() {
                   setSelectedDate(undefined);
                   setSelectedOperator('all');
                   setSelectedLossReason('all');
-                  setSelectedFactory(null);
                }} className="h-8 text-[10px] font-black uppercase tracking-widest text-destructive">Limpar</Button>
           </div>
       </div>
@@ -592,7 +596,6 @@ export default function RecordsPage() {
       <DailyPdlMplLossChart lossData={operatorFilteredLossRecords} loading={isLoading} />
       <MonthlyOeeEvolutionChart loading={isLoading} />
       
-      {/* Novo gráfico de tempo por requisição */}
       <TimePerRequisitionChart data={operatorFilteredProductionRecords} loading={isLoading} />
       
       <Card>

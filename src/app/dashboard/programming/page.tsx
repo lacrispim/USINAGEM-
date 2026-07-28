@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useDatabase, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { ref, onValue, push, set, update, remove } from 'firebase/database';
 import { collection, query, where } from 'firebase/firestore';
@@ -72,8 +73,13 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip, LabelList } from 'recharts';
-import { ChartContainer } from '@/components/ui/chart';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Carregamento dinâmico para otimizar o tempo de acesso
+const ProgrammingComparisonChart = dynamic(
+  () => import('@/components/charts/programming-comparison-chart'),
+  { ssr: false, loading: () => <Skeleton className="h-[600px] w-full" /> }
+);
 
 interface AtividadePlanejada {
   tipo: string;
@@ -147,12 +153,6 @@ const lossOptions = [
   { value: 'LIMPEZA', label: 'Limpeza Planejada', color: '#22c55e' },
   { value: 'QUALIDADE', label: 'Inspeção / Qualidade', color: '#3b82f6' },
   { value: 'AUXÍLIO AS FÁBRICAS', label: 'Auxílio as Fábricas', color: '#0ea5e9' },
-];
-
-const REQ_COLORS = [
-    '#3b82f6', '#f97316', '#a855f7', '#22c55e', '#ef4444', 
-    '#eab308', '#0ea5e9', '#ec4899', '#14b8a6', '#6366f1',
-    '#8b5cf6', '#d946ef', '#f43f5e', '#10b981', '#f59e0b'
 ];
 
 const planningFormSchema = z.object({
@@ -299,7 +299,7 @@ export default function ProgrammingPage() {
   const { weeklyChartData, uniqueRequisitions } = useMemo(() => {
     const reqSet = new Set<string>();
     
-    const data = calendarDays.map(day => {
+    const chartData = calendarDays.map(day => {
       const items = getItemsForDay(day);
       const productionItems = getProductionForDay(day);
       
@@ -341,7 +341,7 @@ export default function ProgrammingPage() {
     });
 
     return { 
-        weeklyChartData: data, 
+        weeklyChartData: chartData, 
         uniqueRequisitions: Array.from(reqSet).sort() 
     };
   }, [calendarDays, planejamentoData, productionRecords]);
@@ -489,7 +489,7 @@ export default function ProgrammingPage() {
       : (Number(rawHours) || 0);
 
     const firstType = item.atividades && item.atividades.length > 0 ? item.atividades[0].tipo : (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO');
-    const typeColor = lossOptions.find(o => o.value === firstType.toUpperCase())?.color || '#ffffff';
+    const typeColor = lossOptions.find(o => o.value === (firstType || '').toUpperCase())?.color || '#ffffff';
     
     return (
       <TooltipProvider key={item.id}>
@@ -529,53 +529,6 @@ export default function ProgrammingPage() {
         </Tooltip>
       </TooltipProvider>
     );
-  };
-
-  const CustomChartTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      const planEntries = payload.filter((p: any) => p.dataKey.startsWith('P_'));
-      const realEntries = payload.filter((p: any) => p.dataKey.startsWith('R_'));
-
-      return (
-        <div className="rounded-lg border bg-background p-3 shadow-lg min-w-[16rem]">
-          <p className="font-bold text-sm mb-2 border-b pb-1">{label} - {data.fullDate}</p>
-          <div className="space-y-4">
-            <div>
-                <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Planejado (Total: {data.totalPlan.toFixed(1)}h)</p>
-                <div className="space-y-1">
-                    {planEntries.map((entry: any) => (
-                        <div key={entry.dataKey} className="flex justify-between items-center gap-4">
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                                <span className="text-[10px] text-foreground">Forms {entry.dataKey.replace('P_', '')}:</span>
-                            </div>
-                            <span className="text-[10px] font-black">{Number(entry.value).toFixed(1)}h</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-            {data.totalReal > 0 && (
-                <div>
-                    <p className="text-[10px] font-black uppercase text-blue-400 mb-1">Realizado (Total: {data.totalReal.toFixed(1)}h)</p>
-                    <div className="space-y-1">
-                        {realEntries.map((entry: any) => (
-                            <div key={entry.dataKey} className="flex justify-between items-center gap-4">
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-2 h-2 rounded-full opacity-60" style={{ backgroundColor: entry.color }} />
-                                    <span className="text-[10px] text-foreground">Forms {entry.dataKey.replace('R_', '')}:</span>
-                                </div>
-                                <span className="text-[10px] font-black text-blue-400">{Number(entry.value).toFixed(1)}h</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-    return null;
   };
 
   return (
@@ -686,114 +639,22 @@ export default function ProgrammingPage() {
       <div className="mt-8">
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-                <div>
-                    <CardTitle>Planejado vs Realizado por Requisição</CardTitle>
-                    <CardDescription>
-                      Comparativo de horas planejadas (Plan) e registradas pelos técnicos (Real) por dia.
-                    </CardDescription>
-                </div>
-                <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
-                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-6 bg-muted-foreground opacity-30" /> Planejado</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-6 bg-blue-500 opacity-60" /> Realizado</div>
-                </div>
-            </div>
+            <CardTitle>Planejado vs Realizado por Requisição</CardTitle>
+            <CardDescription>
+              Comparativo de horas planejadas (Plan) e registradas pelos técnicos (Real) por dia.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[600px] w-full">
-              {weeklyChartData.some(d => d.totalPlan > 0 || d.totalReal > 0) ? (
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={weeklyChartData}
-                      layout="vertical"
-                      margin={{ top: 20, right: 60, left: 40, bottom: 20 }}
-                      barGap={8}
-                    >
-                      <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.1} />
-                      <XAxis
-                        type="number"
-                        unit="h"
-                        tickLine={false}
-                        axisLine={false}
-                        className="text-[10px]"
-                      />
-                      <YAxis
-                        dataKey="name"
-                        type="category"
-                        tickLine={false}
-                        axisLine={false}
-                        width={60}
-                        className="text-[10px] font-black uppercase"
-                      />
-                      <RechartsTooltip 
-                         cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
-                         content={<CustomChartTooltip />}
-                      />
-                      
-                      {uniqueRequisitions.map((req, idx) => {
-                        const color = REQ_COLORS[idx % REQ_COLORS.length];
-                        return (
-                          <React.Fragment key={req}>
-                            {/* Barra Planejada (Superior) */}
-                            <Bar 
-                                dataKey={`P_${req}`} 
-                                stackId="plan" 
-                                fill={color} 
-                                radius={[0, idx === uniqueRequisitions.length - 1 ? 4 : 0, idx === uniqueRequisitions.length - 1 ? 4 : 0, 0]}
-                                barSize={25}
-                            >
-                                <LabelList 
-                                    dataKey={`P_${req}`} 
-                                    position="inside" 
-                                    formatter={(v: any) => v > 0.4 ? req : ''} 
-                                    className="fill-white text-[9px] font-black"
-                                />
-                                {idx === uniqueRequisitions.length - 1 && (
-                                    <LabelList
-                                      dataKey="totalPlan"
-                                      position="right"
-                                      offset={8}
-                                      formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''}
-                                      className="fill-muted-foreground text-[8px] font-bold"
-                                    />
-                                )}
-                            </Bar>
-                            {/* Barra Realizada (Inferior) */}
-                            <Bar 
-                                dataKey={`R_${req}`} 
-                                stackId="real" 
-                                fill={color} 
-                                opacity={0.6}
-                                radius={[0, idx === uniqueRequisitions.length - 1 ? 4 : 0, idx === uniqueRequisitions.length - 1 ? 4 : 0, 0]}
-                                barSize={25}
-                            >
-                                <LabelList 
-                                    dataKey={`R_${req}`} 
-                                    position="inside" 
-                                    formatter={(v: any) => v > 0.4 ? req : ''} 
-                                    className="fill-white text-[9px] font-black"
-                                />
-                                {idx === uniqueRequisitions.length - 1 && (
-                                    <LabelList
-                                      dataKey="totalReal"
-                                      position="right"
-                                      offset={8}
-                                      formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''}
-                                      className="fill-blue-400 text-[8px] font-bold"
-                                    />
-                                )}
-                            </Bar>
-                          </React.Fragment>
-                        );
-                      })}
-                    </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground text-sm italic">
-                  Nenhum dado encontrado para esta semana.
-                </div>
-              )}
-            </div>
+            {weeklyChartData.some(d => d.totalPlan > 0 || d.totalReal > 0) ? (
+              <ProgrammingComparisonChart 
+                data={weeklyChartData} 
+                uniqueRequisitions={uniqueRequisitions} 
+              />
+            ) : (
+              <div className="flex h-[300px] items-center justify-center text-muted-foreground text-sm italic">
+                Nenhum dado encontrado para esta semana.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

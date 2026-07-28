@@ -56,7 +56,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp, orderBy, query, deleteDoc, doc, updateDoc, limit } from 'firebase/firestore';
-import { format, parse, startOfDay, endOfDay, getMonth, getYear } from 'date-fns';
+import { format, parse, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { Label } from '@/components/ui/label';
@@ -797,12 +797,12 @@ export default function ProductionRegistryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const productionRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1000)) : null
+    firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(200)) : null
   , [firestore]);
   const { data: productionRecords, isLoading: loadingProduction } = useCollection(productionRecordsQuery);
   
   const lossRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(1000)) : null
+    firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(200)) : null
   , [firestore]);
   const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossRecordsQuery);
 
@@ -810,10 +810,6 @@ export default function ProductionRegistryPage() {
     if (!productionRecords) return [];
     
     if (selectedCategory !== 'all' && selectedCategory !== 'PRODUCAO') return [];
-
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const startOfLimit = startOfDay(thirtyDaysAgo);
 
     return productionRecords.filter(record => {
       const recordDate = record.date?.toDate ? record.date.toDate() : null;
@@ -826,8 +822,6 @@ export default function ProductionRegistryPage() {
           const monthIdx = parseInt(selectedMonth);
           if (recordDate.getMonth() !== monthIdx) return false;
           if (recordDate.getFullYear() !== new Date().getFullYear()) return false;
-      } else {
-        if (recordDate < startOfLimit) return false;
       }
 
       const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
@@ -844,10 +838,6 @@ export default function ProductionRegistryPage() {
 
     if (selectedCategory === 'PRODUCAO') return [];
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const startOfLimit = startOfDay(thirtyDaysAgo);
-
      return lossRecords.filter(record => {
       const recordDate = record.date?.toDate ? record.date.toDate() : null;
       if (!recordDate) return false;
@@ -859,8 +849,6 @@ export default function ProductionRegistryPage() {
           const monthIdx = parseInt(selectedMonth);
           if (recordDate.getMonth() !== monthIdx) return false;
           if (recordDate.getFullYear() !== new Date().getFullYear()) return false;
-      } else {
-        if (recordDate < startOfLimit) return false;
       }
 
       const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
@@ -1199,7 +1187,7 @@ export default function ProductionRegistryPage() {
                   <div className="flex items-center justify-between">
                       <div>
                           <CardTitle>Registros de Produção Recentes</CardTitle>
-                          <CardDescription>Visualização de registros (por padrão últimos 30 dias ou mês selecionado).</CardDescription>
+                          <CardDescription>Visualização dos 200 registros mais recentes.</CardDescription>
                       </div>
                       <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredProductionRecords, 'Registros_Producao')}>
                           <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -1361,7 +1349,7 @@ export default function ProductionRegistryPage() {
                   <div className="flex items-center justify-between">
                       <div>
                           <CardTitle>Registros de Perdas Recentes</CardTitle>
-                          <CardDescription>Visualização de perdas (por padrão últimos 30 dias ou mês selecionado).</CardDescription>
+                          <CardDescription>Visualização das 200 perdas mais recentes.</CardDescription>
                       </div>
                       <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredLossRecords, 'Registros_Perdas')}>
                           <FileSpreadsheet className="mr-2 h-4 w-4" />
