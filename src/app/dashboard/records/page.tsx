@@ -36,7 +36,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 
-// Importações diretas para evitar ChunkLoadError e garantir estabilidade
+// Importações diretas para garantir estabilidade e evitar ChunkLoadError
 import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
 import { OperatorPerformanceChart } from '@/components/charts/operator-performance-chart';
 import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
@@ -44,7 +44,6 @@ import { MonthlyOeeEvolutionChart } from '@/components/charts/monthly-oee-evolut
 import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
 import { DailyPdlMplLossChart } from '@/components/charts/daily-pdl-mpl-loss-chart';
 import { AvailableVsActualChart } from '@/components/charts/available-vs-actual-chart';
-import { TimePerRequisitionChart } from '@/components/charts/time-per-requisition-chart';
 
 const months = [
     { value: '0', label: 'Janeiro' },
@@ -593,8 +592,6 @@ export default function RecordsPage() {
       <OeeLossWaterfallChart productionData={operatorFilteredProductionRecords} lossData={operatorFilteredLossRecords} loading={isLoading} />
       <DailyPdlMplLossChart lossData={operatorFilteredLossRecords} loading={isLoading} />
       <MonthlyOeeEvolutionChart loading={isLoading} />
-      
-      <TimePerRequisitionChart data={operatorFilteredProductionRecords} loading={isLoading} />
       
       <Card>
         <CardHeader>
