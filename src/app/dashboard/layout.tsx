@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -36,12 +37,16 @@ import {
   Eye,
   PanelLeft,
   FileCode,
+  Wifi,
+  ShieldAlert,
+  Loader2
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 const CustomSidebarTrigger = () => {
   const { toggleSidebar } = useSidebar();
@@ -58,7 +63,6 @@ const CustomSidebarTrigger = () => {
   );
 };
 
-
 export default function DashboardLayout({
   children,
 }: {
@@ -68,12 +72,45 @@ export default function DashboardLayout({
   const router = useRouter();
   const auth = useAuth();
   const { user, isUserLoading: loading } = useUser();
+  
+  // Lógica de restrição de rede (Wi-Fi)
+  const [isNetworkAuthorized, setIsNetworkAuthorized] = React.useState<boolean>(true);
+  const [checkingNetwork, setCheckingNetwork] = React.useState<boolean>(true);
 
   React.useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  React.useEffect(() => {
+    async function checkNetwork() {
+      const savedIp = localStorage.getItem('authorized_wifi_ip');
+      const isRestrictionActive = localStorage.getItem('wifi_restriction_active') === 'true';
+
+      if (!isRestrictionActive || !savedIp) {
+        setIsNetworkAuthorized(true);
+        setCheckingNetwork(false);
+        return;
+      }
+
+      try {
+        const res = await fetch('https://api.ipify.org?format=json');
+        const data = await res.json();
+        setIsNetworkAuthorized(data.ip === savedIp);
+      } catch (error) {
+        console.error("Erro ao validar rede:", error);
+        // Em caso de erro na API de IP, permitimos o acesso mas avisamos no console
+        setIsNetworkAuthorized(true);
+      } finally {
+        setCheckingNetwork(false);
+      }
+    }
+    
+    if (user) {
+      checkNetwork();
+    }
+  }, [user, pathname]); // Re-valida ao mudar de página ou login
 
 
   const handleLogout = async () => {
@@ -127,14 +164,14 @@ export default function DashboardLayout({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
+        <DropdownMenuLabel>{user?.displayName || 'Minha Conta'}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-            <Link href="/dashboard/settings">Settings</Link>
+            <Link href="/dashboard/settings">Configurações</Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
          <DropdownMenuItem onClick={handleLogout}>
-            Log out
+            Sair
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -145,50 +182,55 @@ export default function DashboardLayout({
       <DropdownMenuTrigger asChild>
         <SidebarMenuButton
           className="justify-start"
-          tooltip="User Settings"
+          tooltip="Configurações do Usuário"
         >
           <Avatar className="h-7 w-7">
             <AvatarImage src={"https://pravatar.cc/100?img=3"} data-ai-hint="female avatar" alt={user?.displayName ?? "User"} />
             <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
           </Avatar>
-          <span className="text-sm font-medium">{user?.displayName || 'User'}</span>
+          <span className="text-sm font-medium">{user?.displayName || 'Usuário'}</span>
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 mb-2 ml-2">
-        <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
+        <DropdownMenuLabel>{user?.displayName || 'Minha Conta'}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
             <Link href="/dashboard/settings">
               <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
+              <span>Configurações</span>
             </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
+          <span>Sair</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 
-  const UserMenuPlaceholder = () => (
-     <div className="flex items-center justify-end">
-        <Skeleton className="h-10 w-10 rounded-full" />
-    </div>
-  );
-  
-  const UserMenuFooterPlaceholder = () => (
-    <div className="flex items-center gap-2 p-2">
-        <Skeleton className="h-7 w-7 rounded-full" />
-        <Skeleton className="h-4 w-12" />
-    </div>
-  );
-  
   if (loading || !user) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <Skeleton className="h-12 w-12 rounded-full" />
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Tela de bloqueio de rede
+  if (!checkingNetwork && !isNetworkAuthorized && pathname !== '/dashboard/settings') {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center p-6 text-center">
+        <ShieldAlert className="h-20 w-20 text-destructive mb-4" />
+        <h1 className="text-2xl font-bold mb-2">Acesso Restrito</h1>
+        <p className="text-muted-foreground max-w-md mb-6">
+          Este aplicativo está configurado para funcionar apenas na rede Wi-Fi autorizada da empresa. 
+          Sua rede atual não possui permissão de acesso.
+        </p>
+        <div className="flex gap-4">
+          <Button variant="outline" onClick={() => window.location.reload()}>Tentar Novamente</Button>
+          <Button asChild><Link href="/dashboard/settings">Ir para Configurações</Link></Button>
+        </div>
       </div>
     );
   }
@@ -218,20 +260,26 @@ export default function DashboardLayout({
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-          {loading ? <UserMenuFooterPlaceholder /> : <UserMenuFooter />}
+          <UserMenuFooter />
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <header className="flex h-14 items-center justify-between border-b bg-card px-4 lg:h-[60px] lg:px-6">
           <CustomSidebarTrigger />
-          <div className="flex-1">
-             {/* Can add page title or search bar here */}
+          <div className="flex-1 px-4">
+             {checkingNetwork && (
+               <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground animate-pulse">
+                 <Wifi className="h-3 w-3" /> VERIFICANDO REDE...
+               </div>
+             )}
           </div>
           <div className="flex items-center gap-4">
-            {loading ? <UserMenuPlaceholder /> : <UserMenu />}
+            <UserMenu />
           </div>
         </header>
-        <main className="flex-1 p-4 lg:p-6">{children}</main>
+        <main className="flex-1 p-4 lg:p-6">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );
