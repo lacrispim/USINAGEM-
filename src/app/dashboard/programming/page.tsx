@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import dynamic from 'next/dynamic';
 import { useDatabase, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { ref, onValue, push, set, update, remove } from 'firebase/database';
 import { collection, query, where } from 'firebase/firestore';
@@ -73,13 +72,7 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
-
-// Carregamento dinâmico para otimizar o tempo de acesso
-const ProgrammingComparisonChart = dynamic(
-  () => import('@/components/charts/programming-comparison-chart'),
-  { ssr: false, loading: () => <Skeleton className="h-[600px] w-full" /> }
-);
+import ProgrammingComparisonChart from '@/components/charts/programming-comparison-chart';
 
 interface AtividadePlanejada {
   tipo: string;
@@ -115,9 +108,9 @@ interface PlanejamentoItem {
 }
 
 const turnos = [
-  { id: '1', label: '1º Turno', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', chartColor: '#3b82f6', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson Franca"] },
-  { id: '2', label: '2º Turno', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20', chartColor: '#f97316', technicians: ["Nathan Xavier", "Jair Melo"] },
-  { id: '3', label: '3º Turno', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', chartColor: '#a855f7', technicians: ["Gustavo Gozzi", "Rodrigo Cantano"] },
+  { id: '1', label: '1º Turno', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson Franca"] },
+  { id: '2', label: '2º Turno', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20', technicians: ["Nathan Xavier", "Jair Melo"] },
+  { id: '3', label: '3º Turno', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', technicians: ["Gustavo Gozzi", "Rodrigo Cantano"] },
 ];
 
 const operatorList = [
@@ -189,10 +182,8 @@ export default function ProgrammingPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
 
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
+  const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 0 }), [currentDate]);
+  const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 0 }), [weekStart]);
 
   const productionQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -227,10 +218,7 @@ export default function ProgrammingPage() {
     name: "atividades"
   });
 
-  const watchAtividades = useWatch({
-    control: form.control,
-    name: "atividades"
-  });
+  const watchAtividades = useWatch({ control: form.control, name: "atividades" });
 
   useEffect(() => {
     const total = (watchAtividades || []).reduce((acc, curr) => acc + (Number(curr.tempo) || 0), 0);
@@ -242,7 +230,6 @@ export default function ProgrammingPage() {
       setLoading(false);
       return;
     }
-
     const dbRef = ref(database, '/Planejamento S');
     const unsubscribe = onValue(dbRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -260,63 +247,43 @@ export default function ProgrammingPage() {
       console.error(error);
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, [database]);
 
-  const calendarDays = eachDayOfInterval({
+  const calendarDays = useMemo(() => eachDayOfInterval({
     start: weekStart,
     end: weekEnd,
-  });
+  }), [weekStart, weekEnd]);
 
   const nextWeek = () => setCurrentDate(prev => addWeeks(prev, 1));
   const prevWeek = () => setCurrentDate(prev => subWeeks(prev, 1));
   const goToToday = () => setCurrentDate(new Date());
 
-  const getItemsForDay = (day: Date) => {
-    return planejamentoData.filter(item => {
-      const dateStr = item.dataExecucao || item['Data Execução'];
-      if (!dateStr) return false;
-      try {
-        const parsedDate = parse(dateStr, 'dd/MM/yyyy', new Date());
-        return isSameDay(parsedDate, day);
-      } catch {
-        const fallbackDate = new Date(dateStr);
-        return isSameDay(fallbackDate, day);
-      }
-    });
-  };
-
-  const getProductionForDay = (day: Date) => {
-    if (!productionRecords) return [];
-    return productionRecords.filter(record => {
-      if (!record.date) return false;
-      const recordDate = record.date.toDate ? record.date.toDate() : new Date(record.date);
-      return isSameDay(recordDate, day);
-    });
-  };
-
   const { weeklyChartData, uniqueRequisitions } = useMemo(() => {
     const reqSet = new Set<string>();
-    
     const chartData = calendarDays.map(day => {
-      const items = getItemsForDay(day);
-      const productionItems = getProductionForDay(day);
+      const items = planejamentoData.filter(item => {
+        const dStr = item.dataExecucao || item['Data Execução'];
+        if (!dStr) return false;
+        try { return isSameDay(parse(dStr, 'dd/MM/yyyy', new Date()), day); } catch { return isSameDay(new Date(dStr), day); }
+      });
+      
+      const productionItems = (productionRecords || []).filter(record => {
+        if (!record.date) return false;
+        const rDate = record.date.toDate ? record.date.toDate() : new Date(record.date);
+        return isSameDay(rDate, day);
+      });
       
       const dayData: any = {
         name: format(day, 'EEE', { locale: ptBR }),
         fullDate: format(day, 'dd/MM/yyyy'),
-        totalPlan: 0,
-        totalReal: 0
+        totalPlan: 0, totalReal: 0
       };
 
       items.forEach(item => {
         const req = item.requisicao || item['Requisição'] || 'S/N';
         const rawHours = item.horasPlanejadas || item['Horas Máquina'];
-        const hours = typeof rawHours === 'string' 
-          ? parseFloat(rawHours.replace(',', '.')) 
-          : (Number(rawHours) || 0);
-        
+        const hours = typeof rawHours === 'string' ? parseFloat(rawHours.replace(',', '.')) : (Number(rawHours) || 0);
         if (hours > 0) {
             const key = `P_${req}`;
             dayData[key] = (dayData[key] || 0) + hours;
@@ -328,7 +295,6 @@ export default function ProgrammingPage() {
       productionItems.forEach(record => {
         const req = record.formsNumber || 'S/N';
         const hours = (Number(record.machiningTime) || 0) / 60;
-        
         if (hours > 0) {
             const key = `R_${req}`;
             dayData[key] = (dayData[key] || 0) + hours;
@@ -339,55 +305,35 @@ export default function ProgrammingPage() {
 
       return dayData;
     });
-
-    return { 
-        weeklyChartData: chartData, 
-        uniqueRequisitions: Array.from(reqSet).sort() 
-    };
+    return { weeklyChartData: chartData, uniqueRequisitions: Array.from(reqSet).sort() };
   }, [calendarDays, planejamentoData, productionRecords]);
-
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    setDraggedItemId(id);
-    e.dataTransfer.setData('itemId', id);
-  };
 
   const handleDrop = async (e: React.DragEvent, day: Date, turnoId: string, tecnico?: string) => {
     e.preventDefault();
-    const itemId = e.dataTransfer.getData('itemId') || draggedItemId;
+    const itemId = e.dataTransfer.getData('itemId');
     if (!itemId || !database) return;
-
     const newDateStr = format(day, 'dd/MM/yyyy');
     try {
-      const updatePayload: any = {
+      await update(ref(database, `/Planejamento S/${itemId}`), {
         dataExecucao: newDateStr,
         Turno: turnoId,
-        turno: turnoId
-      };
-      if (tecnico) {
-        updatePayload.tecnico = tecnico;
-      }
-      await update(ref(database, `/Planejamento S/${itemId}`), updatePayload);
+        turno: turnoId,
+        ...(tecnico ? { tecnico } : {})
+      });
       toast({ title: "Planejamento Movido", description: `Movido para ${newDateStr}` });
-    } catch (error) {
-      console.error(error);
-      toast({ title: "Erro ao mover", variant: "destructive" });
-    }
-    setDraggedItemId(null);
+    } catch (error) { toast({ title: "Erro ao mover", variant: "destructive" }); }
   };
 
   const handleShiftClick = (day: Date, turnoId: string, tecnico?: string) => {
     setEditingId(null);
     setSelectedDay(day);
     setSelectedTurno(turnoId);
-
     const isSunday = day.getDay() === 0;
     const defaultAtividades = [{ tipo: 'PRODUCAO', tempo: 0, site: 'VALINHOS DOVE' }];
-    
     if (!isSunday) {
         defaultAtividades.push({ tipo: 'DDS', tempo: 0.25, site: 'TORRE' });
         defaultAtividades.push({ tipo: 'CAFE', tempo: 0.25, site: 'TORRE' });
     }
-
     form.reset({
       dataExecucao: format(day, 'dd/MM/yyyy'),
       turno: turnoId,
@@ -408,20 +354,15 @@ export default function ProgrammingPage() {
     setEditingId(item.id);
     const shiftVal = String(item.Turno || item.turno || '1');
     setSelectedTurno(shiftVal);
-    
     let itemDate = new Date();
     const dateStr = item.dataExecucao || item['Data Execução'];
     if (dateStr) { try { itemDate = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { itemDate = new Date(dateStr); } }
     setSelectedDay(itemDate);
-
     const initialAtividades = item.atividades || [{
       tipo: (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase(),
-      tempo: typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
-        ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
-        : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0),
+      tempo: typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0),
       site: item.site || item.Site || 'VALINHOS DOVE'
     }];
-
     form.reset({
       dataExecucao: dateStr || '',
       turno: shiftVal,
@@ -430,9 +371,7 @@ export default function ProgrammingPage() {
       nomeDaPeca: item.nomeDaPeca || item['Nome da Peça'] || '',
       quantidade: Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0,
       tecnico: item.tecnico || item.Técnicos || '',
-      horasPlanejadas: typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' 
-        ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) 
-        : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0),
+      horasPlanejadas: Number(form.getValues('horasPlanejadas')),
       site: item.site || item.Site || 'VALINHOS DOVE',
       observacao: item.observacao || item.Observação || '',
       atividades: initialAtividades,
@@ -440,37 +379,16 @@ export default function ProgrammingPage() {
     setIsDialogOpen(true);
   };
 
-  const handleDeleteItem = async () => {
-    if (!database || !editingId) return;
-    try {
-      await remove(ref(database, `/Planejamento S/${editingId}`));
-      toast({ title: "Planejamento Excluído" });
-      setIsDialogOpen(false);
-    } catch (error) { console.error(error); }
-  };
-
   async function onSubmit(values: PlanningFormValues) {
     if (!database) return;
     try {
       const mainLoss = values.atividades.length === 1 ? values.atividades[0].tipo : 'MÚLTIPLAS';
       const lossLabel = lossOptions.find(o => o.value === mainLoss)?.label || mainLoss;
-
       const payload = {
-        dataExecucao: values.dataExecucao,
-        equipamento: values.equipamento,
-        requisicao: values.requisicao,
-        nomeDaPeca: values.nomeDaPeca,
-        quantidade: values.quantidade,
-        tecnico: values.tecnico,
-        horasPlanejadas: values.horasPlanejadas,
+        ...values,
         Turno: values.turno,
-        turno: values.turno,
-        site: values.site,
-        observacao: values.observacao || '',
         'Perdas planejadas': values.atividades.find(a => a.tipo !== 'PRODUCAO') ? lossLabel.toUpperCase() : '',
-        atividades: values.atividades
       };
-
       if (editingId) {
         await update(ref(database, `/Planejamento S/${editingId}`), payload);
         toast({ title: "Planejamento Atualizado" });
@@ -484,10 +402,7 @@ export default function ProgrammingPage() {
 
   const renderEvent = (item: PlanejamentoItem) => {
     const rawHours = item.horasPlanejadas || item['Horas Máquina'];
-    const totalHours = typeof rawHours === 'string' 
-      ? parseFloat(rawHours.replace(',', '.')) 
-      : (Number(rawHours) || 0);
-
+    const totalHours = typeof rawHours === 'string' ? parseFloat(rawHours.replace(',', '.')) : (Number(rawHours) || 0);
     const firstType = item.atividades && item.atividades.length > 0 ? item.atividades[0].tipo : (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO');
     const typeColor = lossOptions.find(o => o.value === (firstType || '').toUpperCase())?.color || '#ffffff';
     
@@ -497,25 +412,16 @@ export default function ProgrammingPage() {
           <TooltipTrigger asChild>
             <div 
               draggable
-              onDragStart={(e) => handleDragStart(e, item.id)}
+              onDragStart={(e) => e.dataTransfer.setData('itemId', item.id)}
               onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}
-              className={cn(
-                "mb-1 cursor-grab active:cursor-grabbing rounded border p-1.5 text-[10px] leading-tight shadow-sm transition-all flex flex-col gap-1 group/event",
-                "border-border bg-card hover:border-primary shrink-0 min-w-[80px] max-w-[120px]"
-              )}
+              className="mb-1 cursor-grab active:cursor-grabbing rounded border p-1.5 text-[10px] leading-tight shadow-sm transition-all flex flex-col gap-1 border-border bg-card hover:border-primary shrink-0 min-w-[80px] max-w-[120px]"
               style={{ borderLeft: `3px solid ${typeColor}` }}
             >
               <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-bold text-primary truncate max-w-[70%]" title={item.requisicao || item['Requisição']}>
-                  {item.requisicao || item['Requisição']}
-                </span>
-                <span className="bg-muted px-1 rounded-sm font-black text-[9px] shrink-0">
-                  {totalHours.toFixed(1)}h
-                </span>
+                <span className="font-bold text-primary truncate max-w-[70%]">{item.requisicao || item['Requisição']}</span>
+                <span className="bg-muted px-1 rounded-sm font-black text-[9px] shrink-0">{totalHours.toFixed(1)}h</span>
               </div>
-              <div className="flex items-center gap-1 opacity-70">
-                <span className="truncate">{item.nomeDaPeca || item['Nome da Peça']}</span>
-              </div>
+              <div className="flex items-center gap-1 opacity-70"><span className="truncate">{item.nomeDaPeca || item['Nome da Peça']}</span></div>
             </div>
           </TooltipTrigger>
           <TooltipContent className="w-64 p-3" side="right">
@@ -549,77 +455,47 @@ export default function ProgrammingPage() {
       <Card className="border-none shadow-none bg-transparent">
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex h-[400px] items-center justify-center gap-2 bg-card rounded-lg border">
-              <Loader className="h-8 w-8 animate-spin" /><span className="font-medium">Carregando...</span>
-            </div>
+            <div className="flex h-[400px] items-center justify-center gap-2 bg-card rounded-lg border"><Loader className="h-8 w-8 animate-spin" /><span className="font-medium">Carregando...</span></div>
           ) : (
             <div className="grid grid-cols-7 gap-px bg-border overflow-hidden rounded-lg border shadow-lg">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
                 <div key={day} className="bg-muted/50 p-3 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b">{day}</div>
               ))}
               {calendarDays.map((day) => {
-                const dayItems = getItemsForDay(day);
+                const dayItems = planejamentoData.filter(item => {
+                    const dStr = item.dataExecucao || item['Data Execução'];
+                    if (!dStr) return false;
+                    try { return isSameDay(parse(dStr, 'dd/MM/yyyy', new Date()), day); } catch { return isSameDay(new Date(dStr), day); }
+                });
                 return (
                   <div key={day.toString()} className={cn("min-h-[500px] bg-card p-0 flex flex-col border-r last:border-r-0", isToday(day) && "ring-1 ring-inset ring-primary z-10")}>
                     <div className="flex items-center justify-between p-2 border-b bg-muted/20">
                       <span className={cn("text-xs font-black w-6 h-6 flex items-center justify-center rounded-full", isToday(day) ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{format(day, 'd')}</span>
                       <span className="text-[9px] text-muted-foreground font-bold uppercase">{format(day, 'MMM', { locale: ptBR })}</span>
                     </div>
-                    
                     <div className="flex-1 overflow-y-auto scrollbar-hide">
                       {turnos.map(turno => {
-                        const techniciansInThisTurno = Array.from(new Set([
-                           ...turno.technicians,
-                           ...dayItems.filter(item => String(item.Turno || item.turno || '1') === turno.id).map(item => item.tecnico || item.Técnicos || '')
-                        ])).filter(Boolean);
-
+                        const techniciansInThisTurno = Array.from(new Set([...turno.technicians, ...dayItems.filter(item => String(item.Turno || item.turno || '1') === turno.id).map(item => item.tecnico || item.Técnicos || '')])).filter(Boolean);
                         return (
                           <div key={turno.id} className="border-b last:border-b-0">
-                            <div className={cn("px-2 py-1 text-[8px] font-black uppercase tracking-tighter border-b", turno.color)}>
-                              {turno.label}
-                            </div>
+                            <div className={cn("px-2 py-1 text-[8px] font-black uppercase tracking-tighter border-b", turno.color)}>{turno.label}</div>
                             <div className="p-1 space-y-2">
                                 {techniciansInThisTurno.map(tech => {
-                                   const itemsForTech = dayItems.filter(item => 
-                                      String(item.Turno || item.turno || '1') === turno.id && 
-                                      (item.tecnico === tech || item.Técnicos === tech)
-                                   );
-                                   
+                                   const itemsForTech = dayItems.filter(item => String(item.Turno || item.turno || '1') === turno.id && (item.tecnico === tech || item.Técnicos === tech));
                                    const totalHoursForTech = itemsForTech.reduce((acc, item) => {
                                       const raw = item.horasPlanejadas || item['Horas Máquina'];
                                       return acc + (typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : (Number(raw) || 0));
                                    }, 0);
-
                                    return (
                                      <div key={tech} className="bg-muted/10 rounded border border-dashed p-1.5 min-h-[40px] group/tech">
                                         <div className="flex items-center justify-between mb-1">
                                             <div className="flex flex-col">
-                                                <div className="flex items-center gap-1">
-                                                    <UserIcon className="h-2 w-2 text-muted-foreground" />
-                                                    <span className="text-[8px] font-bold text-muted-foreground uppercase truncate max-w-[60px]">{tech.split(' ')[0]}</span>
-                                                </div>
-                                                {totalHoursForTech > 0 && (
-                                                  <span className={cn("text-[7px] font-black px-1 rounded-sm w-fit", totalHoursForTech > 8 ? "bg-red-500/20 text-red-400" : "bg-primary/20 text-primary")}>
-                                                    TOTAL: {totalHoursForTech.toFixed(1)}h
-                                                  </span>
-                                                )}
+                                                <div className="flex items-center gap-1"><UserIcon className="h-2 w-2 text-muted-foreground" /><span className="text-[8px] font-bold text-muted-foreground uppercase truncate max-w-[60px]">{tech.split(' ')[0]}</span></div>
+                                                {totalHoursForTech > 0 && <span className={cn("text-[7px] font-black px-1 rounded-sm w-fit", totalHoursForTech > 8 ? "bg-red-500/20 text-red-400" : "bg-primary/20 text-primary")}>TOTAL: {totalHoursForTech.toFixed(1)}h</span>}
                                             </div>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-3 w-3 opacity-0 group-hover/tech:opacity-100 transition-opacity"
-                                                onClick={() => handleShiftClick(day, turno.id, tech)}
-                                            >
-                                                <Plus className="h-2 w-2" />
-                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-3 w-3 opacity-0 group-hover/tech:opacity-100 transition-opacity" onClick={() => handleShiftClick(day, turno.id, tech)}><Plus className="h-2 w-2" /></Button>
                                         </div>
-                                        <div 
-                                          className="min-h-[10px] flex flex-row flex-wrap gap-1"
-                                          onDragOver={(e) => e.preventDefault()}
-                                          onDrop={(e) => handleDrop(e, day, turno.id, tech)}
-                                        >
-                                            {itemsForTech.map(item => renderEvent(item))}
-                                        </div>
+                                        <div className="min-h-[10px] flex flex-row flex-wrap gap-1" onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleDrop(e, day, turno.id, tech)}>{itemsForTech.map(item => renderEvent(item))}</div>
                                      </div>
                                    );
                                 })}
@@ -640,20 +516,13 @@ export default function ProgrammingPage() {
         <Card>
           <CardHeader>
             <CardTitle>Planejado vs Realizado por Requisição</CardTitle>
-            <CardDescription>
-              Comparativo de horas planejadas (Plan) e registradas pelos técnicos (Real) por dia.
-            </CardDescription>
+            <CardDescription>Comparativo semanal de horas planejadas (Plan) e reais (Real) por dia.</CardDescription>
           </CardHeader>
           <CardContent>
             {weeklyChartData.some(d => d.totalPlan > 0 || d.totalReal > 0) ? (
-              <ProgrammingComparisonChart 
-                data={weeklyChartData} 
-                uniqueRequisitions={uniqueRequisitions} 
-              />
+              <ProgrammingComparisonChart data={weeklyChartData} uniqueRequisitions={uniqueRequisitions} />
             ) : (
-              <div className="flex h-[300px] items-center justify-center text-muted-foreground text-sm italic">
-                Nenhum dado encontrado para esta semana.
-              </div>
+              <div className="flex h-[300px] items-center justify-center text-muted-foreground text-sm italic">Nenhum dado para esta semana.</div>
             )}
           </CardContent>
         </Card>
@@ -661,21 +530,15 @@ export default function ProgrammingPage() {
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}</DialogTitle></DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField control={form.control} name="equipamento" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="font-bold">Equipamento</FormLabel>
                     <div className="grid grid-cols-2 gap-4">
-                      <Button type="button" variant={field.value === 'TORNO CNC CENTUR 30' ? 'default' : 'outline'} className="h-16 flex flex-col" onClick={() => field.onChange('TORNO CNC CENTUR 30')}>
-                        <Settings2 className="h-4 w-4" /><span className="text-xs font-bold">TORNO CENTUR 30</span>
-                      </Button>
-                      <Button type="button" variant={field.value === 'CENTRO DE USINAGEM D600' ? 'default' : 'outline'} className="h-16 flex flex-col" onClick={() => field.onChange('CENTRO DE USINAGEM D600')}>
-                        <Cpu className="h-4 w-4" /><span className="text-xs font-bold">CENTRO D600</span>
-                      </Button>
+                      <Button type="button" variant={field.value === 'TORNO CNC CENTUR 30' ? 'default' : 'outline'} className="h-16 flex flex-col" onClick={() => field.onChange('TORNO CNC CENTUR 30')}><Settings2 className="h-4 w-4" /><span className="text-xs font-bold">TORNO CENTUR 30</span></Button>
+                      <Button type="button" variant={field.value === 'CENTRO DE USINAGEM D600' ? 'default' : 'outline'} className="h-16 flex flex-col" onClick={() => field.onChange('CENTRO DE USINAGEM D600')}><Cpu className="h-4 w-4" /><span className="text-xs font-bold">CENTRO D600</span></Button>
                     </div>
                   </FormItem>
                 )} />
@@ -694,9 +557,7 @@ export default function ProgrammingPage() {
                             <FormControl><SelectTrigger className="h-8 text-[10px]"><SelectValue placeholder="Tipo" /></SelectTrigger></FormControl>
                             <SelectContent>
                               {lossOptions.map(opt => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: opt.color }} />{opt.label}</div>
-                                </SelectItem>
+                                <SelectItem key={opt.value} value={opt.value}><div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: opt.color }} />{opt.label}</div></SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -708,9 +569,7 @@ export default function ProgrammingPage() {
                         <FormItem>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl><SelectTrigger className="h-8 text-[10px]"><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                                {factoryList.map(f => <SelectItem key={f} value={f} className="text-[10px]">{f}</SelectItem>)}
-                            </SelectContent>
+                            <SelectContent>{factoryList.map(f => <SelectItem key={f} value={f} className="text-[10px]">{f}</SelectItem>)}</SelectContent>
                           </Select>
                         </FormItem>
                       )} />
@@ -720,9 +579,7 @@ export default function ProgrammingPage() {
                         <FormItem><FormControl><Input type="number" step="0.1" placeholder="Horas" className="h-8 text-[10px]" {...field} /></FormControl></FormItem>
                       )} />
                     </div>
-                    {fields.length > 1 && (
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeAtividade(index)} className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                    )}
+                    {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" onClick={() => removeAtividade(index)} className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>)}
                   </div>
                 ))}
               </div>
@@ -732,15 +589,7 @@ export default function ProgrammingPage() {
                 <FormField control={form.control} name="site" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Fábrica Principal</FormLabel>
-                        <Select onValueChange={(val) => {
-                            field.onChange(val);
-                            const currentAtivs = form.getValues('atividades');
-                            currentAtivs.forEach((_, idx) => {
-                                if (!form.getValues(`atividades.${idx}.site`)) {
-                                    form.setValue(`atividades.${idx}.site`, val);
-                                }
-                            });
-                        }} value={field.value}>
+                        <Select onValueChange={(val) => { field.onChange(val); const currentAtivs = form.getValues('atividades'); currentAtivs.forEach((_, idx) => { if (!form.getValues(`atividades.${idx}.site`)) form.setValue(`atividades.${idx}.site`, val); }); }} value={field.value}>
                             <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                             <SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
                         </Select>
@@ -754,7 +603,7 @@ export default function ProgrammingPage() {
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
-                {editingId && (<Button type="button" variant="destructive" onClick={handleDeleteItem}>Excluir</Button>)}
+                {editingId && (<Button type="button" variant="destructive" onClick={async () => { if (!database || !editingId) return; await remove(ref(database, `/Planejamento S/${editingId}`)); toast({ title: "Planejamento Excluído" }); setIsDialogOpen(false); }}>Excluir</Button>)}
                 <Button type="submit">Salvar Planejamento</Button>
               </DialogFooter>
             </form>

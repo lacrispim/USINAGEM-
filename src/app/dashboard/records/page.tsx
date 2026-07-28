@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,17 +35,16 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
 
-// Carregamento dinâmico de gráficos para performance
-const MachiningTimeTrendChart = dynamic(() => import('@/components/charts/machining-time-trend-chart').then(m => m.MachiningTimeTrendChart), { ssr: false, loading: () => <Skeleton className="h-[350px] w-full" /> });
-const OperatorPerformanceChart = dynamic(() => import('@/components/charts/operator-performance-chart').then(m => m.OperatorPerformanceChart), { ssr: false, loading: () => <Skeleton className="h-[450px] w-full" /> });
-const PlannedVsMachinedChart = dynamic(() => import('@/components/charts/planned-vs-machined-chart').then(m => m.PlannedVsMachinedChart), { ssr: false, loading: () => <Skeleton className="h-[600px] w-full" /> });
-const MonthlyOeeEvolutionChart = dynamic(() => import('@/components/charts/monthly-oee-evolution-chart').then(m => m.MonthlyOeeEvolutionChart), { ssr: false, loading: () => <Skeleton className="h-[500px] w-full" /> });
-const OeeLossWaterfallChart = dynamic(() => import('@/components/charts/oee-loss-waterfall-chart').then(m => m.OeeLossWaterfallChart), { ssr: false, loading: () => <Skeleton className="h-[350px] w-full" /> });
-const DailyPdlMplLossChart = dynamic(() => import('@/components/charts/daily-pdl-mpl-loss-chart').then(m => m.DailyPdlMplLossChart), { ssr: false, loading: () => <Skeleton className="h-[350px] w-full" /> });
-const AvailableVsActualChart = dynamic(() => import('@/components/charts/available-vs-actual-chart').then(m => m.AvailableVsActualChart), { ssr: false, loading: () => <Skeleton className="h-[600px] w-full" /> });
-const TimePerRequisitionChart = dynamic(() => import('@/components/charts/time-per-requisition-chart').then(m => m.TimePerRequisitionChart), { ssr: false, loading: () => <Skeleton className="h-[500px] w-full" /> });
+// Importações diretas para evitar ChunkLoadError e garantir estabilidade
+import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
+import { OperatorPerformanceChart } from '@/components/charts/operator-performance-chart';
+import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
+import { MonthlyOeeEvolutionChart } from '@/components/charts/monthly-oee-evolution-chart';
+import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
+import { DailyPdlMplLossChart } from '@/components/charts/daily-pdl-mpl-loss-chart';
+import { AvailableVsActualChart } from '@/components/charts/available-vs-actual-chart';
+import { TimePerRequisitionChart } from '@/components/charts/time-per-requisition-chart';
 
 const months = [
     { value: '0', label: 'Janeiro' },
@@ -234,7 +232,7 @@ export default function RecordsPage() {
     const constraints = [
       where('date', '>=', startDate),
       where('date', '<=', endDate),
-      limit(500) // Otimização: limite de busca
+      limit(500)
     ];
     return query(collection(firestore, 'productionRecords'), ...constraints);
   }, [firestore, startDate, endDate]);
@@ -246,7 +244,7 @@ export default function RecordsPage() {
     const constraints = [
       where('date', '>=', startDate),
       where('date', '<=', endDate),
-      limit(500) // Otimização: limite de busca
+      limit(500)
     ];
     return query(collection(firestore, 'lossRecords'), ...constraints);
   }, [firestore, startDate, endDate]);
