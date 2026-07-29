@@ -95,16 +95,22 @@ interface PlanejamentoItem {
   atividades?: AtividadePlanejada[];
 }
 
-// --- Configurações Estéticas e Motor de Escala ---
+// --- Configurações Estéticas e Motor de Escala Fiel à Imagem ---
 const turnos = [
-  { id: '1', label: '1T', range: '06:00-14:00', technicians: ["Marcos Barbosa", "Alisson Franca", "Daniel Solivo", "William Martinucci"] },
+  { id: '1', label: '1T', range: '06:00-14:00', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson França"] },
   { id: '2', label: '2T', range: '14:00-22:00', technicians: ["Jair Melo", "Nathan Xavier"] },
   { id: '3', label: '3T', range: '22:00-06:00', technicians: ["Gustavo Gozzi", "Rodrigo Cantano"] },
 ];
 
 const operatorList = [
-    "Alisson Franca", "Daniel Solivo", "Rodrigo Cantano", "Gustavo Gozzi",
-    "William Martinucci", "Nathan Xavier", "Jair Melo", "Marcos Barbosa"
+    "Marcos Barbosa",
+    "Daniel Solivo",
+    "Jair Melo",
+    "Nathan Xavier",
+    "Gustavo Gozzi",
+    "Rodrigo Cantano",
+    "William Martinucci",
+    "Alisson França"
 ];
 
 const factoryList = [
@@ -112,10 +118,10 @@ const factoryList = [
     "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"
 ];
 
-// Mapeamento de Escala Técnica Oficial
+// Mapeamento de Escala Técnica Oficial (Conforme Imagem)
 const ESCALA_TECNICA: Record<string, Record<string, string[]>> = {
   'TORNO': { 
-    '1': ['Marcos Barbosa', 'Alisson Franca'], 
+    '1': ['Marcos Barbosa'], 
     '2': ['Jair Melo'], 
     '3': ['Gustavo Gozzi'] 
   },
@@ -125,7 +131,7 @@ const ESCALA_TECNICA: Record<string, Record<string, string[]>> = {
     '3': ['Rodrigo Cantano'] 
   },
   'PROGRAMADOR': {
-    '1': ['William Martinucci'] 
+    '1': ['William Martinucci', 'Alisson França'] 
   }
 };
 
@@ -329,7 +335,7 @@ export default function ProgrammingPage() {
     let initialAtividades = item.atividades;
     if (!initialAtividades) {
         const tempoRaw = item.horasPlanejadas || item['Horas Máquina'];
-        const tempo = typeof tempoRaw === 'string' ? parseFloat(tempoRaw.replace(',', '.')) : (Number(tempoRaw) || 0);
+        const tempo = typeof tempoRaw === 'string' ? parseFloat(rawHours.replace(',', '.')) : (Number(tempoRaw) || 0);
         const tipo = (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase() || 'PRODUCAO';
         initialAtividades = [{
           tipo: tipo.includes('PRODUCAO') ? 'PRODUCAO' : (tipo.includes('SETUP') ? 'SETUP' : tipo),
@@ -382,7 +388,7 @@ export default function ProgrammingPage() {
     } catch (error) { console.error(error); }
   }
 
-  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO COM LÓGICA DE PEÇAS POR TURNO ---
+  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO COM ESCALA TÉCNICA ATUALIZADA ---
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !database) return;
@@ -421,17 +427,22 @@ export default function ProgrammingPage() {
           const centroTime = Number(findVal(row, ['centro', 'minutos centro']) || 0);
           const site = String(findVal(row, ['site', 'fabrica']) || 'VALINHOS DOVE');
 
-          // 1. Alocação de Programação para William Martinucci
+          // 1. Alocação de Programação (Equipe ADM: William e Alisson)
           if (progTime > 0) {
               const currentMin = pointers['PROG'];
               const dayOffset = Math.floor(currentMin / S);
               const targetDate = addDays(currentDate, dayOffset);
+              
+              // Alternar entre William e Alisson para programação ADM
+              const progPool = ESCALA_TECNICA['PROGRAMADOR']['1'];
+              const tecnicoProg = progPool[Math.floor(currentMin / S) % progPool.length];
+
               const newRef = push(ref(database, '/Planejamento S'));
               const id = newRef.key;
               if (id) {
                 updates[id] = {
                   dataExecucao: format(targetDate, 'dd/MM/yyyy'),
-                  turno: '1', tecnico: 'William Martinucci',
+                  turno: '1', tecnico: tecnicoProg,
                   equipamento: centroTime > 0 ? 'CENTRO DE USINAGEM D600' : 'TORNO CNC CENTUR 30',
                   requisicao: req, nomeDaPeca: peca, quantidadeTotal: qtd, quantidadeNoBloco: 0,
                   horasPlanejadas: progTime / 60, site: site,
@@ -442,7 +453,7 @@ export default function ProgrammingPage() {
               pointers['PROG'] += progTime;
           }
 
-          // 2. Alocação de Usinagem (Lógica de entrega de peças conforme seu exemplo)
+          // 2. Alocação de Usinagem (Lógica de entrega de peças conforme escala por turno)
           const technologies = [];
           if (tornoTime > 0) technologies.push({ type: 'TORNO', total: tornoTime });
           if (centroTime > 0) technologies.push({ type: 'CENTRO', total: centroTime });
@@ -451,10 +462,9 @@ export default function ProgrammingPage() {
             const cycleTime = tech.total / qtd;
             let pendingSetup = setup;
             let doneTime = 0;
-            let doneQty = 0;
-            let isFirstBlock = true;
+            let guard = 0;
 
-            while (pendingSetup > 0.0001 || doneTime < tech.total - 0.0001) {
+            while ((pendingSetup > 0.0001 || doneTime < tech.total - 0.0001) && guard++ < 100) {
               const currentMinTotal = pointers[tech.type as keyof typeof pointers];
               const shiftIndex = Math.floor(currentMinTotal / S);
               const dayOffset = Math.floor(shiftIndex / 3);
@@ -462,14 +472,8 @@ export default function ProgrammingPage() {
               const minInCurrentShift = currentMinTotal % S;
               const availInShift = S - minInCurrentShift;
 
-              let tecnico;
               const pool = ESCALA_TECNICA[tech.type][String(turnoNum)];
-              if (tech.type === 'TORNO' && turnoNum === 1) {
-                  // Alternar entre Marcos e Alisson se necessário ou baseado na carga
-                  tecnico = pool[Math.floor(minInCurrentShift / S)] || pool[0];
-              } else {
-                  tecnico = pool[0];
-              }
+              const tecnico = pool[0]; // Técnico principal da escala para aquele turno
 
               const seg = { setup: 0, prod: 0, pieces: 0 };
               let timeUsedInThisSeg = 0;
@@ -491,7 +495,6 @@ export default function ProgrammingPage() {
                   const qtyAfter = Math.min(qtd, Math.floor(doneTime / cycleTime + 0.00001));
                   seg.prod = p;
                   seg.pieces = qtyAfter - qtyBefore;
-                  doneQty = qtyAfter;
                   timeUsedInThisSeg += p;
               }
 
@@ -622,17 +625,21 @@ export default function ProgrammingPage() {
                                         <div className="space-y-1.5">
                                           {turno.technicians.map((tech) => {
                                             const techItems = dayItems.filter(item => (item.tecnico === tech || item.Técnicos === tech) && String(item.Turno || item.turno || '1') === turno.id);
-                                            const isTornoTech = ["Marcos Barbosa", "Jair Melo", "Gustavo Gozzi", "Alisson Franca"].includes(tech);
-                                            const isProg = tech === "William Martinucci";
+                                            const isTornoTech = ["Marcos Barbosa", "Jair Melo", "Gustavo Gozzi", "Alisson França"].includes(tech);
+                                            const isProg = ["William Martinucci", "Alisson França"].includes(tech) && techItems.some(i => (i.perdaPlanejada || '').includes('PROGRAMACAO'));
                                             
+                                            // Se o Alisson estiver no lane mas não tiver itens de Torno, e tiver de Programação, rotula como Programador
+                                            const displayRole = tech === "William Martinucci" || (tech === "Alisson França" && isProg) ? 'Téc. Programação' : 'Téc. Prog./Op.';
+                                            const displayTechLabel = tech === "William Martinucci" || (tech === "Alisson França" && isProg) ? '▣ ADM/Prog' : (isTornoTech ? '▬ Torno' : '▣ Centro');
+
                                             return (
                                               <div key={tech} className="grid grid-cols-[150px_1fr] items-center group">
                                                 <div className="pr-2 min-w-0">
-                                                  <div className={cn("text-[9px] font-mono font-bold uppercase tracking-widest", isTornoTech ? "text-[#00707F]" : (isProg ? "text-[#5B36A8]" : "text-[#5B36A8]"))}>
-                                                    {isTornoTech ? '▬ Torno' : (isProg ? '▣ Programador' : '▣ Centro')}
+                                                  <div className={cn("text-[9px] font-mono font-bold uppercase tracking-widest", (isTornoTech && !isProg) ? "text-[#00707F]" : "text-[#5B36A8]")}>
+                                                    {displayTechLabel}
                                                   </div>
                                                   <div className="text-[12px] font-bold text-[#0F151B] truncate">{tech}</div>
-                                                  <div className="text-[9px] text-[#6C7C8B] leading-none">{isProg ? 'Téc. Programação' : 'Téc. Prog./Op.'}</div>
+                                                  <div className="text-[9px] text-[#6C7C8B] leading-none">{displayRole}</div>
                                                 </div>
                                                 <div className="relative h-[36px] border border-[#E2E9EE] rounded-[3px] bg-[repeating-linear-gradient(90deg,#F4F7F9_0_1px,transparent_1px_100%)] bg-[size:12.5%_100%] overflow-hidden">
                                                   {techItems.length === 0 && (
