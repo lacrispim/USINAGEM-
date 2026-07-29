@@ -78,8 +78,8 @@ interface PlanejamentoItem {
   'Requisição'?: string;
   nomeDaPeca?: string;
   'Nome da Peça'?: string;
-  quantidade?: number;
-  Quantidade?: number;
+  quantidadeTotal?: number;
+  quantidadeNoBloco?: number;
   tecnico?: string;
   Técnicos?: string;
   horasPlanejadas?: number | string;
@@ -125,7 +125,7 @@ const ESCALA_TECNICA: Record<string, Record<string, string[]>> = {
     '3': ['Rodrigo Cantano'] 
   },
   'PROGRAMADOR': {
-    '1': ['William Martinucci'] // William dedicado à programação no 1T
+    '1': ['William Martinucci'] 
   }
 };
 
@@ -144,7 +144,8 @@ const planningFormSchema = z.object({
   equipamento: z.string().min(1, 'Equipamento é obrigatório.'),
   requisicao: z.string().min(1, 'Nº da Requisição é obrigatório.'),
   nomeDaPeca: z.string().min(1, 'Nome da peça é obrigatória.'),
-  quantidade: z.coerce.number().min(0, 'Quantidade deve ser zero ou maior.'),
+  quantidadeTotal: z.coerce.number().min(0),
+  quantidadeNoBloco: z.coerce.number().min(0),
   tecnico: z.string().min(1, 'Técnico é obrigatório.'),
   horasPlanejadas: z.coerce.number().default(0),
   turno: z.string(),
@@ -193,13 +194,14 @@ const TimelineBar = ({ item, realData, onClick, shiftMin }: { item: Planejamento
   const isTorno = machineType.includes('TORNO');
 
   const widthPc = (hours / 8) * 100;
+  const labelPcs = item.quantidadeNoBloco !== undefined ? `${item.quantidadeNoBloco} pç` : (hours > 0 ? 'em curso' : 'setup');
 
   return (
     <div 
       onClick={onClick}
       className={cn(
         "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden cursor-pointer border border-black/20 flex items-center shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all z-10",
-        isProg ? "bg-indigo-600" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")
+        isProg ? "bg-[#5B36A8]" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")
       )}
       style={{ width: `${widthPc}%`, minWidth: '4px' }}
     >
@@ -212,7 +214,7 @@ const TimelineBar = ({ item, realData, onClick, shiftMin }: { item: Planejamento
 
       <div className="relative flex-1 flex items-center gap-2 px-2 min-w-0 text-white">
         <span className="font-mono text-[11px] font-bold shrink-0">{req}</span>
-        <span className="font-mono text-[10px] opacity-80 shrink-0">{item.quantidade || item.Quantidade || 0} pç</span>
+        <span className="font-mono text-[10px] opacity-80 shrink-0">{labelPcs}</span>
         <span className="text-[10px] opacity-90 truncate uppercase font-medium">
           {item.nomeDaPeca || item['Nome da Peça'] || 'SEM NOME'}
         </span>
@@ -264,7 +266,7 @@ export default function ProgrammingPage() {
     resolver: zodResolver(planningFormSchema),
     defaultValues: {
       dataExecucao: '', equipamento: '', requisicao: '', nomeDaPeca: '',
-      quantidade: 0, tecnico: '', horasPlanejadas: 0, turno: '1',
+      quantidadeTotal: 0, quantidadeNoBloco: 0, tecnico: '', horasPlanejadas: 0, turno: '1',
       site: 'VALINHOS DOVE', observacao: '',
       atividades: [{ tipo: 'PRODUCAO', tempo: 0, site: 'VALINHOS DOVE' }],
     },
@@ -309,7 +311,7 @@ export default function ProgrammingPage() {
     form.reset({
       dataExecucao: format(day, 'dd/MM/yyyy'),
       turno: turnoId, equipamento: '', requisicao: '', nomeDaPeca: '',
-      quantidade: 0, tecnico: tecnico || '', horasPlanejadas: isSunday ? 0 : 0.5,
+      quantidadeTotal: 0, quantidadeNoBloco: 0, tecnico: tecnico || '', horasPlanejadas: isSunday ? 0 : 0.5,
       site: 'VALINHOS DOVE', observacao: '', atividades: defaultAtividades,
     });
     setIsDialogOpen(true);
@@ -327,7 +329,7 @@ export default function ProgrammingPage() {
     let initialAtividades = item.atividades;
     if (!initialAtividades) {
         const tempoRaw = item.horasPlanejadas || item['Horas Máquina'];
-        const tempo = typeof tempoRaw === 'string' ? parseFloat(tempoRaw.replace(',', '.')) : (Number(rawHours) || 0);
+        const tempo = typeof tempoRaw === 'string' ? parseFloat(tempoRaw.replace(',', '.')) : (Number(tempoRaw) || 0);
         const tipo = (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase() || 'PRODUCAO';
         initialAtividades = [{
           tipo: tipo.includes('PRODUCAO') ? 'PRODUCAO' : (tipo.includes('SETUP') ? 'SETUP' : tipo),
@@ -341,7 +343,8 @@ export default function ProgrammingPage() {
       equipamento: item.equipamento || item.EQUIPAMENTO || '',
       requisicao: item.requisicao || item['Requisição'] || '',
       nomeDaPeca: item.nomeDaPeca || item['Nome da Peça'] || '',
-      quantidade: Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0,
+      quantidadeTotal: Number(item.quantidadeTotal || 0),
+      quantidadeNoBloco: Number(item.quantidadeNoBloco || 0),
       tecnico: item.tecnico || item.Técnicos || '',
       horasPlanejadas: (watchAtividades || []).reduce((acc, curr) => acc + (Number(curr.tempo) || 0), 0),
       site: item.site || item.Site || 'VALINHOS DOVE',
@@ -379,7 +382,7 @@ export default function ProgrammingPage() {
     } catch (error) { console.error(error); }
   }
 
-  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO REFINADO ---
+  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO COM LÓGICA DE PEÇAS POR TURNO ---
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !database) return;
@@ -399,7 +402,7 @@ export default function ProgrammingPage() {
             return;
         }
 
-        const DAILY_CAPACITY = (2 + 1 + 1) * 480; 
+        const S = 480; // 8 horas = 480 min
         let pointers = { 'TORNO': 0, 'CENTRO': 0, 'PROG': 0 };
         const updates: any = {};
 
@@ -411,17 +414,17 @@ export default function ProgrammingPage() {
         json.forEach((row) => {
           const req = String(findVal(row, ['req', 'forms', 'requisicao']) || '');
           const peca = String(findVal(row, ['peca', 'nome', 'desc']) || 'SEM DESCRIÇÃO');
-          const qtd = Number(findVal(row, ['qtd', 'quantidade']) || 0);
+          const qtd = Number(findVal(row, ['qtd', 'quantidade']) || 1);
           const setup = Number(findVal(row, ['setup']) || 0);
-          const prog = Number(findVal(row, ['prog', 'programacao', 'programação']) || 0);
-          const torno = Number(findVal(row, ['torno', 'minutos torno']) || 0);
-          const centro = Number(findVal(row, ['centro', 'minutos centro']) || 0);
+          const progTime = Number(findVal(row, ['prog', 'programacao', 'programação']) || 0);
+          const tornoTime = Number(findVal(row, ['torno', 'minutos torno']) || 0);
+          const centroTime = Number(findVal(row, ['centro', 'minutos centro']) || 0);
           const site = String(findVal(row, ['site', 'fabrica']) || 'VALINHOS DOVE');
 
-          // 1. Alocação de Programação (Centro) para William Martinucci
-          if (prog > 0 && centro > 0) {
+          // 1. Alocação de Programação para William Martinucci
+          if (progTime > 0) {
               const currentMin = pointers['PROG'];
-              const dayOffset = Math.floor(currentMin / 480);
+              const dayOffset = Math.floor(currentMin / S);
               const targetDate = addDays(currentDate, dayOffset);
               const newRef = push(ref(database, '/Planejamento S'));
               const id = newRef.key;
@@ -429,80 +432,95 @@ export default function ProgrammingPage() {
                 updates[id] = {
                   dataExecucao: format(targetDate, 'dd/MM/yyyy'),
                   turno: '1', tecnico: 'William Martinucci',
-                  equipamento: 'CENTRO DE USINAGEM D600',
-                  requisicao: req, nomeDaPeca: peca, quantidade: qtd,
-                  horasPlanejadas: prog / 60, site: site,
+                  equipamento: centroTime > 0 ? 'CENTRO DE USINAGEM D600' : 'TORNO CNC CENTUR 30',
+                  requisicao: req, nomeDaPeca: peca, quantidadeTotal: qtd, quantidadeNoBloco: 0,
+                  horasPlanejadas: progTime / 60, site: site,
                   perdaPlanejada: 'PROGRAMACAO',
-                  atividades: [{ tipo: 'PROGRAMACAO', tempo: prog / 60, site: site }]
+                  atividades: [{ tipo: 'PROGRAMACAO', tempo: progTime / 60, site: site }]
                 };
               }
-              pointers['PROG'] += prog;
+              pointers['PROG'] += progTime;
           }
 
-          // 2. Alocação de Usinagem (Torno e Centro)
+          // 2. Alocação de Usinagem (Lógica de entrega de peças conforme seu exemplo)
           const technologies = [];
-          if (torno > 0) technologies.push({ type: 'TORNO', usinagem: torno });
-          if (centro > 0) technologies.push({ type: 'CENTRO', usinagem: centro });
+          if (tornoTime > 0) technologies.push({ type: 'TORNO', total: tornoTime });
+          if (centroTime > 0) technologies.push({ type: 'CENTRO', total: centroTime });
 
           technologies.forEach(tech => {
-            let pendingTime = setup + tech.usinagem;
+            const cycleTime = tech.total / qtd;
+            let pendingSetup = setup;
+            let doneTime = 0;
+            let doneQty = 0;
             let isFirstBlock = true;
 
-            while (pendingTime > 0) {
-              const currentMin = pointers[tech.type as keyof typeof pointers];
-              const dayOffset = Math.floor(currentMin / DAILY_CAPACITY);
-              const minInDay = currentMin % DAILY_CAPACITY;
-              
-              let turnoNum, tecnico, remainingInShift;
-              
-              if (minInDay < 960) { // 1T (Até 960 min)
-                  turnoNum = 1;
-                  const pool = ESCALA_TECNICA[tech.type]['1'];
-                  const poolIdx = Math.floor(minInDay / 480);
-                  tecnico = pool[poolIdx] || pool[0];
-                  remainingInShift = 480 - (minInDay % 480);
-              } else if (minInDay < 1440) { // 2T
-                  turnoNum = 2;
-                  tecnico = ESCALA_TECNICA[tech.type]['2'][0];
-                  remainingInShift = 1440 - minInDay;
-              } else { // 3T
-                  turnoNum = 3;
-                  tecnico = ESCALA_TECNICA[tech.type]['3'][0];
-                  remainingInShift = 1920 - minInDay;
+            while (pendingSetup > 0.0001 || doneTime < tech.total - 0.0001) {
+              const currentMinTotal = pointers[tech.type as keyof typeof pointers];
+              const shiftIndex = Math.floor(currentMinTotal / S);
+              const dayOffset = Math.floor(shiftIndex / 3);
+              const turnoNum = (shiftIndex % 3) + 1;
+              const minInCurrentShift = currentMinTotal % S;
+              const availInShift = S - minInCurrentShift;
+
+              let tecnico;
+              const pool = ESCALA_TECNICA[tech.type][String(turnoNum)];
+              if (tech.type === 'TORNO' && turnoNum === 1) {
+                  // Alternar entre Marcos e Alisson se necessário ou baseado na carga
+                  tecnico = pool[Math.floor(minInCurrentShift / S)] || pool[0];
+              } else {
+                  tecnico = pool[0];
               }
 
-              const timeToAllocate = Math.min(pendingTime, remainingInShift);
-              if (timeToAllocate <= 0) {
-                  pointers[tech.type as keyof typeof pointers] += remainingInShift;
-                  continue;
+              const seg = { setup: 0, prod: 0, pieces: 0 };
+              let timeUsedInThisSeg = 0;
+
+              // Consumir Setup
+              if (pendingSetup > 0.0001) {
+                  const s = Math.min(pendingSetup, availInShift);
+                  seg.setup = s;
+                  pendingSetup -= s;
+                  timeUsedInThisSeg += s;
+              }
+
+              // Consumir Produção e calcular peças entregues
+              const availForProd = availInShift - timeUsedInThisSeg;
+              if (availForProd > 0.0001 && doneTime < tech.total - 0.0001) {
+                  const p = Math.min(availForProd, tech.total - doneTime);
+                  const qtyBefore = Math.floor(doneTime / cycleTime + 0.00001);
+                  doneTime += p;
+                  const qtyAfter = Math.min(qtd, Math.floor(doneTime / cycleTime + 0.00001));
+                  seg.prod = p;
+                  seg.pieces = qtyAfter - qtyBefore;
+                  doneQty = qtyAfter;
+                  timeUsedInThisSeg += p;
               }
 
               const targetDate = addDays(currentDate, dayOffset);
               const newRef = push(ref(database, '/Planejamento S'));
               const id = newRef.key;
               
-              if (id) {
-                const hasSetup = isFirstBlock && setup > 0;
+              if (id && (seg.setup > 0 || seg.prod > 0)) {
                 updates[id] = {
                   dataExecucao: format(targetDate, 'dd/MM/yyyy'),
                   turno: String(turnoNum), tecnico: tecnico,
                   equipamento: tech.type === 'TORNO' ? 'TORNO CNC CENTUR 30' : 'CENTRO DE USINAGEM D600',
-                  requisicao: req, nomeDaPeca: peca, quantidade: qtd,
-                  horasPlanejadas: timeToAllocate / 60, site: site,
-                  perdaPlanejada: hasSetup ? 'SETUP' : 'PRODUCAO',
-                  atividades: [{ tipo: hasSetup ? 'SETUP' : 'PRODUCAO', tempo: timeToAllocate / 60, site: site }]
+                  requisicao: req, nomeDaPeca: peca, 
+                  quantidadeTotal: qtd,
+                  quantidadeNoBloco: seg.pieces,
+                  horasPlanejadas: (seg.setup + seg.prod) / 60, site: site,
+                  perdaPlanejada: seg.setup > 0 ? 'SETUP' : 'PRODUCAO',
+                  atividades: [{ tipo: seg.setup > 0 ? 'SETUP' : 'PRODUCAO', tempo: (seg.setup + seg.prod) / 60, site: site }]
                 };
               }
 
-              pointers[tech.type as keyof typeof pointers] += timeToAllocate;
-              pendingTime -= timeToAllocate;
-              isFirstBlock = false;
+              pointers[tech.type as keyof typeof pointers] += timeUsedInThisSeg;
+              if (pendingSetup <= 0.0001 && doneTime >= tech.total - 0.0001) break;
             }
           });
         });
 
         await update(ref(database, '/Planejamento S'), updates);
-        toast({ title: "Planejamento Automático Concluído", description: `${Object.keys(updates).length} blocos alocados.` });
+        toast({ title: "Planejamento Automático Concluído", description: `${Object.keys(updates).length} blocos alocados com sucesso.` });
       } catch (error) {
         console.error(error);
         toast({ title: "Erro no Planejamento", variant: "destructive" });
@@ -571,7 +589,7 @@ export default function ProgrammingPage() {
                     try { return isSameDay(parse(dStr, 'dd/MM/yyyy', new Date()), day); } catch { return isSameDay(new Date(dStr), day); }
                 });
 
-                const totalPecas = dayItems.reduce((acc, curr) => acc + (Number(curr.quantidade || curr.Quantidade) || 0), 0);
+                const totalPecas = dayItems.reduce((acc, curr) => acc + (Number(curr.quantidadeNoBloco || 0)), 0);
                 const totalHoras = dayItems.reduce((acc, curr) => {
                     const raw = curr.horasPlanejadas || curr['Horas Máquina'];
                     return acc + (typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : (Number(raw) || 0));
@@ -585,7 +603,7 @@ export default function ProgrammingPage() {
                                 <span className="text-[10px] font-bold text-[#8FA3B2] uppercase tracking-[0.18em]">{format(day, 'EEEE', { locale: ptBR })}</span>
                             </div>
                             <div className="flex items-center gap-6 font-mono text-[11px] text-[#B7C6D2]">
-                                <span>peças <b className="text-white ml-1">{totalPecas}</b></span>
+                                <span>peças entregues <b className="text-white ml-1">{totalPecas}</b></span>
                                 <span>ocupação <b className="text-white ml-1">{totalHoras.toFixed(1)}h</b></span>
                                 <span>utilização <b className="text-white ml-1">{(totalHoras > 0 ? Math.min((totalHoras / 48) * 100, 100).toFixed(0) : '0')}%</b></span>
                             </div>
@@ -605,13 +623,12 @@ export default function ProgrammingPage() {
                                           {turno.technicians.map((tech) => {
                                             const techItems = dayItems.filter(item => (item.tecnico === tech || item.Técnicos === tech) && String(item.Turno || item.turno || '1') === turno.id);
                                             const isTornoTech = ["Marcos Barbosa", "Jair Melo", "Gustavo Gozzi", "Alisson Franca"].includes(tech);
-                                            const isCentroTech = ["Daniel Solivo", "Nathan Xavier", "Rodrigo Cantano"].includes(tech);
                                             const isProg = tech === "William Martinucci";
                                             
                                             return (
                                               <div key={tech} className="grid grid-cols-[150px_1fr] items-center group">
                                                 <div className="pr-2 min-w-0">
-                                                  <div className={cn("text-[9px] font-mono font-bold uppercase tracking-widest", isTornoTech ? "text-[#00707F]" : (isProg ? "text-indigo-600" : "text-[#5B36A8]"))}>
+                                                  <div className={cn("text-[9px] font-mono font-bold uppercase tracking-widest", isTornoTech ? "text-[#00707F]" : (isProg ? "text-[#5B36A8]" : "text-[#5B36A8]"))}>
                                                     {isTornoTech ? '▬ Torno' : (isProg ? '▣ Programador' : '▣ Centro')}
                                                   </div>
                                                   <div className="text-[12px] font-bold text-[#0F151B] truncate">{tech}</div>
@@ -656,9 +673,8 @@ export default function ProgrammingPage() {
       <div className="flex gap-4 flex-wrap text-[11px] font-bold text-[#3D4C5A] items-center bg-white p-3 border border-[#CBD5DD] rounded-sm">
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10" style={{ background: 'repeating-linear-gradient(45deg, #F0BC00 0 4px, #3A2E00 4px 8px)' }} /> Setup</div>
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#00707F]" /> Produção Torno</div>
-        <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#5B36A8]" /> Produção Centro</div>
-        <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-indigo-600" /> Programação ADM</div>
-        <div className="ml-auto text-[#6C7C8B] font-medium italic">William Martinucci atua exclusivamente na Programação do Centro (1T).</div>
+        <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#5B36A8]" /> Produção Centro / Programação</div>
+        <div className="ml-auto text-[#6C7C8B] font-medium italic">As peças são contabilizadas no turno em que o ciclo de usinagem termina.</div>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -726,7 +742,10 @@ export default function ProgrammingPage() {
               <div className="grid grid-cols-3 gap-4">
                 <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Nº Forms</FormLabel><FormControl><Input className="font-mono" {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Meta (Pç)</FormLabel><FormControl><Input type="number" className="font-mono" {...field} /></FormControl></FormItem>)} />
+                <div className="grid grid-cols-2 gap-2">
+                   <FormField control={form.control} name="quantidadeTotal" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Total (Pç)</FormLabel><FormControl><Input type="number" className="font-mono" {...field} /></FormControl></FormItem>)} />
+                   <FormField control={form.control} name="quantidadeNoBloco" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Bloco (Pç)</FormLabel><FormControl><Input type="number" className="font-mono" {...field} /></FormControl></FormItem>)} />
+                </div>
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Notas de Produção</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
