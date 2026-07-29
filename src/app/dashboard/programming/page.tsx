@@ -97,8 +97,8 @@ interface PlanejamentoItem {
 
 // --- Configurações Estéticas e Motor de Escala ---
 const turnos = [
-  { id: '1', label: '1T', range: '06:00-14:00', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson Franca"] },
-  { id: '2', label: '2T', range: '14:00-22:00', technicians: ["Nathan Xavier", "Jair Melo"] },
+  { id: '1', label: '1T', range: '06:00-14:00', technicians: ["Marcos Barbosa", "Alisson Franca", "Daniel Solivo", "William Martinucci"] },
+  { id: '2', label: '2T', range: '14:00-22:00', technicians: ["Jair Melo", "Nathan Xavier"] },
   { id: '3', label: '3T', range: '22:00-06:00', technicians: ["Gustavo Gozzi", "Rodrigo Cantano"] },
 ];
 
@@ -113,9 +113,18 @@ const factoryList = [
 ];
 
 // Mapeamento de quem opera o quê em cada turno (Escala Oficial)
-const ESCALA_TECNICA: Record<string, Record<string, string>> = {
-  'TORNO': { '1': 'Marcos Barbosa', '2': 'Jair Melo', '3': 'Gustavo Gozzi' },
-  'CENTRO': { '1': 'Daniel Solivo', '2': 'Nathan Xavier', '3': 'Rodrigo Cantano' }
+// 1T agora tem 2 técnicos por tecnologia para dobrar capacidade
+const ESCALA_TECNICA: Record<string, Record<string, string[]>> = {
+  'TORNO': { 
+    '1': ['Marcos Barbosa', 'Alisson Franca'], 
+    '2': ['Jair Melo'], 
+    '3': ['Gustavo Gozzi'] 
+  },
+  'CENTRO': { 
+    '1': ['Daniel Solivo', 'William Martinucci'], 
+    '2': ['Nathan Xavier'], 
+    '3': ['Rodrigo Cantano'] 
+  }
 };
 
 const lossOptions = [
@@ -367,7 +376,7 @@ export default function ProgrammingPage() {
     } catch (error) { console.error(error); }
   }
 
-  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO REFINADO ---
+  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO REFINADO COM CAPACIDADE DUPLA ---
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !database) return;
@@ -387,11 +396,12 @@ export default function ProgrammingPage() {
             return;
         }
 
-        const SHIFT_CAPACITY_MIN = 480;
+        // Capacidade Diária (2 tec em 1T, 1 em 2T, 1 em 3T)
+        // Total por dia = (2*480) + (1*480) + (1*480) = 1920 min
+        const DAILY_CAPACITY = (2 + 1 + 1) * 480; 
         let pointers = { 'TORNO': 0, 'CENTRO': 0 };
         const updates: any = {};
 
-        // Helper para detectar colunas independente do nome exato
         const findVal = (row: any, keys: string[]) => {
             const foundKey = Object.keys(row).find(k => keys.some(search => k.toLowerCase().includes(search.toLowerCase())));
             return foundKey ? row[foundKey] : undefined;
@@ -411,35 +421,45 @@ export default function ProgrammingPage() {
           if (centro > 0) technologies.push({ type: 'CENTRO', usinagem: centro });
 
           technologies.forEach(tech => {
-            // Tempo Total = Setup + Usinagem
             let pendingTime = setup + tech.usinagem;
             let isFirstBlock = true;
 
             while (pendingTime > 0) {
               const currentMin = pointers[tech.type as keyof typeof pointers];
-              const shiftIdx = Math.floor(currentMin / SHIFT_CAPACITY_MIN);
-              const minInCurrentShift = currentMin % SHIFT_CAPACITY_MIN;
-              const remainingInShift = SHIFT_CAPACITY_MIN - minInCurrentShift;
+              const dayOffset = Math.floor(currentMin / DAILY_CAPACITY);
+              const minInDay = currentMin % DAILY_CAPACITY;
               
+              let turnoNum, tecnico, remainingInShift;
+              
+              // Lógica de alocação considerando múltiplos técnicos no 1T
+              if (minInDay < 960) { // 1T (Até 960 min = 2 técnicos)
+                  turnoNum = 1;
+                  const pool = ESCALA_TECNICA[tech.type]['1'];
+                  const poolIdx = Math.floor(minInDay / 480);
+                  tecnico = pool[poolIdx];
+                  remainingInShift = 480 - (minInDay % 480);
+              } else if (minInDay < 1440) { // 2T (1 técnico)
+                  turnoNum = 2;
+                  tecnico = ESCALA_TECNICA[tech.type]['2'][0];
+                  remainingInShift = 1440 - minInDay;
+              } else { // 3T (1 técnico)
+                  turnoNum = 3;
+                  tecnico = ESCALA_TECNICA[tech.type]['3'][0];
+                  remainingInShift = 1920 - minInDay;
+              }
+
               const timeToAllocate = Math.min(pendingTime, remainingInShift);
               if (timeToAllocate <= 0) {
                   pointers[tech.type as keyof typeof pointers] += remainingInShift;
                   continue;
               }
 
-              const hoursToAllocate = timeToAllocate / 60;
-              const dayOffset = Math.floor(shiftIdx / 3);
-              const turnoNum = (shiftIdx % 3) + 1;
               const targetDate = addDays(currentDate, dayOffset);
-              const tecnico = ESCALA_TECNICA[tech.type][String(turnoNum)];
-
               const newRef = push(ref(database, '/Planejamento S'));
               const id = newRef.key;
               
               if (id) {
-                const isSetupOnly = isFirstBlock && setup >= timeToAllocate;
                 const hasSetup = isFirstBlock && setup > 0;
-
                 updates[id] = {
                   dataExecucao: format(targetDate, 'dd/MM/yyyy'),
                   turno: String(turnoNum),
@@ -448,12 +468,12 @@ export default function ProgrammingPage() {
                   requisicao: req,
                   nomeDaPeca: peca,
                   quantidade: qtd,
-                  horasPlanejadas: hoursToAllocate,
+                  horasPlanejadas: timeToAllocate / 60,
                   site: site,
                   perdaPlanejada: hasSetup ? 'SETUP' : 'PRODUCAO',
                   atividades: [{
                     tipo: hasSetup ? 'SETUP' : 'PRODUCAO',
-                    tempo: hoursToAllocate,
+                    tempo: timeToAllocate / 60,
                     site: site
                   }]
                 };
@@ -467,7 +487,7 @@ export default function ProgrammingPage() {
         });
 
         await update(ref(database, '/Planejamento S'), updates);
-        toast({ title: "Planejamento Automático Concluído", description: `${Object.keys(updates).length} blocos alocados na timeline.` });
+        toast({ title: "Planejamento Automático Concluído", description: `${Object.keys(updates).length} blocos alocados com suporte a escala dupla.` });
       } catch (error) {
         console.error(error);
         toast({ title: "Erro no Planejamento", variant: "destructive" });
@@ -569,7 +589,8 @@ export default function ProgrammingPage() {
                                         <div className="space-y-1.5">
                                           {turno.technicians.map((tech) => {
                                             const techItems = dayItems.filter(item => (item.tecnico === tech || item.Técnicos === tech) && String(item.Turno || item.turno || '1') === turno.id);
-                                            const isTornoTech = tech === "Marcos Barbosa" || tech === "Jair Melo" || tech === "Gustavo Gozzi";
+                                            const isTornoTech = ["Marcos Barbosa", "Jair Melo", "Gustavo Gozzi", "Alisson Franca"].includes(tech);
+                                            const isCentroTech = ["Daniel Solivo", "Nathan Xavier", "Rodrigo Cantano", "William Martinucci"].includes(tech);
                                             
                                             return (
                                               <div key={tech} className="grid grid-cols-[150px_1fr] items-center group">
@@ -620,8 +641,8 @@ export default function ProgrammingPage() {
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10" style={{ background: 'repeating-linear-gradient(45deg, #F0BC00 0 4px, #3A2E00 4px 8px)' }} /> Setup</div>
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#00707F]" /> Produção Torno</div>
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#5B36A8]" /> Produção Centro</div>
-        <div className="flex items-center gap-2 ml-4 px-2 py-1 bg-[#F4F7F9] border rounded text-[10px] text-muted-foreground uppercase"><Info className="h-3 w-3 mr-1" /> Dica: O botão "Planejar Automático" distribui as requisições respeitando a capacidade de 480 min/turno.</div>
-        <div className="ml-auto text-[#6C7C8B] font-medium italic">As tarefas são quebradas automaticamente entre turnos se necessário.</div>
+        <div className="flex items-center gap-2 ml-4 px-2 py-1 bg-[#F4F7F9] border rounded text-[10px] text-muted-foreground uppercase"><Info className="h-3 w-3 mr-1" /> Dica: O botão "Planejar Automático" distribui as requisições respeitando a capacidade de 480 min/turno por técnico.</div>
+        <div className="ml-auto text-[#6C7C8B] font-medium italic">O 1º Turno possui capacidade dupla (2 técnicos por tecnologia).</div>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
