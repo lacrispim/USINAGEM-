@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -20,7 +21,9 @@ import {
   Settings2,
   PlusCircle,
   User as UserIcon,
-  Cpu
+  Cpu,
+  CalendarDays,
+  Clock
 } from 'lucide-react';
 import { 
   format, 
@@ -33,7 +36,8 @@ import {
   parse, 
   isToday,
   startOfDay,
-  endOfDay
+  endOfDay,
+  addDays
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -72,8 +76,8 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
-import ProgrammingComparisonChart from '@/components/charts/programming-comparison-chart';
 
+// --- Interfaces ---
 interface AtividadePlanejada {
   tipo: string;
   tempo: number;
@@ -108,9 +112,9 @@ interface PlanejamentoItem {
 }
 
 const turnos = [
-  { id: '1', label: '1º Turno', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson Franca"] },
-  { id: '2', label: '2º Turno', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20', technicians: ["Nathan Xavier", "Jair Melo"] },
-  { id: '3', label: '3º Turno', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', technicians: ["Gustavo Gozzi", "Rodrigo Cantano"] },
+  { id: '1', label: '1T', range: '06:00-14:00', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson Franca"] },
+  { id: '2', label: '2T', range: '14:00-22:00', technicians: ["Nathan Xavier", "Jair Melo"] },
+  { id: '3', label: '3T', range: '22:00-06:00', technicians: ["Gustavo Gozzi", "Rodrigo Cantano"] },
 ];
 
 const operatorList = [
@@ -138,14 +142,13 @@ const factoryList = [
 ];
 
 const lossOptions = [
-  { value: 'PRODUCAO', label: 'Produção Normal', color: '#ffffff' },
-  { value: 'PROGRAMACAO', label: 'Programação', color: '#a855f7' },
+  { value: 'PRODUCAO', label: 'Produção Normal', color: '#007b8a' }, // Cor base TORNO
+  { value: 'PROGRAMACAO', label: 'Programação', color: '#a855f7' }, // Roxo CENTRO
   { value: 'SETUP', label: 'Setup', color: '#ef4444' },
   { value: 'DDS', label: 'Atividades ADM', color: '#f97316' },
   { value: 'CAFE', label: 'Parada para Café', color: '#eab308' },
   { value: 'LIMPEZA', label: 'Limpeza Planejada', color: '#22c55e' },
   { value: 'QUALIDADE', label: 'Inspeção / Qualidade', color: '#3b82f6' },
-  { value: 'AUXÍLIO AS FÁBRICAS', label: 'Auxílio as Fábricas', color: '#0ea5e9' },
 ];
 
 const planningFormSchema = z.object({
@@ -168,6 +171,132 @@ const planningFormSchema = z.object({
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
+// --- Componentes Internos da Timeline ---
+
+const ShiftTimelineRow = ({ 
+  label, 
+  range, 
+  items, 
+  techs, 
+  realData,
+  onItemClick,
+  onAddClick,
+  day 
+}: { 
+  label: string; 
+  range: string; 
+  items: PlanejamentoItem[]; 
+  techs: string[]; 
+  realData: any[];
+  onItemClick: (item: PlanejamentoItem) => void;
+  onAddClick: (day: Date, turnoId: string, tech: string) => void;
+  day: Date;
+}) => {
+  return (
+    <div className="flex border-b border-border/40 hover:bg-muted/5 transition-colors">
+      {/* Coluna do Turno */}
+      <div className="w-[80px] shrink-0 p-4 flex flex-col justify-center items-center border-r bg-muted/10">
+        <span className="text-xl font-black text-foreground">{label}</span>
+        <span className="text-[10px] text-muted-foreground font-medium">{range}</span>
+        <span className="text-[10px] font-bold text-muted-foreground/60 mt-1">480 min</span>
+      </div>
+
+      {/* Coluna de Recursos e Linhas do Tempo */}
+      <div className="flex-1">
+        {techs.map((tech, idx) => {
+          const techItems = items.filter(item => (item.tecnico === tech || item.Técnicos === tech));
+          const machineType = techItems[0]?.equipamento || techItems[0]?.EQUIPAMENTO || (idx % 2 === 0 ? 'TORNO' : 'CENTRO');
+          const isTorno = machineType.includes('TORNO');
+
+          return (
+            <div key={tech} className="flex border-b last:border-0 h-[70px]">
+              {/* Nome do Técnico e Máquina */}
+              <div className="w-[180px] shrink-0 p-3 border-r flex flex-col justify-center gap-0.5">
+                <div className="flex items-center gap-1.5">
+                   <div className={cn("w-1.5 h-1.5 rounded-full", isTorno ? "bg-[#007b8a]" : "bg-[#6d28d9]")} />
+                   <span className={cn("text-[9px] font-black uppercase tracking-widest", isTorno ? "text-[#007b8a]" : "text-[#a855f7]")}>
+                      {isTorno ? 'TORNO' : 'CENTRO'}
+                   </span>
+                </div>
+                <span className="text-sm font-bold truncate">{tech}</span>
+                <span className="text-[10px] text-muted-foreground font-medium">Téc. Prog./Op.</span>
+              </div>
+
+              {/* Grid de Tempo (0-8h) */}
+              <div className="flex-1 relative bg-[linear-gradient(to_right,#8881_1px,transparent_1px)] bg-[size:12.5%_100%] overflow-hidden group/row">
+                 {/* Botão de adição rápida flutuante */}
+                 <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="absolute right-2 top-2 h-6 w-6 opacity-0 group-hover/row:opacity-100 transition-opacity z-20"
+                    onClick={() => onAddClick(day, label.charAt(0), tech)}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+
+                 {/* Atividades Timeline */}
+                 <div className="flex h-full items-center px-0.5 gap-1">
+                   {techItems.map(item => {
+                      const rawHours = item.horasPlanejadas || item['Horas Máquina'];
+                      const hours = typeof rawHours === 'string' ? parseFloat(rawHours.replace(',', '.')) : (Number(rawHours) || 0);
+                      
+                      // Cálculo de Realizado para este Forms
+                      const req = item.requisicao || item['Requisição'];
+                      const realHours = realData
+                        .filter(r => r.formsNumber === req)
+                        .reduce((acc, curr) => acc + (Number(curr.machiningTime) || 0) / 60, 0);
+                      
+                      const progress = hours > 0 ? Math.min((realHours / hours) * 100, 100) : 0;
+                      const hasSetup = (item.perdaPlanejada || item['Perdas planejadas'] || '').toUpperCase().includes('SETUP');
+
+                      return (
+                        <div 
+                          key={item.id}
+                          onClick={() => onItemClick(item)}
+                          className={cn(
+                            "relative h-[48px] rounded-sm overflow-hidden flex flex-col justify-between cursor-pointer border-r last:border-r-0 shadow-sm hover:ring-2 ring-primary transition-all",
+                            isTorno ? "bg-[#007b8a]" : "bg-[#6d28d9]"
+                          )}
+                          style={{ width: `${(hours / 8) * 100}%`, minWidth: '80px' }}
+                        >
+                          {/* Faixas de Setup (Zebrinha) */}
+                          {hasSetup && (
+                            <div className="absolute inset-0 opacity-40 pointer-events-none" 
+                                 style={{ background: 'repeating-linear-gradient(45deg, #facc15, #facc15 10px, #000 10px, #000 20px)' }} />
+                          )}
+
+                          <div className="relative p-1.5 flex flex-col h-full justify-between">
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[12px] font-black text-white">{req}</span>
+                                <span className="text-[10px] font-bold text-white/80">{item.quantidade || item.Quantidade || 0} pç</span>
+                              </div>
+                              <span className="text-[9px] font-black bg-black/20 text-white px-1 rounded">{hours.toFixed(1)}h</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-white/90 truncate leading-tight uppercase">
+                              {item.nomeDaPeca || item['Nome da Peça'] || 'SEM NOME'}
+                            </span>
+                          </div>
+
+                          {/* Barra de Progresso Realizado */}
+                          <div className="h-1.5 w-full bg-black/30 mt-auto overflow-hidden">
+                             <div className="h-full bg-white/40" style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                      );
+                   })}
+                 </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// --- Página Principal ---
+
 export default function ProgrammingPage() {
   const database = useDatabase();
   const firestore = useFirestore();
@@ -182,6 +311,13 @@ export default function ProgrammingPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
 
+  // Buscamos 3 dias a partir da data atual para a Timeline
+  const timelineDays = useMemo(() => [
+    currentDate,
+    addDays(currentDate, 1),
+    addDays(currentDate, 2)
+  ], [currentDate]);
+
   const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 0 }), [currentDate]);
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 0 }), [weekStart]);
 
@@ -189,10 +325,10 @@ export default function ProgrammingPage() {
     if (!firestore) return null;
     return query(
       collection(firestore, 'productionRecords'),
-      where('date', '>=', startOfDay(weekStart)),
-      where('date', '<=', endOfDay(weekEnd))
+      where('date', '>=', startOfDay(currentDate)),
+      where('date', '<=', endOfDay(addDays(currentDate, 3)))
     );
-  }, [firestore, weekStart, weekEnd]);
+  }, [firestore, currentDate]);
 
   const { data: productionRecords } = useCollection(productionQuery);
 
@@ -250,79 +386,9 @@ export default function ProgrammingPage() {
     return () => unsubscribe();
   }, [database]);
 
-  const calendarDays = useMemo(() => eachDayOfInterval({
-    start: weekStart,
-    end: weekEnd,
-  }), [weekStart, weekEnd]);
-
-  const nextWeek = () => setCurrentDate(prev => addWeeks(prev, 1));
-  const prevWeek = () => setCurrentDate(prev => subWeeks(prev, 1));
+  const nextDay = () => setCurrentDate(prev => addDays(prev, 1));
+  const prevDay = () => setCurrentDate(prev => addDays(prev, -1));
   const goToToday = () => setCurrentDate(new Date());
-
-  const { weeklyChartData, uniqueRequisitions } = useMemo(() => {
-    const reqSet = new Set<string>();
-    const chartData = calendarDays.map(day => {
-      const items = planejamentoData.filter(item => {
-        const dStr = item.dataExecucao || item['Data Execução'];
-        if (!dStr) return false;
-        try { return isSameDay(parse(dStr, 'dd/MM/yyyy', new Date()), day); } catch { return isSameDay(new Date(dStr), day); }
-      });
-      
-      const productionItems = (productionRecords || []).filter(record => {
-        if (!record.date) return false;
-        const rDate = record.date.toDate ? record.date.toDate() : new Date(record.date);
-        return isSameDay(rDate, day);
-      });
-      
-      const dayData: any = {
-        name: format(day, 'EEE', { locale: ptBR }),
-        fullDate: format(day, 'dd/MM/yyyy'),
-        totalPlan: 0, totalReal: 0
-      };
-
-      items.forEach(item => {
-        const req = item.requisicao || item['Requisição'] || 'S/N';
-        const rawHours = item.horasPlanejadas || item['Horas Máquina'];
-        const hours = typeof rawHours === 'string' ? parseFloat(rawHours.replace(',', '.')) : (Number(rawHours) || 0);
-        if (hours > 0) {
-            const key = `P_${req}`;
-            dayData[key] = (dayData[key] || 0) + hours;
-            dayData.totalPlan += hours;
-            reqSet.add(req);
-        }
-      });
-
-      productionItems.forEach(record => {
-        const req = record.formsNumber || 'S/N';
-        const hours = (Number(record.machiningTime) || 0) / 60;
-        if (hours > 0) {
-            const key = `R_${req}`;
-            dayData[key] = (dayData[key] || 0) + hours;
-            dayData.totalReal += hours;
-            reqSet.add(req);
-        }
-      });
-
-      return dayData;
-    });
-    return { weeklyChartData: chartData, uniqueRequisitions: Array.from(reqSet).sort() };
-  }, [calendarDays, planejamentoData, productionRecords]);
-
-  const handleDrop = async (e: React.DragEvent, day: Date, turnoId: string, tecnico?: string) => {
-    e.preventDefault();
-    const itemId = e.dataTransfer.getData('itemId');
-    if (!itemId || !database) return;
-    const newDateStr = format(day, 'dd/MM/yyyy');
-    try {
-      await update(ref(database, `/Planejamento S/${itemId}`), {
-        dataExecucao: newDateStr,
-        Turno: turnoId,
-        turno: turnoId,
-        ...(tecnico ? { tecnico } : {})
-      });
-      toast({ title: "Planejamento Movido", description: `Movido para ${newDateStr}` });
-    } catch (error) { toast({ title: "Erro ao mover", variant: "destructive" }); }
-  };
 
   const handleShiftClick = (day: Date, turnoId: string, tecnico?: string) => {
     setEditingId(null);
@@ -400,134 +466,104 @@ export default function ProgrammingPage() {
     } catch (error) { console.error(error); }
   }
 
-  const renderEvent = (item: PlanejamentoItem) => {
-    const rawHours = item.horasPlanejadas || item['Horas Máquina'];
-    const totalHours = typeof rawHours === 'string' ? parseFloat(rawHours.replace(',', '.')) : (Number(rawHours) || 0);
-    const firstType = item.atividades && item.atividades.length > 0 ? item.atividades[0].tipo : (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO');
-    const typeColor = lossOptions.find(o => o.value === (firstType || '').toUpperCase())?.color || '#ffffff';
-    
-    return (
-      <TooltipProvider key={item.id}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div 
-              draggable
-              onDragStart={(e) => e.dataTransfer.setData('itemId', item.id)}
-              onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}
-              className="mb-1 cursor-grab active:cursor-grabbing rounded border p-1.5 text-[10px] leading-tight shadow-sm transition-all flex flex-col gap-1 border-border bg-card hover:border-primary shrink-0 min-w-[80px] max-w-[120px]"
-              style={{ borderLeft: `3px solid ${typeColor}` }}
-            >
-              <div className="flex items-center justify-between gap-1 w-full">
-                <span className="font-bold text-primary truncate max-w-[70%]">{item.requisicao || item['Requisição']}</span>
-                <span className="bg-muted px-1 rounded-sm font-black text-[9px] shrink-0">{totalHours.toFixed(1)}h</span>
-              </div>
-              <div className="flex items-center gap-1 opacity-70"><span className="truncate">{item.nomeDaPeca || item['Nome da Peça']}</span></div>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent className="w-64 p-3" side="right">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-                <span className="text-muted-foreground">Equip:</span><span className="font-medium text-right">{item.equipamento || item.EQUIPAMENTO}</span>
-                <span className="text-muted-foreground">Site:</span><span className="font-medium text-right">{item.site || item.Site}</span>
-                <span className="text-muted-foreground">Total Planejado:</span><span className="font-medium text-right">{totalHours.toFixed(1)}h</span>
-                <span className="text-muted-foreground">Técnico:</span><span className="font-medium text-right truncate">{item.tecnico || item.Técnicos}</span>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  };
-
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Planejamento de Produção</h1>
-          <p className="text-muted-foreground">Gestão semanal detalhada por turnos e técnicos.</p>
+          <p className="text-muted-foreground">Visão detalhada de cronograma e execução (Gantt).</p>
         </div>
         <div className="flex items-center gap-2 bg-card p-1 rounded-lg border shadow-sm">
-          <Button variant="ghost" size="icon" onClick={prevWeek}><ChevronLeft className="h-4 w-4" /></Button>
-          <div className="min-w-[140px] text-center font-bold capitalize">{format(currentDate, 'MMMM yyyy', { locale: ptBR })}</div>
-          <Button variant="ghost" size="icon" onClick={nextWeek}><ChevronRight className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={prevDay}><ChevronLeft className="h-4 w-4" /></Button>
+          <div className="min-w-[160px] text-center font-bold flex items-center justify-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <span className="capitalize">{format(currentDate, 'dd/MM/yyyy', { locale: ptBR })}</span>
+          </div>
+          <Button variant="ghost" size="icon" onClick={nextDay}><ChevronRight className="h-4 w-4" /></Button>
           <Button variant="secondary" size="sm" onClick={goToToday}>Hoje</Button>
         </div>
       </div>
 
-      <Card className="border-none shadow-none bg-transparent">
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex h-[400px] items-center justify-center gap-2 bg-card rounded-lg border"><Loader className="h-8 w-8 animate-spin" /><span className="font-medium">Carregando...</span></div>
-          ) : (
-            <div className="grid grid-cols-7 gap-px bg-border overflow-hidden rounded-lg border shadow-lg">
-              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
-                <div key={day} className="bg-muted/50 p-3 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b">{day}</div>
-              ))}
-              {calendarDays.map((day) => {
+      <div className="space-y-12">
+        {loading ? (
+            <div className="flex h-[400px] items-center justify-center gap-2 bg-card rounded-lg border shadow-sm">
+                <Loader className="h-8 w-8 animate-spin" />
+                <span className="font-bold uppercase text-[10px] tracking-widest">Sincronizando Planejamento...</span>
+            </div>
+        ) : (
+            timelineDays.map((day, dIdx) => {
                 const dayItems = planejamentoData.filter(item => {
                     const dStr = item.dataExecucao || item['Data Execução'];
                     if (!dStr) return false;
                     try { return isSameDay(parse(dStr, 'dd/MM/yyyy', new Date()), day); } catch { return isSameDay(new Date(dStr), day); }
                 });
-                return (
-                  <div key={day.toString()} className={cn("min-h-[500px] bg-card p-0 flex flex-col border-r last:border-r-0", isToday(day) && "ring-1 ring-inset ring-primary z-10")}>
-                    <div className="flex items-center justify-between p-2 border-b bg-muted/20">
-                      <span className={cn("text-xs font-black w-6 h-6 flex items-center justify-center rounded-full", isToday(day) ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{format(day, 'd')}</span>
-                      <span className="text-[9px] text-muted-foreground font-bold uppercase">{format(day, 'MMM', { locale: ptBR })}</span>
-                    </div>
-                    <div className="flex-1 overflow-y-auto scrollbar-hide">
-                      {turnos.map(turno => {
-                        const techniciansInThisTurno = Array.from(new Set([...turno.technicians, ...dayItems.filter(item => String(item.Turno || item.turno || '1') === turno.id).map(item => item.tecnico || item.Técnicos || '')])).filter(Boolean);
-                        return (
-                          <div key={turno.id} className="border-b last:border-b-0">
-                            <div className={cn("px-2 py-1 text-[8px] font-black uppercase tracking-tighter border-b", turno.color)}>{turno.label}</div>
-                            <div className="p-1 space-y-2">
-                                {techniciansInThisTurno.map(tech => {
-                                   const itemsForTech = dayItems.filter(item => String(item.Turno || item.turno || '1') === turno.id && (item.tecnico === tech || item.Técnicos === tech));
-                                   const totalHoursForTech = itemsForTech.reduce((acc, item) => {
-                                      const raw = item.horasPlanejadas || item['Horas Máquina'];
-                                      return acc + (typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : (Number(raw) || 0));
-                                   }, 0);
-                                   return (
-                                     <div key={tech} className="bg-muted/10 rounded border border-dashed p-1.5 min-h-[40px] group/tech">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <div className="flex flex-col">
-                                                <div className="flex items-center gap-1"><UserIcon className="h-2 w-2 text-muted-foreground" /><span className="text-[8px] font-bold text-muted-foreground uppercase truncate max-w-[60px]">{tech.split(' ')[0]}</span></div>
-                                                {totalHoursForTech > 0 && <span className={cn("text-[7px] font-black px-1 rounded-sm w-fit", totalHoursForTech > 8 ? "bg-red-500/20 text-red-400" : "bg-primary/20 text-primary")}>TOTAL: {totalHoursForTech.toFixed(1)}h</span>}
-                                            </div>
-                                            <Button variant="ghost" size="icon" className="h-3 w-3 opacity-0 group-hover/tech:opacity-100 transition-opacity" onClick={() => handleShiftClick(day, turno.id, tech)}><Plus className="h-2 w-2" /></Button>
-                                        </div>
-                                        <div className="min-h-[10px] flex flex-row flex-wrap gap-1" onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleDrop(e, day, turno.id, tech)}>{itemsForTech.map(item => renderEvent(item))}</div>
-                                     </div>
-                                   );
-                                })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      <div className="mt-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Planejado vs Realizado por Requisição</CardTitle>
-            <CardDescription>Comparativo semanal de horas planejadas (Plan) e reais (Real) por dia.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {weeklyChartData.some(d => d.totalPlan > 0 || d.totalReal > 0) ? (
-              <ProgrammingComparisonChart data={weeklyChartData} uniqueRequisitions={uniqueRequisitions} />
-            ) : (
-              <div className="flex h-[300px] items-center justify-center text-muted-foreground text-sm italic">Nenhum dado para esta semana.</div>
-            )}
-          </CardContent>
-        </Card>
+                const totalPecas = dayItems.reduce((acc, curr) => acc + (Number(curr.quantidade || curr.Quantidade) || 0), 0);
+                const totalHoras = dayItems.reduce((acc, curr) => {
+                    const raw = curr.horasPlanejadas || curr['Horas Máquina'];
+                    return acc + (typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : (Number(raw) || 0));
+                }, 0);
+
+                return (
+                    <div key={day.toString()} className="rounded-xl border shadow-xl bg-card overflow-hidden">
+                        {/* Header do Dia (Estilo Imagem) */}
+                        <div className="bg-[#1e293b] text-white px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-baseline gap-4">
+                                <span className="text-2xl font-black uppercase tracking-tighter">DIA {format(day, 'dd · MM/yy')}</span>
+                                <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
+                            </div>
+                            <div className="flex items-center gap-8">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-slate-400 text-[10px] font-black uppercase">peças</span>
+                                    <span className="text-xl font-black">{totalPecas}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-slate-400 text-[10px] font-black uppercase">ocupação</span>
+                                    <span className="text-xl font-black">{totalHoras.toFixed(1)}h</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-slate-400 text-[10px] font-black uppercase">máq. ocupadas</span>
+                                    <span className="text-xl font-black">{totalHoras > 0 ? '100%' : '0%'}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Eixo de Tempo 0h - 8h */}
+                        <div className="flex bg-muted/20 border-b border-border/60">
+                           <div className="w-[260px] shrink-0" /> {/* Espaço das Labels */}
+                           <div className="flex-1 flex text-[9px] font-black text-muted-foreground/60 py-1 relative">
+                              {[0, 2, 4, 6, 8].map(h => (
+                                <div key={h} className="absolute h-4 border-l border-border" style={{ left: `${(h/8)*100}%` }}>
+                                    <span className="ml-1 leading-none">{h}h</span>
+                                </div>
+                              ))}
+                              <div className="h-4 w-full" />
+                           </div>
+                        </div>
+
+                        {/* Linhas de Turnos */}
+                        <div className="divide-y divide-border/30">
+                            {turnos.map(turno => (
+                                <ShiftTimelineRow 
+                                    key={turno.id}
+                                    label={turno.label}
+                                    range={turno.range}
+                                    items={dayItems.filter(item => String(item.Turno || item.turno || '1') === turno.id)}
+                                    techs={turno.technicians}
+                                    realData={productionRecords || []}
+                                    onItemClick={handleItemClick}
+                                    onAddClick={handleShiftClick}
+                                    day={day}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                );
+            })
+        )}
       </div>
 
+      {/* Diálogo de Edição / Novo */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}</DialogTitle></DialogHeader>
