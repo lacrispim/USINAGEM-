@@ -27,24 +27,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, useFieldArray, useWatch } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { 
   ChevronLeft, 
   ChevronRight, 
   Loader, 
   Plus,
-  Trash2,
-  Settings2,
-  Cpu,
-  CalendarDays,
   Wand2,
   Eraser,
+  CalendarDays,
 } from 'lucide-react';
 import { 
   format, 
@@ -58,7 +53,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 
-// --- Interfaces Baseadas no Código do Usuário ---
+// --- Interfaces ---
 interface PlanejamentoItem {
   id: string;
   dataExecucao: string;
@@ -68,37 +63,36 @@ interface PlanejamentoItem {
   nomeDaPeca: string;
   quantidadeTotal: number;
   quantidadeNoBloco: number;
-  horasPlanejadas: number; // Em horas (para compatibilidade)
-  tempoMinutos: number;    // Em minutos (para o motor)
+  horasPlanejadas: number; 
+  tempoMinutos: number;    
   setupMinutos: number;
   turno: string;
   perdaPlanejada?: string;
   site: string;
   observacao?: string;
-  startOffsetMin: number; // Offset dentro do turno (0-480)
+  startOffsetMin: number; 
 }
 
-// --- Configuração Oficial do Time ---
+// --- Escala Oficial do Time Técnico ---
 const TURNOS = [
   { id: '1', label: '1T', range: '06:00-14:00' },
   { id: '2', label: '2T', range: '14:00-22:00' },
   { id: '3', label: '3T', range: '22:00-06:00' },
 ];
 
-const EQUIPE: Record<string, Record<string, { name: string; role: string }>> = {
+const EQUIPE: Record<string, Record<string, { name: string; role: string }[]>> = {
   'TORNO': {
-    '1': { name: 'Marcos Barbosa', role: 'Téc. Prog./Op.' },
-    '2': { name: 'Jair Melo', role: 'Téc. Prog./Op.' },
-    '3': { name: 'Gustavo Gozzi', role: 'Téc. Prog./Op.' }
+    '1': [{ name: 'Marcos Barbosa', role: 'Téc. Prog./Op.' }, { name: 'Alisson França', role: 'Téc. Prog./Op.' }],
+    '2': [{ name: 'Jair Melo', role: 'Téc. Prog./Op.' }],
+    '3': [{ name: 'Gustavo Gozzi', role: 'Téc. Prog./Op.' }]
   },
   'CENTRO': {
-    '1': { name: 'Daniel Solivo', role: 'Téc. Operador' },
-    '2': { name: 'Nathan Xavier', role: 'Téc. Prog./Op.' },
-    '3': { name: 'Rodrigo Cantano', role: 'Téc. Prog./Op.' }
+    '1': [{ name: 'Daniel Solivo', role: 'Téc. Operador' }],
+    '2': [{ name: 'Nathan Xavier', role: 'Téc. Prog./Op.' }],
+    '3': [{ name: 'Rodrigo Cantano', role: 'Téc. Prog./Op.' }]
   },
   'ADM': {
-    '1': { name: 'William Martinucci', role: 'Programador ADM' },
-    '2': { name: 'Alisson França', role: 'Programador ADM' }
+    '1': [{ name: 'William Martinucci', role: 'Programador Centro' }]
   }
 };
 
@@ -123,7 +117,7 @@ const planningFormSchema = z.object({
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
-// --- Componentes Visuais (Estilo Industrial) ---
+// --- Componentes de UI ---
 
 const Ruler = () => {
   const marks = [];
@@ -142,11 +136,11 @@ const Ruler = () => {
 
 const TimelineBar = ({ item, realData, onClick }: { item: PlanejamentoItem, realData: any[], onClick: () => void }) => {
   const totalMin = (item.tempoMinutos || 0) + (item.setupMinutos || 0);
-  const widthPc = (totalMin / 480) * 100;
+  const widthPc = Math.max((totalMin / 480) * 100, 1.5);
   const leftPc = (item.startOffsetMin / 480) * 100;
   const setupPc = totalMin > 0 ? (item.setupMinutos / totalMin) * 100 : 0;
 
-  // Cálculo de progresso real do Firestore
+  // Cálculo de progresso real
   const realMinutes = realData
     .filter(r => String(r.formsNumber) === String(item.requisicao))
     .reduce((acc, curr) => acc + (Number(curr.machiningTime) || 0), 0);
@@ -161,9 +155,10 @@ const TimelineBar = ({ item, realData, onClick }: { item: PlanejamentoItem, real
       onClick={onClick}
       className={cn(
         "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden cursor-pointer border border-black/20 flex shadow-sm hover:-translate-y-0.5 transition-all z-10",
-        isProg ? "bg-[#5B36A8]" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")
+        isProg ? "bg-[#333333]" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")
       )}
-      style={{ left: `${leftPc}%`, width: `${widthPc}%`, minWidth: '4px' }}
+      style={{ left: `${leftPc}%`, width: `${widthPc}%` }}
+      title={`${item.requisicao} - ${item.nomeDaPeca}`}
     >
       {item.setupMinutos > 0 && (
         <div 
@@ -172,17 +167,13 @@ const TimelineBar = ({ item, realData, onClick }: { item: PlanejamentoItem, real
             width: `${setupPc}%`,
             background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #3A2E00 5px 10px)' 
           }} 
-          title={`Setup: ${item.setupMinutos}min`}
         />
       )}
-
       <div className="flex-1 flex items-center gap-2 px-2 min-w-0 text-white overflow-hidden">
         <span className="font-mono text-[11px] font-bold shrink-0">{item.requisicao}</span>
-        <span className="font-mono text-[10px] opacity-80 shrink-0">{item.quantidadeNoBloco > 0 ? `${Math.floor(item.quantidadeNoBloco)} pç` : (item.setupMinutos > 0 ? 'setup' : 'curso')}</span>
+        <span className="font-mono text-[10px] opacity-80 shrink-0">{item.quantidadeNoBloco > 0 ? `${Math.floor(item.quantidadeNoBloco)}pç` : (item.setupMinutos > 0 && item.tempoMinutos === 0 ? 'setup' : 'curso')}</span>
         <span className="text-[10px] opacity-90 truncate uppercase font-medium">{item.nomeDaPeca}</span>
       </div>
-
-      {/* Linha de progresso real na base */}
       <div className="absolute bottom-0 left-0 h-[2px] bg-black/20 w-full">
         <div className="h-full bg-white opacity-60" style={{ width: `${progress}%` }} />
       </div>
@@ -200,7 +191,6 @@ export default function ProgrammingPage() {
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
-  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -208,7 +198,7 @@ export default function ProgrammingPage() {
 
   const productionQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'productionRecords'), where('date', '>=', startOfDay(currentDate)), where('date', '<=', endOfDay(addDays(currentDate, 3))));
+    return query(collection(firestore, 'productionRecords'), where('date', '>=', startOfDay(currentDate)), where('date', '<=', endOfDay(addDays(currentDate, 5))));
   }, [firestore, currentDate]);
 
   const { data: productionRecords } = useCollection(productionQuery);
@@ -218,7 +208,7 @@ export default function ProgrammingPage() {
     defaultValues: {
       dataExecucao: '', equipamento: '', requisicao: '', nomeDaPeca: '',
       quantidadeTotal: 0, quantidadeNoBloco: 0, tecnico: '', tempoMinutos: 0, setupMinutos: 0,
-      turno: '1', site: 'VALINHOS DOVE', observacao: '',
+      turno: '1', site: 'VALINHOS DOVE',
     },
   });
 
@@ -235,13 +225,14 @@ export default function ProgrammingPage() {
     return () => unsubscribe();
   }, [database]);
 
-  const handleShiftClick = (day: Date, turnoId: string, tech: string, techInfo: any) => {
+  const handleShiftClick = (day: Date, turnoId: string, tech: string, techName: string) => {
     setEditingId(null);
     form.reset({
       dataExecucao: format(day, 'dd/MM/yyyy'),
-      turno: turnoId, equipamento: tech === 'TORNO' ? 'TORNO CNC CENTUR 30' : 'CENTRO DE USINAGEM D600',
+      turno: turnoId, 
+      equipamento: tech === 'TORNO' ? 'TORNO CNC CENTUR 30' : (tech === 'CENTRO' ? 'CENTRO DE USINAGEM D600' : 'PROGRAMACAO'),
       requisicao: '', nomeDaPeca: '', quantidadeTotal: 0, quantidadeNoBloco: 0,
-      tecnico: techInfo.name, tempoMinutos: 0, setupMinutos: 0, site: 'VALINHOS DOVE'
+      tecnico: techName, tempoMinutos: 0, setupMinutos: 0, site: 'VALINHOS DOVE'
     });
     setIsDialogOpen(true);
   };
@@ -272,7 +263,6 @@ export default function ProgrammingPage() {
     } catch (e) { console.error(e); }
   }
 
-  // --- MOTOR DE PLANEJAMENTO INDUSTRIAL (LOGICA DO USUARIO) ---
   const handleImportAndPlan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !database) return;
@@ -284,8 +274,9 @@ export default function ProgrammingPage() {
         const workbook = XLSX.read(event.target?.result, { type: 'binary' });
         const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
-        const S = 480; // 8 horas
-        let pointers: Record<string, number> = { 'TORNO': 0, 'CENTRO': 0, 'ADM': 0 };
+        const S = 480; 
+        // Pointers por TÉCNICO para evitar amontoamento
+        let techPointers: Record<string, number> = {};
         const updates: any = {};
 
         const findVal = (row: any, keys: string[]) => {
@@ -303,78 +294,94 @@ export default function ProgrammingPage() {
           const progTotal = Number(findVal(row, ['prog', 'programacao']) || 0);
           const site = String(findVal(row, ['site', 'fabrica']) || 'VALINHOS DOVE');
 
-          // 1. Programação ADM
+          // 1. Programação ADM (William)
           if (progTotal > 0) {
-             const tech = pointers['ADM'] >= S ? '2' : '1';
-             const start = pointers['ADM'] % S;
+             const techName = EQUIPE['ADM']['1'][0].name;
+             if (!techPointers[techName]) techPointers[techName] = 0;
+             
+             const start = techPointers[techName] % S;
              const time = Math.min(progTotal, S - start);
              const newRef = push(ref(database, '/Planejamento_V2'));
              updates[newRef.key!] = {
                 dataExecucao: format(currentDate, 'dd/MM/yyyy'), turno: '1', 
-                tecnico: EQUIPE['ADM'][tech].name, equipamento: 'PROGRAMACAO',
+                tecnico: techName, equipamento: 'PROGRAMACAO',
                 requisicao: req, nomeDaPeca: peca, quantidadeTotal: qtdTotal, quantidadeNoBloco: 0,
                 tempoMinutos: time, setupMinutos: 0, site, startOffsetMin: start, perdaPlanejada: 'PROGRAMACAO'
              };
-             pointers['ADM'] += time;
+             techPointers[techName] += time;
           }
 
-          // 2. Usinagem (Motor de Ciclo)
-          const technologies = [];
-          if (tornoTotal > 0) technologies.push({ type: 'TORNO', total: tornoTotal, equip: 'TORNO CNC CENTUR 30' });
-          if (centroTotal > 0) technologies.push({ type: 'CENTRO', total: centroTotal, equip: 'CENTRO DE USINAGEM D600' });
+          // 2. Usinagem
+          const tasks = [];
+          if (tornoTotal > 0) tasks.push({ type: 'TORNO', total: tornoTotal, equip: 'TORNO CNC CENTUR 30' });
+          if (centroTotal > 0) tasks.push({ type: 'CENTRO', total: centroTotal, equip: 'CENTRO DE USINAGEM D600' });
 
-          technologies.forEach(tech => {
+          tasks.forEach(task => {
             let pendingSetup = setupTotal;
             let doneTime = 0;
-            const cycle = tech.total / qtdTotal;
+            const cycle = task.total / qtdTotal;
 
-            while (pendingSetup > 0.1 || doneTime < tech.total - 0.1) {
-              const currentTotal = pointers[tech.type];
-              const shiftIdx = Math.floor(currentTotal / S);
+            // Determinar técnicos do 1T para distribuir
+            const techs1T = EQUIPE[task.type]['1'];
+            
+            while (pendingSetup > 0.1 || doneTime < task.total - 0.1) {
+              // Lógica de escolha de técnico e turno
+              // Simplificação: Encontra o técnico com menor carga no turno atual
+              const currentGlobalMin = Math.min(...techs1T.map(t => techPointers[t.name] || 0));
+              const shiftIdx = Math.floor(currentGlobalMin / S);
               const dayOffset = Math.floor(shiftIdx / 3);
               const turnoNum = (shiftIdx % 3) + 1;
-              const startOffset = currentTotal % S;
-              const avail = S - startOffset;
-              const tecnico = EQUIPE[tech.type][String(turnoNum)].name;
-
-              let timeUsed = 0;
-              let setupInShift = 0;
-              let prodInShift = 0;
-              let piecesInShift = 0;
-
-              if (pendingSetup > 0.1) {
-                setupInShift = Math.min(pendingSetup, avail);
-                pendingSetup -= setupInShift;
-                timeUsed += setupInShift;
+              
+              // Se for 1T Torno, alterna entre Marcos e Alisson
+              let chosenTech;
+              if (task.type === 'TORNO' && turnoNum === 1) {
+                chosenTech = (techPointers[techs1T[0].name] || 0) <= (techPointers[techs1T[1].name] || 0) ? techs1T[0] : techs1T[1];
+              } else {
+                chosenTech = EQUIPE[task.type][String(turnoNum)][0];
               }
 
-              const remaining = avail - timeUsed;
-              if (remaining > 0.1 && doneTime < tech.total - 0.1) {
-                prodInShift = Math.min(remaining, tech.total - doneTime);
-                const before = Math.floor(doneTime / cycle + 0.001);
-                doneTime += prodInShift;
-                const after = Math.min(qtdTotal, Math.floor(doneTime / cycle + 0.001));
-                piecesInShift = after - before;
-                timeUsed += prodInShift;
+              if (!techPointers[chosenTech.name]) techPointers[chosenTech.name] = 0;
+              const startOffset = techPointers[chosenTech.name] % S;
+              const avail = S - startOffset;
+
+              let timeUsed = 0;
+              let sInShift = 0;
+              let pInShift = 0;
+              let qInShift = 0;
+
+              if (pendingSetup > 0.1) {
+                sInShift = Math.min(pendingSetup, avail);
+                pendingSetup -= sInShift;
+                timeUsed += sInShift;
+              }
+
+              const rem = avail - timeUsed;
+              if (rem > 0.1 && doneTime < task.total - 0.1) {
+                pInShift = Math.min(rem, task.total - doneTime);
+                const b4 = Math.floor(doneTime / cycle + 0.001);
+                doneTime += pInShift;
+                const aft = Math.min(qtdTotal, Math.floor(doneTime / cycle + 0.001));
+                qInShift = aft - b4;
+                timeUsed += pInShift;
               }
 
               const newRef = push(ref(database, '/Planejamento_V2'));
               updates[newRef.key!] = {
                 dataExecucao: format(addDays(currentDate, dayOffset), 'dd/MM/yyyy'),
-                turno: String(turnoNum), tecnico, equipamento: tech.equip,
-                requisicao: req, nomeDaPeca: peca, quantidadeTotal: qtdTotal, quantidadeNoBloco: piecesInShift,
-                tempoMinutos: prodInShift, setupMinutos: setupInShift, site, startOffsetMin: startOffset
+                turno: String(turnoNum), tecnico: chosenTech.name, equipamento: task.equip,
+                requisicao: req, nomeDaPeca: peca, quantidadeTotal: qtdTotal, quantidadeNoBloco: qInShift,
+                tempoMinutos: pInShift, setupMinutos: sInShift, site, startOffsetMin: startOffset
               };
 
-              pointers[tech.type] += timeUsed;
-              if (dayOffset > 5) break; // Segurança contra loops
+              techPointers[chosenTech.name] += timeUsed;
+              if (dayOffset > 7) break; 
             }
           });
         });
 
         await set(ref(database, '/Planejamento_V2'), updates);
-        toast({ title: "Planejamento Concluído", description: "Carga distribuída nas raias." });
-      } catch (err) { console.error(err); toast({ title: "Erro", variant: "destructive" }); }
+        toast({ title: "Planejamento Concluído" });
+      } catch (err) { console.error(err); }
       finally { setIsImporting(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
     };
     reader.readAsBinaryString(file);
@@ -385,7 +392,7 @@ export default function ProgrammingPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold tracking-tight text-[#101820] font-['Barlow_Condensed'] uppercase">PLANO DE CARGA CNC</h1>
-          <p className="text-[11px] tracking-[0.22em] text-[#8FA3B2] uppercase font-bold">Time Técnico de Usinagem · Torno & Centro · 3 Turnos</p>
+          <p className="text-[11px] tracking-[0.22em] text-[#8FA3B2] uppercase font-bold">Time Técnico de Usinagem · 3 Turnos</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
@@ -440,20 +447,17 @@ export default function ProgrammingPage() {
                                     </div>
                                     <div className="p-3 bg-white">
                                         <Ruler />
-                                        <div className="space-y-1.5">
+                                        <div className="space-y-2">
                                           {['TORNO', 'CENTRO', 'ADM'].map((cat) => {
-                                            const techGroup = EQUIPE[cat];
-                                            return Object.keys(techGroup).map(subIdx => {
-                                                const techInfo = techGroup[subIdx];
-                                                if (cat === 'ADM' && turno.id !== '1') return null; // ADM só no 1T
-                                                
+                                            const shiftTechs = EQUIPE[cat][turno.id] || [];
+                                            return shiftTechs.map(techInfo => {
                                                 const techItems = dayItems.filter(i => i.tecnico === techInfo.name && i.turno === turno.id);
-                                                const label = cat === 'TORNO' ? '▬ Torno' : (cat === 'CENTRO' ? '▣ Centro' : '▣ ADM');
-
                                                 return (
                                                     <div key={techInfo.name} className="grid grid-cols-[150px_1fr] items-center group">
                                                         <div className="pr-2 min-w-0">
-                                                            <div className={cn("text-[9px] font-mono font-bold uppercase", cat === 'TORNO' ? "text-[#00707F]" : "text-[#5B36A8]")}>{label}</div>
+                                                            <div className={cn("text-[9px] font-mono font-bold uppercase", cat === 'TORNO' ? "text-[#00707F]" : (cat === 'CENTRO' ? "text-[#5B36A8]" : "text-[#333333]"))}>
+                                                                {cat === 'TORNO' ? '▬ Torno' : (cat === 'CENTRO' ? '▣ Centro' : '▣ Programação')}
+                                                            </div>
                                                             <div className="text-[12px] font-bold text-[#0F151B] truncate">{techInfo.name}</div>
                                                             <div className="text-[9px] text-[#6C7C8B] leading-none">{techInfo.role}</div>
                                                         </div>
@@ -464,7 +468,7 @@ export default function ProgrammingPage() {
                                                             {techItems.map(item => (
                                                                 <TimelineBar key={item.id} item={item} realData={productionRecords || []} onClick={() => handleItemClick(item)} />
                                                             ))}
-                                                            <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-full w-8 opacity-0 group-hover:opacity-100 transition-opacity text-[#6C7C8B]" onClick={() => handleShiftClick(day, turno.id, cat, techInfo)}>
+                                                            <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-full w-8 opacity-0 group-hover:opacity-100 transition-opacity text-[#6C7C8B]" onClick={() => handleShiftClick(day, turno.id, cat, techInfo.name)}>
                                                                 <Plus className="h-3 w-3" />
                                                             </Button>
                                                         </div>
@@ -485,7 +489,7 @@ export default function ProgrammingPage() {
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-xl font-['IBM_Plex_Sans']">
-          <DialogHeader><DialogTitle className="font-['Barlow_Condensed'] text-2xl uppercase">{editingId ? 'Editar Bloco' : 'Novo Bloco de Planejamento'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-['Barlow_Condensed'] text-2xl uppercase">Bloco de Planejamento</DialogTitle></DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -493,19 +497,19 @@ export default function ProgrammingPage() {
                 <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Nome da Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <FormField control={form.control} name="quantidadeNoBloco" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Qtd no Turno</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="quantidadeNoBloco" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Qtd no Bloco</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="setupMinutos" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Setup (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="tempoMinutos" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Usinagem (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Técnico Responsável</FormLabel><Input disabled {...field} /></FormItem>)} />
+                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Técnico</FormLabel><Input disabled {...field} /></FormItem>)} />
                 <FormField control={form.control} name="site" render={({ field }) => (
-                    <FormItem><FormLabel className="text-[10px] uppercase font-bold">Fábrica / Site</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="font-bold"><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
+                    <FormItem><FormLabel className="text-[10px] uppercase font-bold">Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="font-bold"><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
                 )} />
               </div>
               <DialogFooter>
                 {editingId && (<Button type="button" variant="destructive" onClick={async () => { if (!database || !editingId) return; await remove(ref(database, `/Planejamento_V2/${editingId}`)); setIsDialogOpen(false); }}>Excluir</Button>)}
-                <Button type="submit" className="bg-[#101820] text-[#F0BC00] uppercase font-bold text-xs">Salvar Alterações</Button>
+                <Button type="submit" className="bg-[#101820] text-[#F0BC00] uppercase font-bold text-xs">Salvar</Button>
               </DialogFooter>
             </form>
           </Form>
