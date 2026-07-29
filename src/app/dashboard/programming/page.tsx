@@ -46,7 +46,8 @@ import {
   CalendarDays,
   FileUp,
   Info,
-  Wand2
+  Wand2,
+  Eraser
 } from 'lucide-react';
 import { 
   format, 
@@ -111,7 +112,7 @@ const factoryList = [
     "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"
 ];
 
-// Mapeamento de quem opera o quê em cada turno (Escala Padrão Industrial)
+// Mapeamento de quem opera o quê em cada turno (Escala Oficial)
 const ESCALA_TECNICA: Record<string, Record<string, string>> = {
   'TORNO': { '1': 'Marcos Barbosa', '2': 'Jair Melo', '3': 'Gustavo Gozzi' },
   'CENTRO': { '1': 'Daniel Solivo', '2': 'Nathan Xavier', '3': 'Rodrigo Cantano' }
@@ -178,6 +179,7 @@ const TimelineBar = ({ item, realData, onClick, shiftMin }: { item: Planejamento
   const machineType = item.equipamento || item.EQUIPAMENTO || '';
   const isTorno = machineType.includes('TORNO');
 
+  // Largura baseada em 8h (480 min)
   const widthPc = (hours / 8) * 100;
 
   return (
@@ -316,7 +318,7 @@ export default function ProgrammingPage() {
         const tempo = typeof tempoRaw === 'string' ? parseFloat(tempoRaw.replace(',', '.')) : (Number(tempoRaw) || 0);
         const tipo = (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase() || 'PRODUCAO';
         initialAtividades = [{
-          tipo: tipo.includes('PRODUCAO') ? 'PRODUCAO' : tipo,
+          tipo: tipo.includes('PRODUCAO') ? 'PRODUCAO' : (tipo.includes('SETUP') ? 'SETUP' : tipo),
           tempo: tempo,
           site: item.site || item.Site || 'VALINHOS DOVE'
         }];
@@ -335,6 +337,14 @@ export default function ProgrammingPage() {
       atividades: initialAtividades,
     });
     setIsDialogOpen(true);
+  };
+
+  const clearAllPlanning = async () => {
+    if (!database) return;
+    if (confirm("Isso apagará TODO o planejamento atual. Deseja continuar?")) {
+        await set(ref(database, '/Planejamento S'), null);
+        toast({ title: "Planejamento Limpo" });
+    }
   };
 
   async function onSubmit(values: PlanningFormValues) {
@@ -357,7 +367,7 @@ export default function ProgrammingPage() {
     } catch (error) { console.error(error); }
   }
 
-  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO ---
+  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO REFINADO ---
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !database) return;
@@ -378,82 +388,92 @@ export default function ProgrammingPage() {
         }
 
         const SHIFT_CAPACITY_MIN = 480;
-        const SHIFT_CAPACITY_H = 8;
-        
-        // Ponteiros de tempo por tecnologia (minutos acumulados a partir do início)
         let pointers = { 'TORNO': 0, 'CENTRO': 0 };
         const updates: any = {};
 
+        // Helper para detectar colunas independente do nome exato
+        const findVal = (row: any, keys: string[]) => {
+            const foundKey = Object.keys(row).find(k => keys.some(search => k.toLowerCase().includes(search.toLowerCase())));
+            return foundKey ? row[foundKey] : undefined;
+        };
+
         json.forEach((row) => {
-          const rawJob = {
-            req: String(row['Requisição'] || row['Req.'] || row['Forms'] || ''),
-            peca: row['Peça'] || row['Nome da Peça'] || 'SEM DESCRIÇÃO',
-            qtd: Number(row['Quantidade'] || row['Qtd'] || 0),
-            setup: Number(row['Setup'] || 0),
-            torno: Number(row['Torno'] || 0),
-            centro: Number(row['Centro'] || 0),
-            site: row['Site'] || row['Fábrica'] || 'VALINHOS DOVE'
-          };
+          const req = String(findVal(row, ['req', 'forms', 'requisicao']) || '');
+          const peca = String(findVal(row, ['peca', 'nome', 'desc']) || 'SEM DESCRIÇÃO');
+          const qtd = Number(findVal(row, ['qtd', 'quantidade']) || 0);
+          const setup = Number(findVal(row, ['setup']) || 0);
+          const torno = Number(findVal(row, ['torno', 'minutos torno']) || 0);
+          const centro = Number(findVal(row, ['centro', 'minutos centro']) || 0);
+          const site = String(findVal(row, ['site', 'fabrica']) || 'VALINHOS DOVE');
 
-          const machines = [];
-          if (rawJob.torno > 0) machines.push('TORNO');
-          if (rawJob.centro > 0) machines.push('CENTRO');
+          const technologies = [];
+          if (torno > 0) technologies.push({ type: 'TORNO', usinagem: torno });
+          if (centro > 0) technologies.push({ type: 'CENTRO', usinagem: centro });
 
-          machines.forEach(mType => {
-            let pendingTime = rawJob.setup + (mType === 'TORNO' ? rawJob.torno : rawJob.centro);
-            
-            // Enquanto houver tempo para alocar (quebra em turnos se necessário)
+          technologies.forEach(tech => {
+            // Tempo Total = Setup + Usinagem
+            let pendingTime = setup + tech.usinagem;
+            let isFirstBlock = true;
+
             while (pendingTime > 0) {
-              const currentMin = pointers[mType as keyof typeof pointers];
+              const currentMin = pointers[tech.type as keyof typeof pointers];
               const shiftIdx = Math.floor(currentMin / SHIFT_CAPACITY_MIN);
-              const remainingInShift = SHIFT_CAPACITY_MIN - (currentMin % SHIFT_CAPACITY_MIN);
+              const minInCurrentShift = currentMin % SHIFT_CAPACITY_MIN;
+              const remainingInShift = SHIFT_CAPACITY_MIN - minInCurrentShift;
               
               const timeToAllocate = Math.min(pendingTime, remainingInShift);
-              const hoursToAllocate = timeToAllocate / 60;
+              if (timeToAllocate <= 0) {
+                  pointers[tech.type as keyof typeof pointers] += remainingInShift;
+                  continue;
+              }
 
-              // Determinar Dia e Turno
+              const hoursToAllocate = timeToAllocate / 60;
               const dayOffset = Math.floor(shiftIdx / 3);
               const turnoNum = (shiftIdx % 3) + 1;
               const targetDate = addDays(currentDate, dayOffset);
-              
-              // Pegar técnico da escala
-              const tecnico = ESCALA_TECNICA[mType][String(turnoNum)];
+              const tecnico = ESCALA_TECNICA[tech.type][String(turnoNum)];
 
               const newRef = push(ref(database, '/Planejamento S'));
               const id = newRef.key;
               
               if (id) {
+                const isSetupOnly = isFirstBlock && setup >= timeToAllocate;
+                const hasSetup = isFirstBlock && setup > 0;
+
                 updates[id] = {
                   dataExecucao: format(targetDate, 'dd/MM/yyyy'),
                   turno: String(turnoNum),
                   tecnico: tecnico,
-                  equipamento: mType === 'TORNO' ? 'TORNO CNC CENTUR 30' : 'CENTRO DE USINAGEM D600',
-                  requisicao: rawJob.req,
-                  nomeDaPeca: rawJob.peca,
-                  quantidade: rawJob.qtd,
+                  equipamento: tech.type === 'TORNO' ? 'TORNO CNC CENTUR 30' : 'CENTRO DE USINAGEM D600',
+                  requisicao: req,
+                  nomeDaPeca: peca,
+                  quantidade: qtd,
                   horasPlanejadas: hoursToAllocate,
-                  site: rawJob.site,
+                  site: site,
+                  perdaPlanejada: hasSetup ? 'SETUP' : 'PRODUCAO',
                   atividades: [{
-                    tipo: rawJob.setup > 0 && pendingTime > (mType === 'TORNO' ? rawJob.torno : rawJob.centro) ? 'SETUP' : 'PRODUCAO',
+                    tipo: hasSetup ? 'SETUP' : 'PRODUCAO',
                     tempo: hoursToAllocate,
-                    site: rawJob.site
+                    site: site
                   }]
                 };
               }
 
-              pointers[mType as keyof typeof pointers] += timeToAllocate;
+              pointers[tech.type as keyof typeof pointers] += timeToAllocate;
               pendingTime -= timeToAllocate;
+              isFirstBlock = false;
             }
           });
         });
 
         await update(ref(database, '/Planejamento S'), updates);
-        toast({ title: "Planejamento Automático Concluído", description: "As requisições foram distribuídas conforme a capacidade." });
+        toast({ title: "Planejamento Automático Concluído", description: `${Object.keys(updates).length} blocos alocados na timeline.` });
       } catch (error) {
         console.error(error);
         toast({ title: "Erro no Planejamento", variant: "destructive" });
       } finally {
         setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
     reader.readAsBinaryString(file);
@@ -468,6 +488,16 @@ export default function ProgrammingPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="bg-destructive/10 border-destructive/20 text-destructive font-bold uppercase text-[10px] tracking-widest hover:bg-destructive hover:text-white transition-colors"
+            onClick={clearAllPlanning}
+          >
+            <Eraser className="h-4 w-4 mr-2" />
+            Limpar Plano
+          </Button>
+
           <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx, .xls, .csv" className="hidden" />
           <Button 
             variant="outline" 
@@ -537,15 +567,15 @@ export default function ProgrammingPage() {
                                     <div className="p-3 bg-white">
                                         <Ruler shiftMin={480} />
                                         <div className="space-y-1.5">
-                                          {turno.technicians.map((tech, idx) => {
+                                          {turno.technicians.map((tech) => {
                                             const techItems = dayItems.filter(item => (item.tecnico === tech || item.Técnicos === tech) && String(item.Turno || item.turno || '1') === turno.id);
-                                            const isTorno = tech === "Marcos Barbosa" || tech === "Jair Melo" || tech === "Gustavo Gozzi";
+                                            const isTornoTech = tech === "Marcos Barbosa" || tech === "Jair Melo" || tech === "Gustavo Gozzi";
                                             
                                             return (
                                               <div key={tech} className="grid grid-cols-[150px_1fr] items-center group">
                                                 <div className="pr-2 min-w-0">
-                                                  <div className={cn("text-[9px] font-mono font-bold uppercase tracking-widest", isTorno ? "text-[#00707F]" : "text-[#5B36A8]")}>
-                                                    {isTorno ? '▬ Torno' : '▣ Centro'}
+                                                  <div className={cn("text-[9px] font-mono font-bold uppercase tracking-widest", isTornoTech ? "text-[#00707F]" : "text-[#5B36A8]")}>
+                                                    {isTornoTech ? '▬ Torno' : '▣ Centro'}
                                                   </div>
                                                   <div className="text-[12px] font-bold text-[#0F151B] truncate">{tech}</div>
                                                   <div className="text-[9px] text-[#6C7C8B] leading-none">Téc. Prog./Op.</div>
