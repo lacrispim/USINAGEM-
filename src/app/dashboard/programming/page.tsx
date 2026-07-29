@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useDatabase, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { ref, onValue, push, set, update, remove } from 'firebase/database';
+import { ref, onValue, set, push } from 'firebase/database';
 import { collection, query, where } from 'firebase/firestore';
 import {
   Dialog,
@@ -36,10 +36,11 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Loader, 
-  Plus,
   Wand2,
   Eraser,
   CalendarDays,
+  Clock,
+  Settings2
 } from 'lucide-react';
 import { 
   format, 
@@ -63,17 +64,15 @@ interface PlanejamentoItem {
   nomeDaPeca: string;
   quantidadeTotal: number;
   quantidadeNoBloco: number;
-  horasPlanejadas: number; 
   tempoMinutos: number;    
   setupMinutos: number;
   turno: string;
-  perdaPlanejada?: string;
   site: string;
-  observacao?: string;
   startOffsetMin: number; 
+  tipoAtividade: 'USINAGEM' | 'PROGRAMACAO' | 'SETUP';
 }
 
-// --- Escala Oficial do Time Técnico ---
+// --- Escala Técnica Oficial ---
 const TURNOS = [
   { id: '1', label: '1T', range: '06:00-14:00' },
   { id: '2', label: '2T', range: '14:00-22:00' },
@@ -98,25 +97,6 @@ const EQUIPE: Record<string, Record<string, { name: string; role: string }[]>> =
 
 const factoryList = ["VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
 
-// --- Form Schema ---
-const planningFormSchema = z.object({
-  dataExecucao: z.string(),
-  equipamento: z.string(),
-  requisicao: z.string(),
-  nomeDaPeca: z.string(),
-  quantidadeTotal: z.coerce.number(),
-  quantidadeNoBloco: z.coerce.number(),
-  tecnico: z.string(),
-  tempoMinutos: z.coerce.number(),
-  setupMinutos: z.coerce.number(),
-  turno: z.string(),
-  site: z.string(),
-  perdaPlanejada: z.string().optional(),
-  observacao: z.string().optional(),
-});
-
-type PlanningFormValues = z.infer<typeof planningFormSchema>;
-
 // --- Componentes de UI ---
 
 const Ruler = () => {
@@ -131,30 +111,29 @@ const Ruler = () => {
       </div>
     );
   }
-  return <div className="relative h-[18px] ml-[150px] border-b border-[#CBD5DD] mb-1">{marks}</div>;
+  return <div className="relative h-[18px] ml-[155px] border-b border-[#CBD5DD] mb-1">{marks}</div>;
 };
 
-const TimelineBar = ({ item, realData, onClick }: { item: PlanejamentoItem, realData: any[], onClick: () => void }) => {
+const TimelineBar = ({ item, realData }: { item: PlanejamentoItem, realData: any[] }) => {
   const totalMin = (item.tempoMinutos || 0) + (item.setupMinutos || 0);
   const widthPc = Math.max((totalMin / 480) * 100, 1.5);
   const leftPc = (item.startOffsetMin / 480) * 100;
   const setupPc = totalMin > 0 ? (item.setupMinutos / totalMin) * 100 : 0;
 
-  // Cálculo de progresso real
+  // Cálculo de progresso real baseado em registros de produção
   const realMinutes = realData
     .filter(r => String(r.formsNumber) === String(item.requisicao))
     .reduce((acc, curr) => acc + (Number(curr.machiningTime) || 0), 0);
   
-  const progress = item.tempoMinutos > 0 ? Math.min((realMinutes / item.tempoMinutos) * 100, 100) : 0;
+  const progress = item.tempoMinutos > 0 ? Math.min((realMinutes / (item.tempoMinutos * (item.quantidadeTotal / item.quantidadeNoBloco || 1))) * 100, 100) : 0;
 
   const isTorno = item.equipamento.includes('TORNO');
-  const isProg = item.perdaPlanejada === 'PROGRAMACAO';
+  const isProg = item.tipoAtividade === 'PROGRAMACAO';
 
   return (
     <div 
-      onClick={onClick}
       className={cn(
-        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden cursor-pointer border border-black/20 flex shadow-sm hover:-translate-y-0.5 transition-all z-10",
+        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/20 flex shadow-sm hover:scale-[1.01] transition-all z-10",
         isProg ? "bg-[#333333]" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")
       )}
       style={{ left: `${leftPc}%`, width: `${widthPc}%` }}
@@ -165,17 +144,21 @@ const TimelineBar = ({ item, realData, onClick }: { item: PlanejamentoItem, real
           className="h-full shrink-0" 
           style={{ 
             width: `${setupPc}%`,
-            background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #3A2E00 5px 10px)' 
+            background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #101820 5px 10px)' 
           }} 
+          title={`Setup: ${item.setupMinutos}min`}
         />
       )}
       <div className="flex-1 flex items-center gap-2 px-2 min-w-0 text-white overflow-hidden">
         <span className="font-mono text-[11px] font-bold shrink-0">{item.requisicao}</span>
-        <span className="font-mono text-[10px] opacity-80 shrink-0">{item.quantidadeNoBloco > 0 ? `${Math.floor(item.quantidadeNoBloco)}pç` : (item.setupMinutos > 0 && item.tempoMinutos === 0 ? 'setup' : 'curso')}</span>
-        <span className="text-[10px] opacity-90 truncate uppercase font-medium">{item.nomeDaPeca}</span>
+        <span className="font-mono text-[10px] opacity-90 shrink-0 font-bold">
+            {item.quantidadeNoBloco > 0 ? `${Math.floor(item.quantidadeNoBloco)}pç` : (item.setupMinutos > 0 && item.tempoMinutos === 0 ? 'SETUP' : 'CURSO')}
+        </span>
+        <span className="text-[10px] opacity-80 truncate uppercase font-medium">{item.nomeDaPeca}</span>
       </div>
-      <div className="absolute bottom-0 left-0 h-[2px] bg-black/20 w-full">
-        <div className="h-full bg-white opacity-60" style={{ width: `${progress}%` }} />
+      {/* Barra de Progresso Real na base */}
+      <div className="absolute bottom-0 left-0 h-[2px] bg-black/30 w-full">
+        <div className="h-full bg-white opacity-80" style={{ width: `${progress}%` }} />
       </div>
     </div>
   );
@@ -191,26 +174,16 @@ export default function ProgrammingPage() {
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
 
   const timelineDays = useMemo(() => [currentDate, addDays(currentDate, 1), addDays(currentDate, 2)], [currentDate]);
 
+  // Busca dados reais de produção para mostrar o progresso nas barras
   const productionQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'productionRecords'), where('date', '>=', startOfDay(currentDate)), where('date', '<=', endOfDay(addDays(currentDate, 5))));
+    return query(collection(firestore, 'productionRecords'), where('date', '>=', startOfDay(currentDate)), where('date', '<=', endOfDays(addDays(currentDate, 5))));
   }, [firestore, currentDate]);
 
   const { data: productionRecords } = useCollection(productionQuery);
-
-  const form = useForm<PlanningFormValues>({
-    resolver: zodResolver(planningFormSchema),
-    defaultValues: {
-      dataExecucao: '', equipamento: '', requisicao: '', nomeDaPeca: '',
-      quantidadeTotal: 0, quantidadeNoBloco: 0, tecnico: '', tempoMinutos: 0, setupMinutos: 0,
-      turno: '1', site: 'VALINHOS DOVE',
-    },
-  });
 
   useEffect(() => {
     if (!database) { setLoading(false); return; }
@@ -225,43 +198,11 @@ export default function ProgrammingPage() {
     return () => unsubscribe();
   }, [database]);
 
-  const handleShiftClick = (day: Date, turnoId: string, tech: string, techName: string) => {
-    setEditingId(null);
-    form.reset({
-      dataExecucao: format(day, 'dd/MM/yyyy'),
-      turno: turnoId, 
-      equipamento: tech === 'TORNO' ? 'TORNO CNC CENTUR 30' : (tech === 'CENTRO' ? 'CENTRO DE USINAGEM D600' : 'PROGRAMACAO'),
-      requisicao: '', nomeDaPeca: '', quantidadeTotal: 0, quantidadeNoBloco: 0,
-      tecnico: techName, tempoMinutos: 0, setupMinutos: 0, site: 'VALINHOS DOVE'
-    });
-    setIsDialogOpen(true);
-  };
-
-  const handleItemClick = (item: PlanejamentoItem) => {
-    setEditingId(item.id);
-    form.reset(item);
-    setIsDialogOpen(true);
-  };
-
   const clearAllPlanning = async () => {
-    if (!database || !confirm("Apagar TODO o planejamento atual?")) return;
+    if (!database || !confirm("Deseja apagar todo o planejamento atual?")) return;
     await set(ref(database, '/Planejamento_V2'), null);
-    toast({ title: "Planejamento Limpo" });
+    toast({ title: "Planejamento Limpo", description: "Inicie um novo ciclo de carga." });
   };
-
-  async function onSubmit(values: PlanningFormValues) {
-    if (!database) return;
-    try {
-      const payload = { ...values, horasPlanejadas: (values.tempoMinutos + values.setupMinutos) / 60 };
-      if (editingId) {
-        await update(ref(database, `/Planejamento_V2/${editingId}`), payload);
-      } else {
-        await set(push(ref(database, '/Planejamento_V2')), { ...payload, startOffsetMin: 0 });
-      }
-      setIsDialogOpen(false);
-      toast({ title: "Salvo com sucesso" });
-    } catch (e) { console.error(e); }
-  }
 
   const handleImportAndPlan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -274,10 +215,11 @@ export default function ProgrammingPage() {
         const workbook = XLSX.read(event.target?.result, { type: 'binary' });
         const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
-        const S = 480; 
-        // Pointers por TÉCNICO para evitar amontoamento
-        let techPointers: Record<string, number> = {};
+        const SHIFT_MIN = 480; 
         const updates: any = {};
+        
+        // Ponteiros de tempo por TÉCNICO para evitar amontoamento
+        let techTimePointers: Record<string, number> = {};
 
         const findVal = (row: any, keys: string[]) => {
             const k = Object.keys(row).find(k => keys.some(s => k.toLowerCase().includes(s.toLowerCase())));
@@ -294,95 +236,108 @@ export default function ProgrammingPage() {
           const progTotal = Number(findVal(row, ['prog', 'programacao']) || 0);
           const site = String(findVal(row, ['site', 'fabrica']) || 'VALINHOS DOVE');
 
-          // 1. Programação ADM (William)
+          // 1. Planejamento de Programação (William)
           if (progTotal > 0) {
              const techName = EQUIPE['ADM']['1'][0].name;
-             if (!techPointers[techName]) techPointers[techName] = 0;
-             
-             const start = techPointers[techName] % S;
-             const time = Math.min(progTotal, S - start);
+             const start = techTimePointers[techName] || 0;
              const newRef = push(ref(database, '/Planejamento_V2'));
              updates[newRef.key!] = {
-                dataExecucao: format(currentDate, 'dd/MM/yyyy'), turno: '1', 
-                tecnico: techName, equipamento: 'PROGRAMACAO',
+                dataExecucao: format(currentDate, 'dd/MM/yyyy'),
+                turno: '1', tecnico: techName, equipamento: 'PROGRAMACAO',
                 requisicao: req, nomeDaPeca: peca, quantidadeTotal: qtdTotal, quantidadeNoBloco: 0,
-                tempoMinutos: time, setupMinutos: 0, site, startOffsetMin: start, perdaPlanejada: 'PROGRAMACAO'
+                tempoMinutos: progTotal, setupMinutos: 0, site, startOffsetMin: start % SHIFT_MIN,
+                tipoAtividade: 'PROGRAMACAO'
              };
-             techPointers[techName] += time;
+             techTimePointers[techName] = start + progTotal;
           }
 
-          // 2. Usinagem
+          // 2. Planejamento de Usinagem (Torno e Centro)
           const tasks = [];
           if (tornoTotal > 0) tasks.push({ type: 'TORNO', total: tornoTotal, equip: 'TORNO CNC CENTUR 30' });
           if (centroTotal > 0) tasks.push({ type: 'CENTRO', total: centroTotal, equip: 'CENTRO DE USINAGEM D600' });
 
           tasks.forEach(task => {
             let pendingSetup = setupTotal;
-            let doneTime = 0;
-            const cycle = task.total / qtdTotal;
+            let pendingProd = task.total;
+            let doneProdTime = 0;
+            const cycleTime = task.total / qtdTotal;
 
-            // Determinar técnicos do 1T para distribuir
-            const techs1T = EQUIPE[task.type]['1'];
-            
-            while (pendingSetup > 0.1 || doneTime < task.total - 0.1) {
-              // Lógica de escolha de técnico e turno
-              // Simplificação: Encontra o técnico com menor carga no turno atual
-              const currentGlobalMin = Math.min(...techs1T.map(t => techPointers[t.name] || 0));
-              const shiftIdx = Math.floor(currentGlobalMin / S);
-              const dayOffset = Math.floor(shiftIdx / 3);
-              const turnoNum = (shiftIdx % 3) + 1;
-              
-              // Se for 1T Torno, alterna entre Marcos e Alisson
-              let chosenTech;
-              if (task.type === 'TORNO' && turnoNum === 1) {
-                chosenTech = (techPointers[techs1T[0].name] || 0) <= (techPointers[techs1T[1].name] || 0) ? techs1T[0] : techs1T[1];
-              } else {
-                chosenTech = EQUIPE[task.type][String(turnoNum)][0];
+            while (pendingSetup > 0.1 || pendingProd > 0.1) {
+              // Encontra o técnico disponível com menor carga no momento
+              const shiftOrder = ['1', '2', '3'];
+              let chosenTech = null;
+              let chosenShift = '1';
+              let currentMinTime = Infinity;
+
+              for (const sId of shiftOrder) {
+                const techs = EQUIPE[task.type][sId] || [];
+                for (const t of techs) {
+                    const tTime = techTimePointers[t.name] || 0;
+                    if (tTime < currentMinTime) {
+                        currentMinTime = tTime;
+                        chosenTech = t;
+                        chosenShift = sId;
+                    }
+                }
               }
 
-              if (!techPointers[chosenTech.name]) techPointers[chosenTech.name] = 0;
-              const startOffset = techPointers[chosenTech.name] % S;
-              const avail = S - startOffset;
+              if (!chosenTech) break;
 
-              let timeUsed = 0;
+              const techName = chosenTech.name;
+              const globalTime = techTimePointers[techName] || 0;
+              const startOffset = globalTime % SHIFT_MIN;
+              const availInShift = SHIFT_MIN - startOffset;
+
+              let timeToUse = 0;
               let sInShift = 0;
               let pInShift = 0;
               let qInShift = 0;
 
               if (pendingSetup > 0.1) {
-                sInShift = Math.min(pendingSetup, avail);
+                sInShift = Math.min(pendingSetup, availInShift);
                 pendingSetup -= sInShift;
-                timeUsed += sInShift;
+                timeToUse += sInShift;
               }
 
-              const rem = avail - timeUsed;
-              if (rem > 0.1 && doneTime < task.total - 0.1) {
-                pInShift = Math.min(rem, task.total - doneTime);
-                const b4 = Math.floor(doneTime / cycle + 0.001);
-                doneTime += pInShift;
-                const aft = Math.min(qtdTotal, Math.floor(doneTime / cycle + 0.001));
-                qInShift = aft - b4;
-                timeUsed += pInShift;
+              const remShift = availInShift - timeToUse;
+              if (remShift > 0.1 && pendingProd > 0.1) {
+                pInShift = Math.min(remShift, pendingProd);
+                
+                // Cálculo matemático de peças concluídas no bloco
+                const pcsBefore = Math.floor(doneProdTime / cycleTime + 0.001);
+                doneProdTime += pInShift;
+                const pcsAfter = Math.min(qtdTotal, Math.floor(doneProdTime / cycleTime + 0.001));
+                qInShift = pcsAfter - pcsBefore;
+                
+                pendingProd -= pInShift;
+                timeToUse += pInShift;
               }
 
+              const dayOffset = Math.floor(globalTime / (SHIFT_MIN * 3));
               const newRef = push(ref(database, '/Planejamento_V2'));
               updates[newRef.key!] = {
                 dataExecucao: format(addDays(currentDate, dayOffset), 'dd/MM/yyyy'),
-                turno: String(turnoNum), tecnico: chosenTech.name, equipamento: task.equip,
+                turno: chosenShift, tecnico: techName, equipamento: task.equip,
                 requisicao: req, nomeDaPeca: peca, quantidadeTotal: qtdTotal, quantidadeNoBloco: qInShift,
-                tempoMinutos: pInShift, setupMinutos: sInShift, site, startOffsetMin: startOffset
+                tempoMinutos: pInShift, setupMinutos: sInShift, site, startOffsetMin: startOffset,
+                tipoAtividade: 'USINAGEM'
               };
 
-              techPointers[chosenTech.name] += timeUsed;
-              if (dayOffset > 7) break; 
+              techTimePointers[techName] = globalTime + timeToUse;
+              if (dayOffset > 7) break; // Trava de segurança
             }
           });
         });
 
         await set(ref(database, '/Planejamento_V2'), updates);
-        toast({ title: "Planejamento Concluído" });
-      } catch (err) { console.error(err); }
-      finally { setIsImporting(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+        toast({ title: "Planejamento Concluído", description: "As requisições foram distribuídas matematicamente nos turnos." });
+      } catch (err) { 
+        console.error(err); 
+        toast({ title: "Erro na Importação", description: "Verifique o formato da sua planilha.", variant: "destructive" });
+      } finally { 
+        setIsImporting(false); 
+        if (fileInputRef.current) fileInputRef.current.value = ''; 
+      }
     };
     reader.readAsBinaryString(file);
   };
@@ -391,25 +346,25 @@ export default function ProgrammingPage() {
     <div className="flex flex-col gap-8 bg-[#E4E9EE] min-h-screen -m-4 p-4 lg:-m-6 lg:p-6 font-['IBM_Plex_Sans']">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-[#101820] font-['Barlow_Condensed'] uppercase">PLANO DE CARGA CNC</h1>
-          <p className="text-[11px] tracking-[0.22em] text-[#8FA3B2] uppercase font-bold">Time Técnico de Usinagem · 3 Turnos</p>
+          <h1 className="text-4xl font-bold tracking-tight text-[#101820] font-['Barlow_Condensed'] uppercase leading-none">PLANO DE CARGA CNC</h1>
+          <p className="text-[11px] tracking-[0.22em] text-[#8FA3B2] uppercase font-bold mt-1">Time Técnico de Usinagem · Torno & Centro · 3 Turnos</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" size="sm" className="bg-destructive/10 border-destructive/20 text-destructive font-bold text-[10px] uppercase h-9" onClick={clearAllPlanning}>
+          <Button variant="outline" size="sm" className="bg-white border-[#CBD5DD] text-[#3D4C5A] font-bold text-[10px] uppercase h-9 shadow-sm" onClick={clearAllPlanning}>
             <Eraser className="h-4 w-4 mr-2" /> Limpar Plano
           </Button>
 
           <input type="file" ref={fileInputRef} onChange={handleImportAndPlan} accept=".xlsx, .xls, .csv" className="hidden" />
-          <Button variant="outline" size="sm" className="bg-[#101820] text-[#F0BC00] font-bold text-[10px] uppercase h-9" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+          <Button variant="outline" size="sm" className="bg-[#101820] text-[#F0BC00] border-[#101820] font-bold text-[10px] uppercase h-9 shadow-lg hover:bg-black" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
             {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <Wand2 className="h-4 w-4 mr-2" />} Importar & Planejar Automático
           </Button>
 
           <div className="flex items-center gap-2 bg-white p-1 rounded border border-[#CBD5DD] shadow-sm">
             <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-            <div className="min-w-[160px] text-center font-bold flex items-center justify-center gap-2">
+            <div className="min-w-[140px] text-center font-bold flex items-center justify-center gap-2 text-xs">
               <CalendarDays className="h-4 w-4 text-[#6C7C8B]" />
-              <span className="capitalize text-[#0F151B]">{format(currentDate, 'dd/MM/yyyy', { locale: ptBR })}</span>
+              <span className="capitalize">{format(currentDate, 'dd/MM/yyyy', { locale: ptBR })}</span>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
           </div>
@@ -418,9 +373,9 @@ export default function ProgrammingPage() {
 
       <div className="space-y-6">
         {loading ? (
-            <div className="flex h-[400px] items-center justify-center gap-2 bg-white rounded-lg border shadow-sm">
-                <Loader className="h-8 w-8 animate-spin text-[#5B36A8]" />
-                <span className="font-bold uppercase text-[10px] tracking-widest text-[#6C7C8B]">Sincronizando Cronograma...</span>
+            <div className="flex h-[400px] flex-col items-center justify-center gap-4 bg-white rounded-lg border shadow-sm">
+                <Loader className="h-10 w-10 animate-spin text-[#5B36A8]" />
+                <span className="font-bold uppercase text-[10px] tracking-widest text-[#6C7C8B]">Sincronizando Cronograma Industrial...</span>
             </div>
         ) : (
             timelineDays.map((day) => {
@@ -429,48 +384,53 @@ export default function ProgrammingPage() {
                     return isSameDay(d, day);
                 });
 
+                const dPcs = dayItems.reduce((acc, s) => acc + (s.quantidadeNoBloco || 0), 0);
+                const dOcc = dayItems.reduce((acc, s) => acc + (s.tempoMinutos || 0) + (s.setupMinutos || 0), 0);
+
                 return (
-                    <div key={day.toString()} className="bg-white border border-[#CBD5DD] shadow-sm overflow-hidden rounded-sm">
-                        <div className="bg-[#101820] text-white px-4 py-2.5 flex items-center justify-between border-b-4 border-[#F0BC00]">
-                            <div className="flex items-center gap-3">
-                                <span className="text-xl font-bold uppercase tracking-widest font-['Barlow_Condensed']">Dia {format(day, 'dd · MM/yy')}</span>
-                                <span className="text-[10px] font-bold text-[#8FA3B2] uppercase tracking-[0.18em]">{format(day, 'EEEE', { locale: ptBR })}</span>
+                    <div key={day.toString()} className="bg-white border border-[#CBD5DD] shadow-md overflow-hidden rounded-sm">
+                        <div className="bg-[#101820] text-white px-4 py-3 flex items-center justify-between border-b-4 border-[#F0BC00]">
+                            <div className="flex items-center gap-4">
+                                <span className="text-2xl font-bold uppercase tracking-widest font-['Barlow_Condensed']">Dia {format(day, 'dd · MM/yy')}</span>
+                                <span className="text-[11px] font-bold text-[#8FA3B2] uppercase tracking-[0.2em]">{format(day, 'EEEE', { locale: ptBR })}</span>
+                            </div>
+                            <div className="flex gap-6 font-mono text-[11px] text-[#8FA3B2]">
+                                <span>PEÇAS: <b className="text-white text-sm">{dPcs}</b></span>
+                                <span>OCUPAÇÃO: <b className="text-white text-sm">{(dOcc / 60).toFixed(1)}h</b></span>
+                                <span>MÁQUINAS: <b className="text-[#F0BC00] text-sm">{(100 * dOcc / (480 * 3 * 2)).toFixed(0)}%</b></span>
                             </div>
                         </div>
 
                         <div className="divide-y divide-[#E2E9EE]">
                             {TURNOS.map(turno => (
                                 <div key={turno.id} className="grid grid-cols-[118px_1fr]">
-                                    <div className="bg-[#F4F7F9] border-r border-[#E2E9EE] p-3 flex flex-col justify-center items-center">
-                                        <span className="text-2xl font-bold font-['Barlow_Condensed'] leading-none text-[#0F151B]">{turno.label}</span>
-                                        <span className="text-[10px] font-mono text-[#6C7C8B] mt-1">{turno.range}</span>
+                                    <div className="bg-[#F4F7F9] border-r border-[#E2E9EE] p-4 flex flex-col justify-center items-center shadow-[inset_-2px_0_5px_rgba(0,0,0,0.02)]">
+                                        <span className="text-3xl font-bold font-['Barlow_Condensed'] leading-none text-[#101820]">{turno.label}</span>
+                                        <span className="text-[10px] font-mono text-[#6C7C8B] mt-2 font-bold">{turno.range}</span>
                                     </div>
-                                    <div className="p-3 bg-white">
+                                    <div className="p-4 bg-white">
                                         <Ruler />
-                                        <div className="space-y-2">
+                                        <div className="space-y-3">
                                           {['TORNO', 'CENTRO', 'ADM'].map((cat) => {
                                             const shiftTechs = EQUIPE[cat][turno.id] || [];
                                             return shiftTechs.map(techInfo => {
                                                 const techItems = dayItems.filter(i => i.tecnico === techInfo.name && i.turno === turno.id);
                                                 return (
-                                                    <div key={techInfo.name} className="grid grid-cols-[150px_1fr] items-center group">
-                                                        <div className="pr-2 min-w-0">
-                                                            <div className={cn("text-[9px] font-mono font-bold uppercase", cat === 'TORNO' ? "text-[#00707F]" : (cat === 'CENTRO' ? "text-[#5B36A8]" : "text-[#333333]"))}>
-                                                                {cat === 'TORNO' ? '▬ Torno' : (cat === 'CENTRO' ? '▣ Centro' : '▣ Programação')}
+                                                    <div key={techInfo.name} className="grid grid-cols-[155px_1fr] items-center group">
+                                                        <div className="pr-3 min-w-0">
+                                                            <div className={cn("text-[9.5px] font-mono font-black uppercase tracking-tight", cat === 'TORNO' ? "text-[#00707F]" : (cat === 'CENTRO' ? "text-[#5B36A8]" : "text-[#333333]"))}>
+                                                                {cat === 'TORNO' ? '▬ Torno' : (cat === 'CENTRO' ? '▣ Centro' : '▣ Software')}
                                                             </div>
-                                                            <div className="text-[12px] font-bold text-[#0F151B] truncate">{techInfo.name}</div>
-                                                            <div className="text-[9px] text-[#6C7C8B] leading-none">{techInfo.role}</div>
+                                                            <div className="text-[13px] font-bold text-[#101820] truncate leading-tight">{techInfo.name}</div>
+                                                            <div className="text-[9px] text-[#6C7C8B] leading-none uppercase font-bold tracking-tighter mt-0.5">{techInfo.role}</div>
                                                         </div>
-                                                        <div className="relative h-[36px] border border-[#E2E9EE] rounded-[3px] bg-[repeating-linear-gradient(90deg,#F4F7F9_0_1px,transparent_1px_100%)] bg-[size:12.5%_100%] overflow-hidden">
+                                                        <div className="relative h-[40px] border border-[#E2E9EE] rounded-[3px] bg-[repeating-linear-gradient(90deg,#F4F7F9_0_1px,transparent_1px_100%)] bg-[size:12.5%_100%] overflow-hidden shadow-inner">
                                                             {techItems.length === 0 && (
-                                                                <div className="absolute inset-0 flex items-center justify-center text-[9px] uppercase tracking-widest text-[#A9B7C2] font-mono opacity-50">sem carga</div>
+                                                                <div className="absolute inset-0 flex items-center justify-center text-[9px] uppercase tracking-[0.25em] text-[#A9B7C2] font-mono opacity-40 font-bold italic">Sem Carga Planejada</div>
                                                             )}
                                                             {techItems.map(item => (
-                                                                <TimelineBar key={item.id} item={item} realData={productionRecords || []} onClick={() => handleItemClick(item)} />
+                                                                <TimelineBar key={item.id} item={item} realData={productionRecords || []} />
                                                             ))}
-                                                            <Button variant="ghost" size="icon" className="absolute right-0 top-0 h-full w-8 opacity-0 group-hover:opacity-100 transition-opacity text-[#6C7C8B]" onClick={() => handleShiftClick(day, turno.id, cat, techInfo.name)}>
-                                                                <Plus className="h-3 w-3" />
-                                                            </Button>
                                                         </div>
                                                     </div>
                                                 );
@@ -487,34 +447,51 @@ export default function ProgrammingPage() {
         )}
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-xl font-['IBM_Plex_Sans']">
-          <DialogHeader><DialogTitle className="font-['Barlow_Condensed'] text-2xl uppercase">Bloco de Planejamento</DialogTitle></DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Requisição</FormLabel><FormControl><Input className="font-mono" {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Nome da Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <FormField control={form.control} name="quantidadeNoBloco" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Qtd no Bloco</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="setupMinutos" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Setup (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="tempoMinutos" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Usinagem (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold">Técnico</FormLabel><Input disabled {...field} /></FormItem>)} />
-                <FormField control={form.control} name="site" render={({ field }) => (
-                    <FormItem><FormLabel className="text-[10px] uppercase font-bold">Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="font-bold"><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
-                )} />
-              </div>
-              <DialogFooter>
-                {editingId && (<Button type="button" variant="destructive" onClick={async () => { if (!database || !editingId) return; await remove(ref(database, `/Planejamento_V2/${editingId}`)); setIsDialogOpen(false); }}>Excluir</Button>)}
-                <Button type="submit" className="bg-[#101820] text-[#F0BC00] uppercase font-bold text-xs">Salvar</Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+        <div className="bg-[#101820] p-6 rounded border border-white/10 shadow-2xl">
+            <h3 className="text-[#F0BC00] font-['Barlow_Condensed'] text-xl uppercase font-bold mb-4 flex items-center gap-2">
+                <Clock className="h-5 w-5" /> Regras de Cálculo do Plano
+            </h3>
+            <ul className="space-y-3 text-[11px] text-[#8FA3B2] leading-relaxed">
+                <li>• <b className="text-white">Ciclo de Produção:</b> O sistema calcula `tempo ÷ quantidade` para determinar o ritmo real.</li>
+                <li>• <b className="text-white">Corte de Turno:</b> Peças que não terminam no turno são automaticamente carregadas para o próximo técnico da escala.</li>
+                <li>• <b className="text-white">Prioridade de Setup:</b> O tempo de preparação é alocado sempre no início da primeira raia da requisição.</li>
+                <li>• <b className="text-white">Escala Real:</b> O 1T do Torno conta com <b className="text-white">Marcos e Alisson</b> simultaneamente para carga pesada.</li>
+            </ul>
+        </div>
+        <div className="bg-white p-6 rounded border border-[#CBD5DD] shadow-lg">
+            <h3 className="text-[#101820] font-['Barlow_Condensed'] text-xl uppercase font-bold mb-4 flex items-center gap-2">
+                <Settings2 className="h-5 w-5" /> Legenda Técnica
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="h-4 w-8 bg-[#00707F] rounded-sm" />
+                    <span className="text-[10px] font-bold uppercase text-[#3D4C5A]">Produção Torno</span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="h-4 w-8 bg-[#5B36A8] rounded-sm" />
+                    <span className="text-[10px] font-bold uppercase text-[#3D4C5A]">Produção Centro</span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="h-4 w-8 rounded-sm" style={{ background: 'repeating-linear-gradient(45deg, #F0BC00 0 4px, #101820 4px 8px)' }} />
+                    <span className="text-[10px] font-bold uppercase text-[#3D4C5A]">Tempo de Setup</span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="h-4 w-8 bg-white border border-[#CBD5DD] relative">
+                        <div className="absolute bottom-0 left-0 w-[70%] h-[2px] bg-blue-500" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase text-[#3D4C5A]">Execução Realizada</span>
+                </div>
+            </div>
+        </div>
+      </div>
     </div>
   );
 }
+
+function endOfDays(date: Date) {
+    const d = new Date(date);
+    d.setHours(23, 59, 59, 999);
+    return d;
+}
+
