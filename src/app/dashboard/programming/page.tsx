@@ -20,21 +20,18 @@ import {
   Trash2,
   Settings2,
   PlusCircle,
-  User as UserIcon,
   Cpu,
   CalendarDays,
-  Clock
+  Clock,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { 
   format, 
-  addWeeks, 
-  subWeeks, 
   startOfWeek, 
   endOfWeek, 
-  eachDayOfInterval, 
   isSameDay, 
   parse, 
-  isToday,
   startOfDay,
   endOfDay,
   addDays
@@ -42,12 +39,6 @@ import {
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -129,21 +120,13 @@ const operatorList = [
 ];
 
 const factoryList = [
-    "VALINHOS DOVE",
-    "VALINHOS SABONETE",
-    "VINHEDO",
-    "POUSO ALEGRE",
-    "INDAIATUBA",
-    "AGUAÍ",
-    "SUAPE",
-    "IGARASSU",
-    "GARANHUNS",
-    "TORRE"
+    "VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", 
+    "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"
 ];
 
 const lossOptions = [
-  { value: 'PRODUCAO', label: 'Produção Normal', color: '#007b8a' }, // Cor base TORNO
-  { value: 'PROGRAMACAO', label: 'Programação', color: '#a855f7' }, // Roxo CENTRO
+  { value: 'PRODUCAO', label: 'Produção Normal', color: '#007b8a' },
+  { value: 'PROGRAMACAO', label: 'Programação', color: '#a855f7' },
   { value: 'SETUP', label: 'Setup', color: '#ef4444' },
   { value: 'DDS', label: 'Atividades ADM', color: '#f97316' },
   { value: 'CAFE', label: 'Parada para Café', color: '#eab308' },
@@ -205,6 +188,8 @@ const ShiftTimelineRow = ({
       <div className="flex-1">
         {techs.map((tech, idx) => {
           const techItems = items.filter(item => (item.tecnico === tech || item.Técnicos === tech));
+          
+          // Pegar o equipamento do primeiro item ou deduzir (estético)
           const machineType = techItems[0]?.equipamento || techItems[0]?.EQUIPAMENTO || (idx % 2 === 0 ? 'TORNO' : 'CENTRO');
           const isTorno = machineType.includes('TORNO');
 
@@ -247,7 +232,7 @@ const ShiftTimelineRow = ({
                         .reduce((acc, curr) => acc + (Number(curr.machiningTime) || 0) / 60, 0);
                       
                       const progress = hours > 0 ? Math.min((realHours / hours) * 100, 100) : 0;
-                      const hasSetup = (item.perdaPlanejada || item['Perdas planejadas'] || '').toUpperCase().includes('SETUP');
+                      const isSetup = (item.perdaPlanejada || item['Perdas planejadas'] || '').toUpperCase().includes('SETUP');
 
                       return (
                         <div 
@@ -260,7 +245,7 @@ const ShiftTimelineRow = ({
                           style={{ width: `${(hours / 8) * 100}%`, minWidth: '80px' }}
                         >
                           {/* Faixas de Setup (Zebrinha) */}
-                          {hasSetup && (
+                          {isSetup && (
                             <div className="absolute inset-0 opacity-40 pointer-events-none" 
                                  style={{ background: 'repeating-linear-gradient(45deg, #facc15, #facc15 10px, #000 10px, #000 20px)' }} />
                           )}
@@ -311,15 +296,12 @@ export default function ProgrammingPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
 
-  // Buscamos 3 dias a partir da data atual para a Timeline
+  // Visão de 3 dias
   const timelineDays = useMemo(() => [
     currentDate,
     addDays(currentDate, 1),
     addDays(currentDate, 2)
   ], [currentDate]);
-
-  const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 0 }), [currentDate]);
-  const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 0 }), [weekStart]);
 
   const productionQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -335,16 +317,9 @@ export default function ProgrammingPage() {
   const form = useForm<PlanningFormValues>({
     resolver: zodResolver(planningFormSchema),
     defaultValues: {
-      dataExecucao: '',
-      equipamento: '',
-      requisicao: '',
-      nomeDaPeca: '',
-      quantidade: 0,
-      tecnico: '',
-      horasPlanejadas: 0,
-      turno: '1',
-      site: 'VALINHOS DOVE',
-      observacao: '',
+      dataExecucao: '', equipamento: '', requisicao: '', nomeDaPeca: '',
+      quantidade: 0, tecnico: '', horasPlanejadas: 0, turno: '1',
+      site: 'VALINHOS DOVE', observacao: '',
       atividades: [{ tipo: 'PRODUCAO', tempo: 0, site: 'VALINHOS DOVE' }],
     },
   });
@@ -362,38 +337,23 @@ export default function ProgrammingPage() {
   }, [watchAtividades, form]);
 
   useEffect(() => {
-    if (!database) {
-      setLoading(false);
-      return;
-    }
+    if (!database) { setLoading(false); return; }
     const dbRef = ref(database, '/Planejamento S');
     const unsubscribe = onValue(dbRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const dataArray: PlanejamentoItem[] = Object.keys(data).map(key => ({
-          id: key,
-          ...data[key],
+          id: key, ...data[key],
         }));
         setPlanejamentoData(dataArray);
-      } else {
-        setPlanejamentoData([]);
-      }
+      } else { setPlanejamentoData([]); }
       setLoading(false);
-    }, (error) => {
-      console.error(error);
-      setLoading(false);
-    });
+    }, (error) => { console.error(error); setLoading(false); });
     return () => unsubscribe();
   }, [database]);
 
-  const nextDay = () => setCurrentDate(prev => addDays(prev, 1));
-  const prevDay = () => setCurrentDate(prev => addDays(prev, -1));
-  const goToToday = () => setCurrentDate(new Date());
-
   const handleShiftClick = (day: Date, turnoId: string, tecnico?: string) => {
-    setEditingId(null);
-    setSelectedDay(day);
-    setSelectedTurno(turnoId);
+    setEditingId(null); setSelectedDay(day); setSelectedTurno(turnoId);
     const isSunday = day.getDay() === 0;
     const defaultAtividades = [{ tipo: 'PRODUCAO', tempo: 0, site: 'VALINHOS DOVE' }];
     if (!isSunday) {
@@ -402,16 +362,9 @@ export default function ProgrammingPage() {
     }
     form.reset({
       dataExecucao: format(day, 'dd/MM/yyyy'),
-      turno: turnoId,
-      equipamento: '',
-      requisicao: '',
-      nomeDaPeca: '',
-      quantidade: 0,
-      tecnico: tecnico || '',
-      horasPlanejadas: isSunday ? 0 : 0.5,
-      site: 'VALINHOS DOVE',
-      observacao: '',
-      atividades: defaultAtividades,
+      turno: turnoId, equipamento: '', requisicao: '', nomeDaPeca: '',
+      quantidade: 0, tecnico: tecnico || '', horasPlanejadas: isSunday ? 0 : 0.5,
+      site: 'VALINHOS DOVE', observacao: '', atividades: defaultAtividades,
     });
     setIsDialogOpen(true);
   };
@@ -430,8 +383,7 @@ export default function ProgrammingPage() {
       site: item.site || item.Site || 'VALINHOS DOVE'
     }];
     form.reset({
-      dataExecucao: dateStr || '',
-      turno: shiftVal,
+      dataExecucao: dateStr || '', turno: shiftVal,
       equipamento: item.equipamento || item.EQUIPAMENTO || '',
       requisicao: item.requisicao || item['Requisição'] || '',
       nomeDaPeca: item.nomeDaPeca || item['Nome da Peça'] || '',
@@ -451,8 +403,7 @@ export default function ProgrammingPage() {
       const mainLoss = values.atividades.length === 1 ? values.atividades[0].tipo : 'MÚLTIPLAS';
       const lossLabel = lossOptions.find(o => o.value === mainLoss)?.label || mainLoss;
       const payload = {
-        ...values,
-        Turno: values.turno,
+        ...values, Turno: values.turno,
         'Perdas planejadas': values.atividades.find(a => a.tipo !== 'PRODUCAO') ? lossLabel.toUpperCase() : '',
       };
       if (editingId) {
@@ -471,16 +422,16 @@ export default function ProgrammingPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Planejamento de Produção</h1>
-          <p className="text-muted-foreground">Visão detalhada de cronograma e execução (Gantt).</p>
+          <p className="text-muted-foreground">Visão Gantt integrada com acompanhamento real de 3 dias.</p>
         </div>
         <div className="flex items-center gap-2 bg-card p-1 rounded-lg border shadow-sm">
-          <Button variant="ghost" size="icon" onClick={prevDay}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
           <div className="min-w-[160px] text-center font-bold flex items-center justify-center gap-2">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
             <span className="capitalize">{format(currentDate, 'dd/MM/yyyy', { locale: ptBR })}</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={nextDay}><ChevronRight className="h-4 w-4" /></Button>
-          <Button variant="secondary" size="sm" onClick={goToToday}>Hoje</Button>
+          <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
+          <Button variant="secondary" size="sm" onClick={() => setCurrentDate(new Date())}>Hoje</Button>
         </div>
       </div>
 
@@ -491,7 +442,7 @@ export default function ProgrammingPage() {
                 <span className="font-bold uppercase text-[10px] tracking-widest">Sincronizando Planejamento...</span>
             </div>
         ) : (
-            timelineDays.map((day, dIdx) => {
+            timelineDays.map((day) => {
                 const dayItems = planejamentoData.filter(item => {
                     const dStr = item.dataExecucao || item['Data Execução'];
                     if (!dStr) return false;
@@ -506,7 +457,7 @@ export default function ProgrammingPage() {
 
                 return (
                     <div key={day.toString()} className="rounded-xl border shadow-xl bg-card overflow-hidden">
-                        {/* Header do Dia (Estilo Imagem) */}
+                        {/* Header do Dia Industrial */}
                         <div className="bg-[#1e293b] text-white px-6 py-4 flex items-center justify-between">
                             <div className="flex items-baseline gap-4">
                                 <span className="text-2xl font-black uppercase tracking-tighter">DIA {format(day, 'dd · MM/yy')}</span>
@@ -522,17 +473,17 @@ export default function ProgrammingPage() {
                                     <span className="text-xl font-black">{totalHoras.toFixed(1)}h</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-slate-400 text-[10px] font-black uppercase">máq. ocupadas</span>
-                                    <span className="text-xl font-black">{totalHoras > 0 ? '100%' : '0%'}</span>
+                                    <span className="text-slate-400 text-[10px] font-black uppercase">utilização</span>
+                                    <span className="text-xl font-black">{totalHoras > 0 ? Math.min((totalHoras / 24) * 100, 100).toFixed(0) : '0'}%</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Eixo de Tempo 0h - 8h */}
                         <div className="flex bg-muted/20 border-b border-border/60">
-                           <div className="w-[260px] shrink-0" /> {/* Espaço das Labels */}
+                           <div className="w-[260px] shrink-0" />
                            <div className="flex-1 flex text-[9px] font-black text-muted-foreground/60 py-1 relative">
-                              {[0, 2, 4, 6, 8].map(h => (
+                              {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(h => (
                                 <div key={h} className="absolute h-4 border-l border-border" style={{ left: `${(h/8)*100}%` }}>
                                     <span className="ml-1 leading-none">{h}h</span>
                                 </div>
@@ -582,7 +533,7 @@ export default function ProgrammingPage() {
               <div className="space-y-4 rounded-lg border p-4 bg-muted/20">
                 <div className="flex items-center justify-between">
                     <Label className="font-bold uppercase text-[10px] tracking-widest text-primary">Atividades / Perdas Planejadas</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={() => append({ tipo: 'PRODUCAO', tempo: 0, site: form.getValues('site') || 'VALINHOS DOVE' })} className="h-7 text-[10px] font-bold"><PlusCircle className="h-3 w-3 mr-1" /> ADICIONAR ATIVIDADE</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ tipo: 'PRODUCAO', tempo: 0, site: form.getValues('site') || 'VALINHOS DOVE' })} className="h-7 text-[10px] font-bold"><PlusCircle className="h-3 w-3 mr-1" /> ADICIONAR</Button>
                 </div>
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex gap-2 items-end border-b pb-3 last:border-0 last:pb-0">
@@ -612,7 +563,7 @@ export default function ProgrammingPage() {
                     </div>
                     <div className="w-20">
                       <FormField control={form.control} name={`atividades.${index}.tempo`} render={({ field }) => (
-                        <FormItem><FormControl><Input type="number" step="0.1" placeholder="Horas" className="h-8 text-[10px]" {...field} /></FormControl></FormItem>
+                        <FormItem><FormControl><Input type="number" step="0.1" placeholder="H" className="h-8 text-[10px]" {...field} /></FormControl></FormItem>
                       )} />
                     </div>
                     {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" onClick={() => removeAtividade(index)} className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>)}
@@ -621,21 +572,15 @@ export default function ProgrammingPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel>Técnico Responsável</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel>Técnico</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                 <FormField control={form.control} name="site" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Fábrica Principal</FormLabel>
-                        <Select onValueChange={(val) => { field.onChange(val); const currentAtivs = form.getValues('atividades'); currentAtivs.forEach((_, idx) => { if (!form.getValues(`atividades.${idx}.site`)) form.setValue(`atividades.${idx}.site`, val); }); }} value={field.value}>
-                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                            <SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
-                        </Select>
-                    </FormItem>
+                    <FormItem><FormLabel>Fábrica Principal</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
                 )} />
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Nº Forms</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Meta (Peças)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Forms</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel>Meta (Pç)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
               </div>
               <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
