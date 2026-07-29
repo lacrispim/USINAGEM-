@@ -44,10 +44,10 @@ import {
   PlusCircle,
   Cpu,
   CalendarDays,
-  FileUp,
-  Info,
   Wand2,
-  Eraser
+  Eraser,
+  Info,
+  Code2
 } from 'lucide-react';
 import { 
   format, 
@@ -112,8 +112,7 @@ const factoryList = [
     "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"
 ];
 
-// Mapeamento de quem opera o quê em cada turno (Escala Oficial)
-// 1T agora tem 2 técnicos por tecnologia para dobrar capacidade
+// Mapeamento de Escala Técnica Oficial
 const ESCALA_TECNICA: Record<string, Record<string, string[]>> = {
   'TORNO': { 
     '1': ['Marcos Barbosa', 'Alisson Franca'], 
@@ -121,9 +120,12 @@ const ESCALA_TECNICA: Record<string, Record<string, string[]>> = {
     '3': ['Gustavo Gozzi'] 
   },
   'CENTRO': { 
-    '1': ['Daniel Solivo', 'William Martinucci'], 
+    '1': ['Daniel Solivo'], 
     '2': ['Nathan Xavier'], 
     '3': ['Rodrigo Cantano'] 
+  },
+  'PROGRAMADOR': {
+    '1': ['William Martinucci'] // William dedicado à programação no 1T
   }
 };
 
@@ -185,10 +187,11 @@ const TimelineBar = ({ item, realData, onClick, shiftMin }: { item: Planejamento
   
   const progress = hours > 0 ? Math.min((realHours / hours) * 100, 100) : 0;
   const isSetup = (item.perdaPlanejada || item['Perdas planejadas'] || '').toUpperCase().includes('SETUP');
+  const isProg = (item.perdaPlanejada || item['Perdas planejadas'] || '').toUpperCase().includes('PROGRAMACAO');
+  
   const machineType = item.equipamento || item.EQUIPAMENTO || '';
   const isTorno = machineType.includes('TORNO');
 
-  // Largura baseada em 8h (480 min)
   const widthPc = (hours / 8) * 100;
 
   return (
@@ -196,9 +199,9 @@ const TimelineBar = ({ item, realData, onClick, shiftMin }: { item: Planejamento
       onClick={onClick}
       className={cn(
         "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden cursor-pointer border border-black/20 flex items-center shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all z-10",
-        isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]"
+        isProg ? "bg-indigo-600" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")
       )}
-      style={{ width: `${widthPc}%`, minWidth: '2px' }}
+      style={{ width: `${widthPc}%`, minWidth: '4px' }}
     >
       {isSetup && (
         <div 
@@ -324,7 +327,7 @@ export default function ProgrammingPage() {
     let initialAtividades = item.atividades;
     if (!initialAtividades) {
         const tempoRaw = item.horasPlanejadas || item['Horas Máquina'];
-        const tempo = typeof tempoRaw === 'string' ? parseFloat(tempoRaw.replace(',', '.')) : (Number(tempoRaw) || 0);
+        const tempo = typeof tempoRaw === 'string' ? parseFloat(tempoRaw.replace(',', '.')) : (Number(rawHours) || 0);
         const tipo = (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase() || 'PRODUCAO';
         initialAtividades = [{
           tipo: tipo.includes('PRODUCAO') ? 'PRODUCAO' : (tipo.includes('SETUP') ? 'SETUP' : tipo),
@@ -376,7 +379,7 @@ export default function ProgrammingPage() {
     } catch (error) { console.error(error); }
   }
 
-  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO REFINADO COM CAPACIDADE DUPLA ---
+  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO REFINADO ---
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !database) return;
@@ -396,10 +399,8 @@ export default function ProgrammingPage() {
             return;
         }
 
-        // Capacidade Diária (2 tec em 1T, 1 em 2T, 1 em 3T)
-        // Total por dia = (2*480) + (1*480) + (1*480) = 1920 min
         const DAILY_CAPACITY = (2 + 1 + 1) * 480; 
-        let pointers = { 'TORNO': 0, 'CENTRO': 0 };
+        let pointers = { 'TORNO': 0, 'CENTRO': 0, 'PROG': 0 };
         const updates: any = {};
 
         const findVal = (row: any, keys: string[]) => {
@@ -412,10 +413,33 @@ export default function ProgrammingPage() {
           const peca = String(findVal(row, ['peca', 'nome', 'desc']) || 'SEM DESCRIÇÃO');
           const qtd = Number(findVal(row, ['qtd', 'quantidade']) || 0);
           const setup = Number(findVal(row, ['setup']) || 0);
+          const prog = Number(findVal(row, ['prog', 'programacao', 'programação']) || 0);
           const torno = Number(findVal(row, ['torno', 'minutos torno']) || 0);
           const centro = Number(findVal(row, ['centro', 'minutos centro']) || 0);
           const site = String(findVal(row, ['site', 'fabrica']) || 'VALINHOS DOVE');
 
+          // 1. Alocação de Programação (Centro) para William Martinucci
+          if (prog > 0 && centro > 0) {
+              const currentMin = pointers['PROG'];
+              const dayOffset = Math.floor(currentMin / 480);
+              const targetDate = addDays(currentDate, dayOffset);
+              const newRef = push(ref(database, '/Planejamento S'));
+              const id = newRef.key;
+              if (id) {
+                updates[id] = {
+                  dataExecucao: format(targetDate, 'dd/MM/yyyy'),
+                  turno: '1', tecnico: 'William Martinucci',
+                  equipamento: 'CENTRO DE USINAGEM D600',
+                  requisicao: req, nomeDaPeca: peca, quantidade: qtd,
+                  horasPlanejadas: prog / 60, site: site,
+                  perdaPlanejada: 'PROGRAMACAO',
+                  atividades: [{ tipo: 'PROGRAMACAO', tempo: prog / 60, site: site }]
+                };
+              }
+              pointers['PROG'] += prog;
+          }
+
+          // 2. Alocação de Usinagem (Torno e Centro)
           const technologies = [];
           if (torno > 0) technologies.push({ type: 'TORNO', usinagem: torno });
           if (centro > 0) technologies.push({ type: 'CENTRO', usinagem: centro });
@@ -431,18 +455,17 @@ export default function ProgrammingPage() {
               
               let turnoNum, tecnico, remainingInShift;
               
-              // Lógica de alocação considerando múltiplos técnicos no 1T
-              if (minInDay < 960) { // 1T (Até 960 min = 2 técnicos)
+              if (minInDay < 960) { // 1T (Até 960 min)
                   turnoNum = 1;
                   const pool = ESCALA_TECNICA[tech.type]['1'];
                   const poolIdx = Math.floor(minInDay / 480);
-                  tecnico = pool[poolIdx];
+                  tecnico = pool[poolIdx] || pool[0];
                   remainingInShift = 480 - (minInDay % 480);
-              } else if (minInDay < 1440) { // 2T (1 técnico)
+              } else if (minInDay < 1440) { // 2T
                   turnoNum = 2;
                   tecnico = ESCALA_TECNICA[tech.type]['2'][0];
                   remainingInShift = 1440 - minInDay;
-              } else { // 3T (1 técnico)
+              } else { // 3T
                   turnoNum = 3;
                   tecnico = ESCALA_TECNICA[tech.type]['3'][0];
                   remainingInShift = 1920 - minInDay;
@@ -462,20 +485,12 @@ export default function ProgrammingPage() {
                 const hasSetup = isFirstBlock && setup > 0;
                 updates[id] = {
                   dataExecucao: format(targetDate, 'dd/MM/yyyy'),
-                  turno: String(turnoNum),
-                  tecnico: tecnico,
+                  turno: String(turnoNum), tecnico: tecnico,
                   equipamento: tech.type === 'TORNO' ? 'TORNO CNC CENTUR 30' : 'CENTRO DE USINAGEM D600',
-                  requisicao: req,
-                  nomeDaPeca: peca,
-                  quantidade: qtd,
-                  horasPlanejadas: timeToAllocate / 60,
-                  site: site,
+                  requisicao: req, nomeDaPeca: peca, quantidade: qtd,
+                  horasPlanejadas: timeToAllocate / 60, site: site,
                   perdaPlanejada: hasSetup ? 'SETUP' : 'PRODUCAO',
-                  atividades: [{
-                    tipo: hasSetup ? 'SETUP' : 'PRODUCAO',
-                    tempo: timeToAllocate / 60,
-                    site: site
-                  }]
+                  atividades: [{ tipo: hasSetup ? 'SETUP' : 'PRODUCAO', tempo: timeToAllocate / 60, site: site }]
                 };
               }
 
@@ -487,7 +502,7 @@ export default function ProgrammingPage() {
         });
 
         await update(ref(database, '/Planejamento S'), updates);
-        toast({ title: "Planejamento Automático Concluído", description: `${Object.keys(updates).length} blocos alocados com suporte a escala dupla.` });
+        toast({ title: "Planejamento Automático Concluído", description: `${Object.keys(updates).length} blocos alocados.` });
       } catch (error) {
         console.error(error);
         toast({ title: "Erro no Planejamento", variant: "destructive" });
@@ -590,16 +605,17 @@ export default function ProgrammingPage() {
                                           {turno.technicians.map((tech) => {
                                             const techItems = dayItems.filter(item => (item.tecnico === tech || item.Técnicos === tech) && String(item.Turno || item.turno || '1') === turno.id);
                                             const isTornoTech = ["Marcos Barbosa", "Jair Melo", "Gustavo Gozzi", "Alisson Franca"].includes(tech);
-                                            const isCentroTech = ["Daniel Solivo", "Nathan Xavier", "Rodrigo Cantano", "William Martinucci"].includes(tech);
+                                            const isCentroTech = ["Daniel Solivo", "Nathan Xavier", "Rodrigo Cantano"].includes(tech);
+                                            const isProg = tech === "William Martinucci";
                                             
                                             return (
                                               <div key={tech} className="grid grid-cols-[150px_1fr] items-center group">
                                                 <div className="pr-2 min-w-0">
-                                                  <div className={cn("text-[9px] font-mono font-bold uppercase tracking-widest", isTornoTech ? "text-[#00707F]" : "text-[#5B36A8]")}>
-                                                    {isTornoTech ? '▬ Torno' : '▣ Centro'}
+                                                  <div className={cn("text-[9px] font-mono font-bold uppercase tracking-widest", isTornoTech ? "text-[#00707F]" : (isProg ? "text-indigo-600" : "text-[#5B36A8]"))}>
+                                                    {isTornoTech ? '▬ Torno' : (isProg ? '▣ Programador' : '▣ Centro')}
                                                   </div>
                                                   <div className="text-[12px] font-bold text-[#0F151B] truncate">{tech}</div>
-                                                  <div className="text-[9px] text-[#6C7C8B] leading-none">Téc. Prog./Op.</div>
+                                                  <div className="text-[9px] text-[#6C7C8B] leading-none">{isProg ? 'Téc. Programação' : 'Téc. Prog./Op.'}</div>
                                                 </div>
                                                 <div className="relative h-[36px] border border-[#E2E9EE] rounded-[3px] bg-[repeating-linear-gradient(90deg,#F4F7F9_0_1px,transparent_1px_100%)] bg-[size:12.5%_100%] overflow-hidden">
                                                   {techItems.length === 0 && (
@@ -641,8 +657,8 @@ export default function ProgrammingPage() {
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10" style={{ background: 'repeating-linear-gradient(45deg, #F0BC00 0 4px, #3A2E00 4px 8px)' }} /> Setup</div>
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#00707F]" /> Produção Torno</div>
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#5B36A8]" /> Produção Centro</div>
-        <div className="flex items-center gap-2 ml-4 px-2 py-1 bg-[#F4F7F9] border rounded text-[10px] text-muted-foreground uppercase"><Info className="h-3 w-3 mr-1" /> Dica: O botão "Planejar Automático" distribui as requisições respeitando a capacidade de 480 min/turno por técnico.</div>
-        <div className="ml-auto text-[#6C7C8B] font-medium italic">O 1º Turno possui capacidade dupla (2 técnicos por tecnologia).</div>
+        <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-indigo-600" /> Programação ADM</div>
+        <div className="ml-auto text-[#6C7C8B] font-medium italic">William Martinucci atua exclusivamente na Programação do Centro (1T).</div>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -652,7 +668,7 @@ export default function ProgrammingPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField control={form.control} name="equipamento" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="font-bold uppercase text-[10px] tracking-widest text-[#6C7C8B]">Equipamento</FormLabel>
+                    <FormLabel className="font-bold uppercase text-[10px] tracking-widest text-[#6C7C8B]">Equipamento / Tipo</FormLabel>
                     <div className="grid grid-cols-2 gap-4">
                       <Button type="button" variant={field.value === 'TORNO CNC CENTUR 30' ? 'default' : 'outline'} className={cn("h-16 flex flex-col gap-1 border-2", field.value === 'TORNO CNC CENTUR 30' ? "border-[#00707F] bg-[#00707F]/10 text-[#00707F]" : "border-[#E2E9EE]")} onClick={() => field.onChange('TORNO CNC CENTUR 30')}><Settings2 className="h-4 w-4" /><span className="text-[10px] font-bold uppercase tracking-widest">TORNO CENTUR 30</span></Button>
                       <Button type="button" variant={field.value === 'CENTRO DE USINAGEM D600' ? 'default' : 'outline'} className={cn("h-16 flex flex-col gap-1 border-2", field.value === 'CENTRO DE USINAGEM D600' ? "border-[#5B36A8] bg-[#5B36A8]/10 text-[#5B36A8]" : "border-[#E2E9EE]")} onClick={() => field.onChange('CENTRO DE USINAGEM D600')}><Cpu className="h-4 w-4" /><span className="text-[10px] font-bold uppercase tracking-widest">CENTRO D600</span></Button>
@@ -702,7 +718,7 @@ export default function ProgrammingPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Técnico</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="font-bold"><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Técnico Responsável</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="font-bold"><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                 <FormField control={form.control} name="site" render={({ field }) => (
                     <FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Fábrica Principal</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="font-bold"><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
                 )} />
@@ -712,7 +728,7 @@ export default function ProgrammingPage() {
                 <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Meta (Pç)</FormLabel><FormControl><Input type="number" className="font-mono" {...field} /></FormControl></FormItem>)} />
               </div>
-              <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
+              <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Notas de Produção</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
                 {editingId && (<Button type="button" variant="destructive" onClick={async () => { if (!database || !editingId) return; await remove(ref(database, `/Planejamento S/${editingId}`)); toast({ title: "Planejamento Excluído" }); setIsDialogOpen(false); }}>Excluir</Button>)}
                 <Button type="submit" className="bg-[#101820] hover:bg-[#101820]/90 uppercase font-bold text-xs tracking-widest">Salvar Planejamento</Button>
