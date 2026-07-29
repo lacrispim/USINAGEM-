@@ -45,7 +45,8 @@ import {
   Cpu,
   CalendarDays,
   FileUp,
-  Info
+  Info,
+  Wand2
 } from 'lucide-react';
 import { 
   format, 
@@ -93,7 +94,7 @@ interface PlanejamentoItem {
   atividades?: AtividadePlanejada[];
 }
 
-// --- Configurações Estéticas (Baseadas no código do usuário) ---
+// --- Configurações Estéticas e Motor de Escala ---
 const turnos = [
   { id: '1', label: '1T', range: '06:00-14:00', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson Franca"] },
   { id: '2', label: '2T', range: '14:00-22:00', technicians: ["Nathan Xavier", "Jair Melo"] },
@@ -109,6 +110,12 @@ const factoryList = [
     "VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", 
     "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"
 ];
+
+// Mapeamento de quem opera o quê em cada turno (Escala Padrão Industrial)
+const ESCALA_TECNICA: Record<string, Record<string, string>> = {
+  'TORNO': { '1': 'Marcos Barbosa', '2': 'Jair Melo', '3': 'Gustavo Gozzi' },
+  'CENTRO': { '1': 'Daniel Solivo', '2': 'Nathan Xavier', '3': 'Rodrigo Cantano' }
+};
 
 const lossOptions = [
   { value: 'PRODUCAO', label: 'Produção Normal', color: '#00707F' },
@@ -182,7 +189,6 @@ const TimelineBar = ({ item, realData, onClick, shiftMin }: { item: Planejamento
       )}
       style={{ width: `${widthPc}%`, minWidth: '2px' }}
     >
-      {/* Efeito Hazard (Setup) */}
       {isSetup && (
         <div 
           className="absolute inset-y-0 left-0 w-[15px] shrink-0 opacity-40" 
@@ -198,7 +204,6 @@ const TimelineBar = ({ item, realData, onClick, shiftMin }: { item: Planejamento
         </span>
       </div>
 
-      {/* Barra de Realizado (Base) */}
       <div className="absolute bottom-0 left-0 h-[3px] bg-black/30 w-full overflow-hidden">
         <div className="h-full bg-white opacity-60" style={{ width: `${progress}%` }} />
       </div>
@@ -224,7 +229,6 @@ export default function ProgrammingPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTurno, setSelectedTurno] = useState<string>('1');
 
-  // Visão de 3 dias
   const timelineDays = useMemo(() => [
     currentDate,
     addDays(currentDate, 1),
@@ -306,7 +310,6 @@ export default function ProgrammingPage() {
     if (dateStr) { try { itemDate = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { itemDate = new Date(dateStr); } }
     setSelectedDay(itemDate);
     
-    // Normalização das atividades para edição
     let initialAtividades = item.atividades;
     if (!initialAtividades) {
         const tempoRaw = item.horasPlanejadas || item['Horas Máquina'];
@@ -354,7 +357,7 @@ export default function ProgrammingPage() {
     } catch (error) { console.error(error); }
   }
 
-  // --- Função de Importação de Excel ---
+  // --- MOTOR DE PLANEJAMENTO AUTOMÁTICO ---
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !database) return;
@@ -365,55 +368,92 @@ export default function ProgrammingPage() {
       try {
         const data = event.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(sheet);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json: any[] = XLSX.utils.sheet_to_json(sheet);
 
         if (json.length === 0) {
-            toast({ title: "Arquivo Vazio", description: "A planilha selecionada não contém dados.", variant: "destructive" });
+            toast({ title: "Arquivo Vazio", variant: "destructive" });
             setIsImporting(false);
             return;
         }
 
+        const SHIFT_CAPACITY_MIN = 480;
+        const SHIFT_CAPACITY_H = 8;
+        
+        // Ponteiros de tempo por tecnologia (minutos acumulados a partir do início)
+        let pointers = { 'TORNO': 0, 'CENTRO': 0 };
         const updates: any = {};
-        json.forEach((row: any) => {
-            const newRef = push(ref(database, '/Planejamento S'));
-            const id = newRef.key;
-            if (!id) return;
 
-            // Mapeamento inteligente de colunas (Suporta nomes em PT e EN)
-            const item: any = {
-                dataExecucao: row['Data Execução'] || row['Data'] || row['Date'] || format(new Date(), 'dd/MM/yyyy'),
-                turno: String(row['Turno'] || row['Shift'] || '1'),
-                tecnico: row['Técnico'] || row['Technician'] || row['Técnicos'] || '',
-                equipamento: row['Equipamento'] || row['Machine'] || row['EQUIPAMENTO'] || '',
-                requisicao: String(row['Requisição'] || row['Forms'] || row['Nº Forms'] || row['requisicao'] || ''),
-                nomeDaPeca: row['Peça'] || row['Nome da Peça'] || row['Part Name'] || '',
-                quantidade: Number(row['Quantidade'] || row['Qty'] || 0),
-                horasPlanejadas: Number(String(row['Horas Máquina'] || row['Tempo'] || row['Hours'] || 0).replace(',', '.')),
-                site: row['Fábrica'] || row['Site'] || 'VALINHOS DOVE',
-                observacao: row['Observação'] || row['Notes'] || '',
-                'Perdas planejadas': row['Perdas'] || row['Loss'] || ''
-            };
+        json.forEach((row) => {
+          const rawJob = {
+            req: String(row['Requisição'] || row['Req.'] || row['Forms'] || ''),
+            peca: row['Peça'] || row['Nome da Peça'] || 'SEM DESCRIÇÃO',
+            qtd: Number(row['Quantidade'] || row['Qtd'] || 0),
+            setup: Number(row['Setup'] || 0),
+            torno: Number(row['Torno'] || 0),
+            centro: Number(row['Centro'] || 0),
+            site: row['Site'] || row['Fábrica'] || 'VALINHOS DOVE'
+          };
 
-            // Criar atividade padrão para compatibilidade com o visual de progresso
-            item.atividades = [{
-                tipo: item['Perdas planejadas'] || 'PRODUCAO',
-                tempo: item.horasPlanejadas,
-                site: item.site
-            }];
+          const machines = [];
+          if (rawJob.torno > 0) machines.push('TORNO');
+          if (rawJob.centro > 0) machines.push('CENTRO');
 
-            updates[id] = item;
+          machines.forEach(mType => {
+            let pendingTime = rawJob.setup + (mType === 'TORNO' ? rawJob.torno : rawJob.centro);
+            
+            // Enquanto houver tempo para alocar (quebra em turnos se necessário)
+            while (pendingTime > 0) {
+              const currentMin = pointers[mType as keyof typeof pointers];
+              const shiftIdx = Math.floor(currentMin / SHIFT_CAPACITY_MIN);
+              const remainingInShift = SHIFT_CAPACITY_MIN - (currentMin % SHIFT_CAPACITY_MIN);
+              
+              const timeToAllocate = Math.min(pendingTime, remainingInShift);
+              const hoursToAllocate = timeToAllocate / 60;
+
+              // Determinar Dia e Turno
+              const dayOffset = Math.floor(shiftIdx / 3);
+              const turnoNum = (shiftIdx % 3) + 1;
+              const targetDate = addDays(currentDate, dayOffset);
+              
+              // Pegar técnico da escala
+              const tecnico = ESCALA_TECNICA[mType][String(turnoNum)];
+
+              const newRef = push(ref(database, '/Planejamento S'));
+              const id = newRef.key;
+              
+              if (id) {
+                updates[id] = {
+                  dataExecucao: format(targetDate, 'dd/MM/yyyy'),
+                  turno: String(turnoNum),
+                  tecnico: tecnico,
+                  equipamento: mType === 'TORNO' ? 'TORNO CNC CENTUR 30' : 'CENTRO DE USINAGEM D600',
+                  requisicao: rawJob.req,
+                  nomeDaPeca: rawJob.peca,
+                  quantidade: rawJob.qtd,
+                  horasPlanejadas: hoursToAllocate,
+                  site: rawJob.site,
+                  atividades: [{
+                    tipo: rawJob.setup > 0 && pendingTime > (mType === 'TORNO' ? rawJob.torno : rawJob.centro) ? 'SETUP' : 'PRODUCAO',
+                    tempo: hoursToAllocate,
+                    site: rawJob.site
+                  }]
+                };
+              }
+
+              pointers[mType as keyof typeof pointers] += timeToAllocate;
+              pendingTime -= timeToAllocate;
+            }
+          });
         });
 
         await update(ref(database, '/Planejamento S'), updates);
-        toast({ title: "Importação Concluída", description: `${json.length} registros foram adicionados ao planejamento.` });
+        toast({ title: "Planejamento Automático Concluído", description: "As requisições foram distribuídas conforme a capacidade." });
       } catch (error) {
-        console.error("Erro na importação:", error);
-        toast({ title: "Erro na Importação", description: "Verifique se o formato do arquivo está correto.", variant: "destructive" });
+        console.error(error);
+        toast({ title: "Erro no Planejamento", variant: "destructive" });
       } finally {
         setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
     reader.readAsBinaryString(file);
@@ -428,22 +468,16 @@ export default function ProgrammingPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleImportExcel} 
-            accept=".xlsx, .xls, .csv" 
-            className="hidden" 
-          />
+          <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx, .xls, .csv" className="hidden" />
           <Button 
             variant="outline" 
             size="sm" 
-            className="bg-white border-[#CBD5DD] text-[#101820] font-bold uppercase text-[10px] tracking-widest hover:bg-[#F4F7F9]"
+            className="bg-[#101820] border-none text-[#F0BC00] font-bold uppercase text-[10px] tracking-widest hover:bg-[#101820]/90 shadow-md h-9"
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
           >
-            {isImporting ? <Loader className="h-3 w-3 animate-spin mr-2" /> : <FileUp className="h-3 w-3 mr-2" />}
-            Importar Excel
+            {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <Wand2 className="h-4 w-4 mr-2" />}
+            Importar & Planejar Automático
           </Button>
 
           <div className="flex items-center gap-2 bg-white p-1 rounded border border-[#CBD5DD] shadow-sm">
@@ -480,8 +514,7 @@ export default function ProgrammingPage() {
 
                 return (
                     <div key={day.toString()} className="bg-white border border-[#CBD5DD] shadow-sm overflow-hidden rounded-sm">
-                        {/* Header do Dia (Estilo User) */}
-                        <div className="bg-[#101820] text-white px-4 py-2.5 flex items-center justify-between">
+                        <div className="bg-[#101820] text-white px-4 py-2.5 flex items-center justify-between border-b-4 border-[#F0BC00]">
                             <div className="flex items-center gap-3">
                                 <span className="text-xl font-bold uppercase tracking-widest font-['Barlow_Condensed']">Dia {format(day, 'dd · MM/yy')}</span>
                                 <span className="text-[10px] font-bold text-[#8FA3B2] uppercase tracking-[0.18em]">{format(day, 'EEEE', { locale: ptBR })}</span>
@@ -493,7 +526,6 @@ export default function ProgrammingPage() {
                             </div>
                         </div>
 
-                        {/* Turnos */}
                         <div className="divide-y divide-[#E2E9EE]">
                             {turnos.map(turno => (
                                 <div key={turno.id} className="grid grid-cols-[118px_1fr]">
@@ -507,7 +539,7 @@ export default function ProgrammingPage() {
                                         <div className="space-y-1.5">
                                           {turno.technicians.map((tech, idx) => {
                                             const techItems = dayItems.filter(item => (item.tecnico === tech || item.Técnicos === tech) && String(item.Turno || item.turno || '1') === turno.id);
-                                            const isTorno = idx % 2 === 0;
+                                            const isTorno = tech === "Marcos Barbosa" || tech === "Jair Melo" || tech === "Gustavo Gozzi";
                                             
                                             return (
                                               <div key={tech} className="grid grid-cols-[150px_1fr] items-center group">
@@ -531,7 +563,6 @@ export default function ProgrammingPage() {
                                                       shiftMin={480}
                                                     />
                                                   ))}
-                                                  {/* Botão Adicionar Rápido */}
                                                   <Button 
                                                     variant="ghost" 
                                                     size="icon" 
@@ -555,16 +586,14 @@ export default function ProgrammingPage() {
         )}
       </div>
 
-      {/* Legenda Estilo User */}
       <div className="flex gap-4 flex-wrap text-[11px] font-bold text-[#3D4C5A] items-center bg-white p-3 border border-[#CBD5DD] rounded-sm">
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10" style={{ background: 'repeating-linear-gradient(45deg, #F0BC00 0 4px, #3A2E00 4px 8px)' }} /> Setup</div>
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#00707F]" /> Produção Torno</div>
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#5B36A8]" /> Produção Centro</div>
-        <div className="flex items-center gap-2 ml-4 px-2 py-1 bg-[#F4F7F9] border rounded text-[10px] text-muted-foreground uppercase"><Info className="h-3 w-3 mr-1" /> Dica: Para importar, use colunas: Data, Turno, Técnico, Equipamento, Requisição, Peça, Quantidade e Tempo.</div>
-        <div className="ml-auto text-[#6C7C8B] font-medium italic">A peça é contada no turno em que termina.</div>
+        <div className="flex items-center gap-2 ml-4 px-2 py-1 bg-[#F4F7F9] border rounded text-[10px] text-muted-foreground uppercase"><Info className="h-3 w-3 mr-1" /> Dica: O botão "Planejar Automático" distribui as requisições respeitando a capacidade de 480 min/turno.</div>
+        <div className="ml-auto text-[#6C7C8B] font-medium italic">As tarefas são quebradas automaticamente entre turnos se necessário.</div>
       </div>
 
-      {/* Diálogo de Edição / Novo (Preservado da lógica anterior) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto font-['IBM_Plex_Sans']">
           <DialogHeader><DialogTitle className="font-['Barlow_Condensed'] text-2xl uppercase">{editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}</DialogTitle></DialogHeader>
