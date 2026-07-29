@@ -6,40 +6,6 @@ import { useDatabase, useFirestore, useCollection, useMemoFirebase } from '@/fir
 import { ref, onValue, push, set, update, remove } from 'firebase/database';
 import { collection, query, where } from 'firebase/firestore';
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Loader, 
-  Plus,
-  Trash2,
-  Settings2,
-  PlusCircle,
-  Cpu,
-  CalendarDays,
-  Clock,
-  CheckCircle2,
-  AlertCircle
-} from 'lucide-react';
-import { 
-  format, 
-  startOfWeek, 
-  endOfWeek, 
-  isSameDay, 
-  parse, 
-  startOfDay,
-  endOfDay,
-  addDays
-} from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -67,6 +33,29 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Loader, 
+  Plus,
+  Trash2,
+  Settings2,
+  PlusCircle,
+  Cpu,
+  CalendarDays,
+  Clock
+} from 'lucide-react';
+import { 
+  format, 
+  startOfDay,
+  endOfDay,
+  addDays,
+  isSameDay,
+  parse
+} from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 // --- Interfaces ---
 interface AtividadePlanejada {
@@ -102,6 +91,7 @@ interface PlanejamentoItem {
   atividades?: AtividadePlanejada[];
 }
 
+// --- Configurações Estéticas (Baseadas no código do usuário) ---
 const turnos = [
   { id: '1', label: '1T', range: '06:00-14:00', technicians: ["Marcos Barbosa", "Daniel Solivo", "William Martinucci", "Alisson Franca"] },
   { id: '2', label: '2T', range: '14:00-22:00', technicians: ["Nathan Xavier", "Jair Melo"] },
@@ -109,14 +99,8 @@ const turnos = [
 ];
 
 const operatorList = [
-    "Alisson Franca",
-    "Daniel Solivo",
-    "Rodrigo Cantano",
-    "Gustavo Gozzi",
-    "William Martinucci",
-    "Nathan Xavier",
-    "Jair Melo",
-    "Marcos Barbosa"
+    "Alisson Franca", "Daniel Solivo", "Rodrigo Cantano", "Gustavo Gozzi",
+    "William Martinucci", "Nathan Xavier", "Jair Melo", "Marcos Barbosa"
 ];
 
 const factoryList = [
@@ -125,9 +109,9 @@ const factoryList = [
 ];
 
 const lossOptions = [
-  { value: 'PRODUCAO', label: 'Produção Normal', color: '#007b8a' },
-  { value: 'PROGRAMACAO', label: 'Programação', color: '#a855f7' },
-  { value: 'SETUP', label: 'Setup', color: '#ef4444' },
+  { value: 'PRODUCAO', label: 'Produção Normal', color: '#00707F' },
+  { value: 'PROGRAMACAO', label: 'Programação', color: '#5B36A8' },
+  { value: 'SETUP', label: 'Setup', color: '#F0BC00' },
   { value: 'DDS', label: 'Atividades ADM', color: '#f97316' },
   { value: 'CAFE', label: 'Parada para Café', color: '#eab308' },
   { value: 'LIMPEZA', label: 'Limpeza Planejada', color: '#22c55e' },
@@ -154,127 +138,67 @@ const planningFormSchema = z.object({
 
 type PlanningFormValues = z.infer<typeof planningFormSchema>;
 
-// --- Componentes Internos da Timeline ---
+// --- Componentes Visuais ---
 
-const ShiftTimelineRow = ({ 
-  label, 
-  range, 
-  items, 
-  techs, 
-  realData,
-  onItemClick,
-  onAddClick,
-  day 
-}: { 
-  label: string; 
-  range: string; 
-  items: PlanejamentoItem[]; 
-  techs: string[]; 
-  realData: any[];
-  onItemClick: (item: PlanejamentoItem) => void;
-  onAddClick: (day: Date, turnoId: string, tech: string) => void;
-  day: Date;
-}) => {
+const Ruler = ({ shiftMin }: { shiftMin: number }) => {
+  const marks = [];
+  for (let m = 0; m <= shiftMin; m += 60) {
+    const pc = (m / shiftMin) * 100;
+    const isMajor = m % 120 === 0;
+    marks.push(
+      <div key={m} className="absolute top-0 h-full flex flex-col items-center" style={{ left: `${pc}%` }}>
+        <div className={cn("w-px bg-[#CBD5DD]", isMajor ? "h-[9px] bg-[#6C7C8B]" : "h-[5px]")} />
+        {isMajor && <span className="text-[9px] font-mono text-[#6C7C8B] leading-none mt-1">{m / 60}h</span>}
+      </div>
+    );
+  }
+  return <div className="relative h-[18px] ml-[150px] border-b border-[#CBD5DD] mb-1">{marks}</div>;
+};
+
+const TimelineBar = ({ item, realData, onClick, shiftMin }: { item: PlanejamentoItem, realData: any[], onClick: () => void, shiftMin: number }) => {
+  const rawHours = item.horasPlanejadas || item['Horas Máquina'];
+  const hours = typeof rawHours === 'string' ? parseFloat(rawHours.replace(',', '.')) : (Number(rawHours) || 0);
+  
+  const req = item.requisicao || item['Requisição'];
+  const realHours = realData
+    .filter(r => r.formsNumber === req)
+    .reduce((acc, curr) => acc + (Number(curr.machiningTime) || 0) / 60, 0);
+  
+  const progress = hours > 0 ? Math.min((realHours / hours) * 100, 100) : 0;
+  const isSetup = (item.perdaPlanejada || item['Perdas planejadas'] || '').toUpperCase().includes('SETUP');
+  const machineType = item.equipamento || item.EQUIPAMENTO || '';
+  const isTorno = machineType.includes('TORNO');
+
+  const widthPc = (hours / 8) * 100;
+
   return (
-    <div className="flex border-b border-border/40 hover:bg-muted/5 transition-colors">
-      {/* Coluna do Turno */}
-      <div className="w-[80px] shrink-0 p-4 flex flex-col justify-center items-center border-r bg-muted/10">
-        <span className="text-xl font-black text-foreground">{label}</span>
-        <span className="text-[10px] text-muted-foreground font-medium">{range}</span>
-        <span className="text-[10px] font-bold text-muted-foreground/60 mt-1">480 min</span>
+    <div 
+      onClick={onClick}
+      className={cn(
+        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden cursor-pointer border border-black/20 flex items-center shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all z-10",
+        isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]"
+      )}
+      style={{ width: `${widthPc}%`, minWidth: '2px' }}
+    >
+      {/* Efeito Hazard (Setup) */}
+      {isSetup && (
+        <div 
+          className="absolute inset-y-0 left-0 w-[15px] shrink-0 opacity-40" 
+          style={{ background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #3A2E00 5px 10px)' }} 
+        />
+      )}
+
+      <div className="relative flex-1 flex items-center gap-2 px-2 min-w-0 text-white">
+        <span className="font-mono text-[11px] font-bold shrink-0">{req}</span>
+        <span className="font-mono text-[10px] opacity-80 shrink-0">{item.quantidade || item.Quantidade || 0} pç</span>
+        <span className="text-[10px] opacity-90 truncate uppercase font-medium">
+          {item.nomeDaPeca || item['Nome da Peça'] || 'SEM NOME'}
+        </span>
       </div>
 
-      {/* Coluna de Recursos e Linhas do Tempo */}
-      <div className="flex-1">
-        {techs.map((tech, idx) => {
-          const techItems = items.filter(item => (item.tecnico === tech || item.Técnicos === tech));
-          
-          // Pegar o equipamento do primeiro item ou deduzir (estético)
-          const machineType = techItems[0]?.equipamento || techItems[0]?.EQUIPAMENTO || (idx % 2 === 0 ? 'TORNO' : 'CENTRO');
-          const isTorno = machineType.includes('TORNO');
-
-          return (
-            <div key={tech} className="flex border-b last:border-0 h-[70px]">
-              {/* Nome do Técnico e Máquina */}
-              <div className="w-[180px] shrink-0 p-3 border-r flex flex-col justify-center gap-0.5">
-                <div className="flex items-center gap-1.5">
-                   <div className={cn("w-1.5 h-1.5 rounded-full", isTorno ? "bg-[#007b8a]" : "bg-[#6d28d9]")} />
-                   <span className={cn("text-[9px] font-black uppercase tracking-widest", isTorno ? "text-[#007b8a]" : "text-[#a855f7]")}>
-                      {isTorno ? 'TORNO' : 'CENTRO'}
-                   </span>
-                </div>
-                <span className="text-sm font-bold truncate">{tech}</span>
-                <span className="text-[10px] text-muted-foreground font-medium">Téc. Prog./Op.</span>
-              </div>
-
-              {/* Grid de Tempo (0-8h) */}
-              <div className="flex-1 relative bg-[linear-gradient(to_right,#8881_1px,transparent_1px)] bg-[size:12.5%_100%] overflow-hidden group/row">
-                 {/* Botão de adição rápida flutuante */}
-                 <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="absolute right-2 top-2 h-6 w-6 opacity-0 group-hover/row:opacity-100 transition-opacity z-20"
-                    onClick={() => onAddClick(day, label.charAt(0), tech)}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-
-                 {/* Atividades Timeline */}
-                 <div className="flex h-full items-center px-0.5 gap-1">
-                   {techItems.map(item => {
-                      const rawHours = item.horasPlanejadas || item['Horas Máquina'];
-                      const hours = typeof rawHours === 'string' ? parseFloat(rawHours.replace(',', '.')) : (Number(rawHours) || 0);
-                      
-                      // Cálculo de Realizado para este Forms
-                      const req = item.requisicao || item['Requisição'];
-                      const realHours = realData
-                        .filter(r => r.formsNumber === req)
-                        .reduce((acc, curr) => acc + (Number(curr.machiningTime) || 0) / 60, 0);
-                      
-                      const progress = hours > 0 ? Math.min((realHours / hours) * 100, 100) : 0;
-                      const isSetup = (item.perdaPlanejada || item['Perdas planejadas'] || '').toUpperCase().includes('SETUP');
-
-                      return (
-                        <div 
-                          key={item.id}
-                          onClick={() => onItemClick(item)}
-                          className={cn(
-                            "relative h-[48px] rounded-sm overflow-hidden flex flex-col justify-between cursor-pointer border-r last:border-r-0 shadow-sm hover:ring-2 ring-primary transition-all",
-                            isTorno ? "bg-[#007b8a]" : "bg-[#6d28d9]"
-                          )}
-                          style={{ width: `${(hours / 8) * 100}%`, minWidth: '80px' }}
-                        >
-                          {/* Faixas de Setup (Zebrinha) */}
-                          {isSetup && (
-                            <div className="absolute inset-0 opacity-40 pointer-events-none" 
-                                 style={{ background: 'repeating-linear-gradient(45deg, #facc15, #facc15 10px, #000 10px, #000 20px)' }} />
-                          )}
-
-                          <div className="relative p-1.5 flex flex-col h-full justify-between">
-                            <div className="flex items-center justify-between gap-1">
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="text-[12px] font-black text-white">{req}</span>
-                                <span className="text-[10px] font-bold text-white/80">{item.quantidade || item.Quantidade || 0} pç</span>
-                              </div>
-                              <span className="text-[9px] font-black bg-black/20 text-white px-1 rounded">{hours.toFixed(1)}h</span>
-                            </div>
-                            <span className="text-[10px] font-bold text-white/90 truncate leading-tight uppercase">
-                              {item.nomeDaPeca || item['Nome da Peça'] || 'SEM NOME'}
-                            </span>
-                          </div>
-
-                          {/* Barra de Progresso Realizado */}
-                          <div className="h-1.5 w-full bg-black/30 mt-auto overflow-hidden">
-                             <div className="h-full bg-white/40" style={{ width: `${progress}%` }} />
-                          </div>
-                        </div>
-                      );
-                   })}
-                 </div>
-              </div>
-            </div>
-          );
-        })}
+      {/* Barra de Realizado (Base) */}
+      <div className="absolute bottom-0 left-0 h-[3px] bg-black/30 w-full overflow-hidden">
+        <div className="h-full bg-white opacity-60" style={{ width: `${progress}%` }} />
       </div>
     </div>
   );
@@ -417,29 +341,35 @@ export default function ProgrammingPage() {
     } catch (error) { console.error(error); }
   }
 
+  const formatHours = (min: number) => {
+    const h = Math.floor(min / 60);
+    const m = Math.round(min % 60);
+    return h ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m}min`;
+  };
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 bg-[#E4E9EE] min-h-screen -m-4 p-4 lg:-m-6 lg:p-6 font-['IBM_Plex_Sans']">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Planejamento de Produção</h1>
-          <p className="text-muted-foreground">Visão Gantt integrada com acompanhamento real de 3 dias.</p>
+          <h1 className="text-4xl font-bold tracking-tight text-[#101820] font-['Barlow_Condensed'] uppercase">PLANO DE CARGA CNC</h1>
+          <p className="text-[11px] tracking-[0.22em] text-[#8FA3B2] uppercase font-bold">Time Técnico de Usinagem · Torno & Centro · 3 Turnos</p>
         </div>
-        <div className="flex items-center gap-2 bg-card p-1 rounded-lg border shadow-sm">
+        <div className="flex items-center gap-2 bg-white p-1 rounded border border-[#CBD5DD] shadow-sm">
           <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
           <div className="min-w-[160px] text-center font-bold flex items-center justify-center gap-2">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <span className="capitalize">{format(currentDate, 'dd/MM/yyyy', { locale: ptBR })}</span>
+            <CalendarDays className="h-4 w-4 text-[#6C7C8B]" />
+            <span className="capitalize text-[#0F151B]">{format(currentDate, 'dd/MM/yyyy', { locale: ptBR })}</span>
           </div>
           <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
           <Button variant="secondary" size="sm" onClick={() => setCurrentDate(new Date())}>Hoje</Button>
         </div>
       </div>
 
-      <div className="space-y-12">
+      <div className="space-y-6">
         {loading ? (
-            <div className="flex h-[400px] items-center justify-center gap-2 bg-card rounded-lg border shadow-sm">
-                <Loader className="h-8 w-8 animate-spin" />
-                <span className="font-bold uppercase text-[10px] tracking-widest">Sincronizando Planejamento...</span>
+            <div className="flex h-[400px] items-center justify-center gap-2 bg-white rounded-lg border shadow-sm">
+                <Loader className="h-8 w-8 animate-spin text-[#5B36A8]" />
+                <span className="font-bold uppercase text-[10px] tracking-widest text-[#6C7C8B]">Sincronizando Planejamento...</span>
             </div>
         ) : (
             timelineDays.map((day) => {
@@ -456,56 +386,74 @@ export default function ProgrammingPage() {
                 }, 0);
 
                 return (
-                    <div key={day.toString()} className="rounded-xl border shadow-xl bg-card overflow-hidden">
-                        {/* Header do Dia Industrial */}
-                        <div className="bg-[#1e293b] text-white px-6 py-4 flex items-center justify-between">
-                            <div className="flex items-baseline gap-4">
-                                <span className="text-2xl font-black uppercase tracking-tighter">DIA {format(day, 'dd · MM/yy')}</span>
-                                <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
+                    <div key={day.toString()} className="bg-white border border-[#CBD5DD] shadow-sm overflow-hidden rounded-sm">
+                        {/* Header do Dia (Estilo User) */}
+                        <div className="bg-[#101820] text-white px-4 py-2.5 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xl font-bold uppercase tracking-widest font-['Barlow_Condensed']">Dia {format(day, 'dd · MM/yy')}</span>
+                                <span className="text-[10px] font-bold text-[#8FA3B2] uppercase tracking-[0.18em]">{format(day, 'EEEE', { locale: ptBR })}</span>
                             </div>
-                            <div className="flex items-center gap-8">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-slate-400 text-[10px] font-black uppercase">peças</span>
-                                    <span className="text-xl font-black">{totalPecas}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-slate-400 text-[10px] font-black uppercase">ocupação</span>
-                                    <span className="text-xl font-black">{totalHoras.toFixed(1)}h</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-slate-400 text-[10px] font-black uppercase">utilização</span>
-                                    <span className="text-xl font-black">{totalHoras > 0 ? Math.min((totalHoras / 24) * 100, 100).toFixed(0) : '0'}%</span>
-                                </div>
+                            <div className="flex items-center gap-6 font-mono text-[11px] text-[#B7C6D2]">
+                                <span>peças <b className="text-white ml-1">{totalPecas}</b></span>
+                                <span>ocupação <b className="text-white ml-1">{totalHoras.toFixed(1)}h</b></span>
+                                <span>utilização <b className="text-white ml-1">{(totalHoras > 0 ? Math.min((totalHoras / 48) * 100, 100).toFixed(0) : '0')}%</b></span>
                             </div>
                         </div>
 
-                        {/* Eixo de Tempo 0h - 8h */}
-                        <div className="flex bg-muted/20 border-b border-border/60">
-                           <div className="w-[260px] shrink-0" />
-                           <div className="flex-1 flex text-[9px] font-black text-muted-foreground/60 py-1 relative">
-                              {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(h => (
-                                <div key={h} className="absolute h-4 border-l border-border" style={{ left: `${(h/8)*100}%` }}>
-                                    <span className="ml-1 leading-none">{h}h</span>
-                                </div>
-                              ))}
-                              <div className="h-4 w-full" />
-                           </div>
-                        </div>
-
-                        {/* Linhas de Turnos */}
-                        <div className="divide-y divide-border/30">
+                        {/* Turnos */}
+                        <div className="divide-y divide-[#E2E9EE]">
                             {turnos.map(turno => (
-                                <ShiftTimelineRow 
-                                    key={turno.id}
-                                    label={turno.label}
-                                    range={turno.range}
-                                    items={dayItems.filter(item => String(item.Turno || item.turno || '1') === turno.id)}
-                                    techs={turno.technicians}
-                                    realData={productionRecords || []}
-                                    onItemClick={handleItemClick}
-                                    onAddClick={handleShiftClick}
-                                    day={day}
-                                />
+                                <div key={turno.id} className="grid grid-cols-[118px_1fr]">
+                                    <div className="bg-[#F4F7F9] border-r border-[#E2E9EE] p-3 flex flex-col justify-center items-center">
+                                        <span className="text-2xl font-bold font-['Barlow_Condensed'] leading-none text-[#0F151B]">{turno.label}</span>
+                                        <span className="text-[10px] font-mono text-[#6C7C8B] mt-1">{turno.range}</span>
+                                        <span className="text-[10px] font-mono text-[#6C7C8B]">480 min</span>
+                                    </div>
+                                    <div className="p-3 bg-white">
+                                        <Ruler shiftMin={480} />
+                                        <div className="space-y-1.5">
+                                          {turno.technicians.map((tech, idx) => {
+                                            const techItems = dayItems.filter(item => (item.tecnico === tech || item.Técnicos === tech) && String(item.Turno || item.turno || '1') === turno.id);
+                                            const isTorno = idx % 2 === 0; // Exemplo de alternância visual se não houver dado
+                                            
+                                            return (
+                                              <div key={tech} className="grid grid-cols-[150px_1fr] items-center group">
+                                                <div className="pr-2 min-w-0">
+                                                  <div className={cn("text-[9px] font-mono font-bold uppercase tracking-widest", isTorno ? "text-[#00707F]" : "text-[#5B36A8]")}>
+                                                    {isTorno ? '▬ Torno' : '▣ Centro'}
+                                                  </div>
+                                                  <div className="text-[12px] font-bold text-[#0F151B] truncate">{tech}</div>
+                                                  <div className="text-[9px] text-[#6C7C8B] leading-none">Téc. Prog./Op.</div>
+                                                </div>
+                                                <div className="relative h-[36px] border border-[#E2E9EE] rounded-[3px] bg-[repeating-linear-gradient(90deg,#F4F7F9_0_1px,transparent_1px_100%)] bg-[size:12.5%_100%] overflow-hidden">
+                                                  {techItems.length === 0 && (
+                                                    <div className="absolute inset-0 flex items-center justify-center text-[9px] uppercase tracking-widest text-[#A9B7C2] font-mono opacity-50">sem carga</div>
+                                                  )}
+                                                  {techItems.map(item => (
+                                                    <TimelineBar 
+                                                      key={item.id} 
+                                                      item={item} 
+                                                      realData={productionRecords || []} 
+                                                      onClick={() => handleItemClick(item)} 
+                                                      shiftMin={480}
+                                                    />
+                                                  ))}
+                                                  {/* Botão Adicionar Rápido */}
+                                                  <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="absolute right-0 top-0 h-full w-8 opacity-0 group-hover:opacity-100 transition-opacity text-[#6C7C8B] hover:bg-[#F4F7F9]"
+                                                    onClick={() => handleShiftClick(day, turno.id, tech)}
+                                                  >
+                                                    <Plus className="h-3 w-3" />
+                                                  </Button>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                    </div>
+                                </div>
                             ))}
                         </div>
                     </div>
@@ -514,37 +462,45 @@ export default function ProgrammingPage() {
         )}
       </div>
 
-      {/* Diálogo de Edição / Novo */}
+      {/* Legenda Estilo User */}
+      <div className="flex gap-4 flex-wrap text-[11px] font-bold text-[#3D4C5A] items-center bg-white p-3 border border-[#CBD5DD] rounded-sm">
+        <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10" style={{ background: 'repeating-linear-gradient(45deg, #F0BC00 0 4px, #3A2E00 4px 8px)' }} /> Setup</div>
+        <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#00707F]" /> Produção Torno</div>
+        <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#5B36A8]" /> Produção Centro</div>
+        <div className="ml-auto text-[#6C7C8B] font-medium italic">A peça é contada no turno em que termina.</div>
+      </div>
+
+      {/* Diálogo de Edição / Novo (Preservado da lógica anterior) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto font-['IBM_Plex_Sans']">
+          <DialogHeader><DialogTitle className="font-['Barlow_Condensed'] text-2xl uppercase">{editingId ? 'Editar Planejamento' : `Novo Planejamento - ${selectedTurno}º Turno`}</DialogTitle></DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField control={form.control} name="equipamento" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="font-bold">Equipamento</FormLabel>
+                    <FormLabel className="font-bold uppercase text-[10px] tracking-widest text-[#6C7C8B]">Equipamento</FormLabel>
                     <div className="grid grid-cols-2 gap-4">
-                      <Button type="button" variant={field.value === 'TORNO CNC CENTUR 30' ? 'default' : 'outline'} className="h-16 flex flex-col" onClick={() => field.onChange('TORNO CNC CENTUR 30')}><Settings2 className="h-4 w-4" /><span className="text-xs font-bold">TORNO CENTUR 30</span></Button>
-                      <Button type="button" variant={field.value === 'CENTRO DE USINAGEM D600' ? 'default' : 'outline'} className="h-16 flex flex-col" onClick={() => field.onChange('CENTRO DE USINAGEM D600')}><Cpu className="h-4 w-4" /><span className="text-xs font-bold">CENTRO D600</span></Button>
+                      <Button type="button" variant={field.value === 'TORNO CNC CENTUR 30' ? 'default' : 'outline'} className={cn("h-16 flex flex-col gap-1 border-2", field.value === 'TORNO CNC CENTUR 30' ? "border-[#00707F] bg-[#00707F]/10 text-[#00707F]" : "border-[#E2E9EE]")} onClick={() => field.onChange('TORNO CNC CENTUR 30')}><Settings2 className="h-4 w-4" /><span className="text-[10px] font-bold uppercase tracking-widest">TORNO CENTUR 30</span></Button>
+                      <Button type="button" variant={field.value === 'CENTRO DE USINAGEM D600' ? 'default' : 'outline'} className={cn("h-16 flex flex-col gap-1 border-2", field.value === 'CENTRO DE USINAGEM D600' ? "border-[#5B36A8] bg-[#5B36A8]/10 text-[#5B36A8]" : "border-[#E2E9EE]")} onClick={() => field.onChange('CENTRO DE USINAGEM D600')}><Cpu className="h-4 w-4" /><span className="text-[10px] font-bold uppercase tracking-widest">CENTRO D600</span></Button>
                     </div>
                   </FormItem>
                 )} />
 
-              <div className="space-y-4 rounded-lg border p-4 bg-muted/20">
+              <div className="space-y-4 rounded-lg border border-[#E2E9EE] p-4 bg-[#F4F7F9]">
                 <div className="flex items-center justify-between">
-                    <Label className="font-bold uppercase text-[10px] tracking-widest text-primary">Atividades / Perdas Planejadas</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={() => append({ tipo: 'PRODUCAO', tempo: 0, site: form.getValues('site') || 'VALINHOS DOVE' })} className="h-7 text-[10px] font-bold"><PlusCircle className="h-3 w-3 mr-1" /> ADICIONAR</Button>
+                    <Label className="font-bold uppercase text-[10px] tracking-widest text-[#0F151B]">Atividades / Perdas Planejadas</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ tipo: 'PRODUCAO', tempo: 0, site: form.getValues('site') || 'VALINHOS DOVE' })} className="h-7 text-[10px] font-bold border-[#CBD5DD]"><PlusCircle className="h-3 w-3 mr-1" /> ADICIONAR</Button>
                 </div>
                 {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-2 items-end border-b pb-3 last:border-0 last:pb-0">
+                  <div key={field.id} className="flex gap-2 items-end border-b border-[#E2E9EE] pb-3 last:border-0 last:pb-0">
                     <div className="flex-[1.5]">
                       <FormField control={form.control} name={`atividades.${index}.tipo`} render={({ field }) => (
                         <FormItem>
                           <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger className="h-8 text-[10px]"><SelectValue placeholder="Tipo" /></SelectTrigger></FormControl>
+                            <FormControl><SelectTrigger className="h-8 text-[10px] font-mono"><SelectValue placeholder="Tipo" /></SelectTrigger></FormControl>
                             <SelectContent>
                               {lossOptions.map(opt => (
-                                <SelectItem key={opt.value} value={opt.value}><div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: opt.color }} />{opt.label}</div></SelectItem>
+                                <SelectItem key={opt.value} value={opt.value} className="text-[10px] font-mono"><div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: opt.color }} />{opt.label}</div></SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -555,15 +511,15 @@ export default function ProgrammingPage() {
                       <FormField control={form.control} name={`atividades.${index}.site`} render={({ field }) => (
                         <FormItem>
                           <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger className="h-8 text-[10px]"><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl>
-                            <SelectContent>{factoryList.map(f => <SelectItem key={f} value={f} className="text-[10px]">{f}</SelectItem>)}</SelectContent>
+                            <FormControl><SelectTrigger className="h-8 text-[10px] font-mono"><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl>
+                            <SelectContent>{factoryList.map(f => <SelectItem key={f} value={f} className="text-[10px] font-mono">{f}</SelectItem>)}</SelectContent>
                           </Select>
                         </FormItem>
                       )} />
                     </div>
                     <div className="w-20">
                       <FormField control={form.control} name={`atividades.${index}.tempo`} render={({ field }) => (
-                        <FormItem><FormControl><Input type="number" step="0.1" placeholder="H" className="h-8 text-[10px]" {...field} /></FormControl></FormItem>
+                        <FormItem><FormControl><Input type="number" step="0.1" placeholder="H" className="h-8 text-[10px] font-mono" {...field} /></FormControl></FormItem>
                       )} />
                     </div>
                     {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" onClick={() => removeAtividade(index)} className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>)}
@@ -572,20 +528,20 @@ export default function ProgrammingPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel>Técnico</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                <FormField control={form.control} name="tecnico" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Técnico</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="font-bold"><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                 <FormField control={form.control} name="site" render={({ field }) => (
-                    <FormItem><FormLabel>Fábrica Principal</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
+                    <FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Fábrica Principal</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="font-bold"><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
                 )} />
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel>Nº Forms</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel>Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel>Meta (Pç)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="requisicao" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Nº Forms</FormLabel><FormControl><Input className="font-mono" {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="nomeDaPeca" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Peça</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Meta (Pç)</FormLabel><FormControl><Input type="number" className="font-mono" {...field} /></FormControl></FormItem>)} />
               </div>
-              <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel>Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
+              <FormField control={form.control} name="observacao" render={({ field }) => (<FormItem><FormLabel className="text-[10px] uppercase font-bold tracking-widest text-[#6C7C8B]">Notas</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>)} />
               <DialogFooter>
                 {editingId && (<Button type="button" variant="destructive" onClick={async () => { if (!database || !editingId) return; await remove(ref(database, `/Planejamento S/${editingId}`)); toast({ title: "Planejamento Excluído" }); setIsDialogOpen(false); }}>Excluir</Button>)}
-                <Button type="submit">Salvar Planejamento</Button>
+                <Button type="submit" className="bg-[#101820] hover:bg-[#101820]/90 uppercase font-bold text-xs tracking-widest">Salvar Planejamento</Button>
               </DialogFooter>
             </form>
           </Form>
