@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useDatabase, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { ref, onValue, push, set, update, remove } from 'firebase/database';
 import { collection, query, where } from 'firebase/firestore';
@@ -44,7 +44,8 @@ import {
   PlusCircle,
   Cpu,
   CalendarDays,
-  Clock
+  FileUp,
+  Info
 } from 'lucide-react';
 import { 
   format, 
@@ -56,6 +57,7 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 
 // --- Interfaces ---
 interface AtividadePlanejada {
@@ -161,7 +163,7 @@ const TimelineBar = ({ item, realData, onClick, shiftMin }: { item: Planejamento
   
   const req = item.requisicao || item['Requisição'];
   const realHours = realData
-    .filter(r => r.formsNumber === req)
+    .filter(r => String(r.formsNumber) === String(req))
     .reduce((acc, curr) => acc + (Number(curr.machiningTime) || 0) / 60, 0);
   
   const progress = hours > 0 ? Math.min((realHours / hours) * 100, 100) : 0;
@@ -210,9 +212,11 @@ export default function ProgrammingPage() {
   const database = useDatabase();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -301,11 +305,20 @@ export default function ProgrammingPage() {
     const dateStr = item.dataExecucao || item['Data Execução'];
     if (dateStr) { try { itemDate = parse(dateStr, 'dd/MM/yyyy', new Date()); } catch { itemDate = new Date(dateStr); } }
     setSelectedDay(itemDate);
-    const initialAtividades = item.atividades || [{
-      tipo: (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase(),
-      tempo: typeof (item.horasPlanejadas || item['Horas Máquina']) === 'string' ? parseFloat(String(item.horasPlanejadas || item['Horas Máquina']).replace(',', '.')) : (Number(item.horasPlanejadas || item['Horas Máquina']) || 0),
-      site: item.site || item.Site || 'VALINHOS DOVE'
-    }];
+    
+    // Normalização das atividades para edição
+    let initialAtividades = item.atividades;
+    if (!initialAtividades) {
+        const tempoRaw = item.horasPlanejadas || item['Horas Máquina'];
+        const tempo = typeof tempoRaw === 'string' ? parseFloat(tempoRaw.replace(',', '.')) : (Number(tempoRaw) || 0);
+        const tipo = (item.perdaPlanejada || item['Perdas planejadas'] || 'PRODUCAO').toUpperCase() || 'PRODUCAO';
+        initialAtividades = [{
+          tipo: tipo.includes('PRODUCAO') ? 'PRODUCAO' : tipo,
+          tempo: tempo,
+          site: item.site || item.Site || 'VALINHOS DOVE'
+        }];
+    }
+
     form.reset({
       dataExecucao: dateStr || '', turno: shiftVal,
       equipamento: item.equipamento || item.EQUIPAMENTO || '',
@@ -313,7 +326,7 @@ export default function ProgrammingPage() {
       nomeDaPeca: item.nomeDaPeca || item['Nome da Peça'] || '',
       quantidade: Number(item.quantidade !== undefined ? item.quantidade : item.Quantidade) || 0,
       tecnico: item.tecnico || item.Técnicos || '',
-      horasPlanejadas: Number(form.getValues('horasPlanejadas')),
+      horasPlanejadas: (watchAtividades || []).reduce((acc, curr) => acc + (Number(curr.tempo) || 0), 0),
       site: item.site || item.Site || 'VALINHOS DOVE',
       observacao: item.observacao || item.Observação || '',
       atividades: initialAtividades,
@@ -341,10 +354,69 @@ export default function ProgrammingPage() {
     } catch (error) { console.error(error); }
   }
 
-  const formatHours = (min: number) => {
-    const h = Math.floor(min / 60);
-    const m = Math.round(min % 60);
-    return h ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m}min`;
+  // --- Função de Importação de Excel ---
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !database) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = event.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(sheet);
+
+        if (json.length === 0) {
+            toast({ title: "Arquivo Vazio", description: "A planilha selecionada não contém dados.", variant: "destructive" });
+            setIsImporting(false);
+            return;
+        }
+
+        const updates: any = {};
+        json.forEach((row: any) => {
+            const newRef = push(ref(database, '/Planejamento S'));
+            const id = newRef.key;
+            if (!id) return;
+
+            // Mapeamento inteligente de colunas (Suporta nomes em PT e EN)
+            const item: any = {
+                dataExecucao: row['Data Execução'] || row['Data'] || row['Date'] || format(new Date(), 'dd/MM/yyyy'),
+                turno: String(row['Turno'] || row['Shift'] || '1'),
+                tecnico: row['Técnico'] || row['Technician'] || row['Técnicos'] || '',
+                equipamento: row['Equipamento'] || row['Machine'] || row['EQUIPAMENTO'] || '',
+                requisicao: String(row['Requisição'] || row['Forms'] || row['Nº Forms'] || row['requisicao'] || ''),
+                nomeDaPeca: row['Peça'] || row['Nome da Peça'] || row['Part Name'] || '',
+                quantidade: Number(row['Quantidade'] || row['Qty'] || 0),
+                horasPlanejadas: Number(String(row['Horas Máquina'] || row['Tempo'] || row['Hours'] || 0).replace(',', '.')),
+                site: row['Fábrica'] || row['Site'] || 'VALINHOS DOVE',
+                observacao: row['Observação'] || row['Notes'] || '',
+                'Perdas planejadas': row['Perdas'] || row['Loss'] || ''
+            };
+
+            // Criar atividade padrão para compatibilidade com o visual de progresso
+            item.atividades = [{
+                tipo: item['Perdas planejadas'] || 'PRODUCAO',
+                tempo: item.horasPlanejadas,
+                site: item.site
+            }];
+
+            updates[id] = item;
+        });
+
+        await update(ref(database, '/Planejamento S'), updates);
+        toast({ title: "Importação Concluída", description: `${json.length} registros foram adicionados ao planejamento.` });
+      } catch (error) {
+        console.error("Erro na importação:", error);
+        toast({ title: "Erro na Importação", description: "Verifique se o formato do arquivo está correto.", variant: "destructive" });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   return (
@@ -354,14 +426,35 @@ export default function ProgrammingPage() {
           <h1 className="text-4xl font-bold tracking-tight text-[#101820] font-['Barlow_Condensed'] uppercase">PLANO DE CARGA CNC</h1>
           <p className="text-[11px] tracking-[0.22em] text-[#8FA3B2] uppercase font-bold">Time Técnico de Usinagem · Torno & Centro · 3 Turnos</p>
         </div>
-        <div className="flex items-center gap-2 bg-white p-1 rounded border border-[#CBD5DD] shadow-sm">
-          <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-          <div className="min-w-[160px] text-center font-bold flex items-center justify-center gap-2">
-            <CalendarDays className="h-4 w-4 text-[#6C7C8B]" />
-            <span className="capitalize text-[#0F151B]">{format(currentDate, 'dd/MM/yyyy', { locale: ptBR })}</span>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleImportExcel} 
+            accept=".xlsx, .xls, .csv" 
+            className="hidden" 
+          />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="bg-white border-[#CBD5DD] text-[#101820] font-bold uppercase text-[10px] tracking-widest hover:bg-[#F4F7F9]"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+          >
+            {isImporting ? <Loader className="h-3 w-3 animate-spin mr-2" /> : <FileUp className="h-3 w-3 mr-2" />}
+            Importar Excel
+          </Button>
+
+          <div className="flex items-center gap-2 bg-white p-1 rounded border border-[#CBD5DD] shadow-sm">
+            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+            <div className="min-w-[160px] text-center font-bold flex items-center justify-center gap-2">
+              <CalendarDays className="h-4 w-4 text-[#6C7C8B]" />
+              <span className="capitalize text-[#0F151B]">{format(currentDate, 'dd/MM/yyyy', { locale: ptBR })}</span>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
+            <Button variant="secondary" size="sm" onClick={() => setCurrentDate(new Date())}>Hoje</Button>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
-          <Button variant="secondary" size="sm" onClick={() => setCurrentDate(new Date())}>Hoje</Button>
         </div>
       </div>
 
@@ -414,7 +507,7 @@ export default function ProgrammingPage() {
                                         <div className="space-y-1.5">
                                           {turno.technicians.map((tech, idx) => {
                                             const techItems = dayItems.filter(item => (item.tecnico === tech || item.Técnicos === tech) && String(item.Turno || item.turno || '1') === turno.id);
-                                            const isTorno = idx % 2 === 0; // Exemplo de alternância visual se não houver dado
+                                            const isTorno = idx % 2 === 0;
                                             
                                             return (
                                               <div key={tech} className="grid grid-cols-[150px_1fr] items-center group">
@@ -467,6 +560,7 @@ export default function ProgrammingPage() {
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10" style={{ background: 'repeating-linear-gradient(45deg, #F0BC00 0 4px, #3A2E00 4px 8px)' }} /> Setup</div>
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#00707F]" /> Produção Torno</div>
         <div className="flex items-center gap-2"><div className="w-4 h-3 rounded-[2px] border border-black/10 bg-[#5B36A8]" /> Produção Centro</div>
+        <div className="flex items-center gap-2 ml-4 px-2 py-1 bg-[#F4F7F9] border rounded text-[10px] text-muted-foreground uppercase"><Info className="h-3 w-3 mr-1" /> Dica: Para importar, use colunas: Data, Turno, Técnico, Equipamento, Requisição, Peça, Quantidade e Tempo.</div>
         <div className="ml-auto text-[#6C7C8B] font-medium italic">A peça é contada no turno em que termina.</div>
       </div>
 
