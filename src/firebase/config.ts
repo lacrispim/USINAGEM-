@@ -1,9 +1,10 @@
+
 'use client';
 
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getDatabase, connectDatabaseEmulator } from 'firebase/database';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
 
 export const firebaseConfig = {
   apiKey: "AIzaSyAI1XkNMBqRNPt59plsuP3-MFskCwgibqQ",
@@ -31,17 +32,7 @@ export function getSdks(firebaseApp: FirebaseApp) {
   const firestore = getFirestore(firebaseApp);
   const database = getDatabase(firebaseApp);
 
-  if (process.env.NEXT_PUBLIC_USE_EMULATOR === 'true') {
-    const host = process.env.NEXT_PUBLIC_EMULATOR_HOST || '127.0.0.1';
-    const firestorePort = parseInt(process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT || '8080', 10);
-    const authPort = parseInt(process.env.NEXT_PUBLIC_AUTH_EMULATOR_PORT || '9099', 10);
-    const databasePort = parseInt(process.env.NEXT_PUBLIC_DATABASE_EMULATOR_PORT || '9000', 10);
-
-    connectFirestoreEmulator(firestore, host, firestorePort);
-    connectAuthEmulator(auth, `http://${host}:${authPort}`);
-    connectDatabaseEmulator(database, host, databasePort);
-  }
-
+  // Removido lógica de emuladores para evitar conflitos no ambiente de produção do Studio
   return {
     firebaseApp,
     auth,

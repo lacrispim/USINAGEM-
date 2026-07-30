@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "MachiningRecord": {
@@ -6,187 +7,45 @@
       "type": "object",
       "description": "Represents a single machining record with detailed information about the process.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the machining record."
-        },
-        "userId": {
-          "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N MachiningRecord). The ID of the user who created this record."
-        },
-        "material": {
-          "type": "string",
-          "description": "The material being machined."
-        },
-        "tool": {
-          "type": "string",
-          "description": "The cutting tool used for machining."
-        },
-        "speed": {
-          "type": "number",
-          "description": "The cutting speed used in the machining process."
-        },
-        "feedRate": {
-          "type": "number",
-          "description": "The feed rate used in the machining process."
-        },
-        "dateTime": {
-          "type": "string",
-          "description": "The date and time when the machining record was created.",
-          "format": "date-time"
-        },
-        "notes": {
-          "type": "string",
-          "description": "Any additional notes or observations about the machining process.",
-          "format": "string"
-        }
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "material": { "type": "string" },
+        "tool": { "type": "string" },
+        "speed": { "type": "number" },
+        "feedRate": { "type": "number" },
+        "dateTime": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" }
       },
-      "required": [
-        "id",
-        "userId",
-        "material",
-        "tool",
-        "speed",
-        "feedRate",
-        "dateTime"
-      ]
+      "required": ["id", "userId", "material", "tool", "speed", "feedRate", "dateTime"]
     },
     "User": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user of the Machining Insights application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user."
-        },
-        "email": {
-          "type": "string",
-          "description": "The email address of the user.",
-          "format": "email"
-        }
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" }
       },
-      "required": [
-        "id",
-        "email"
-      ]
+      "required": ["id", "email"]
     },
-    "MachineSchedule": {
-      "title": "MachineSchedule",
+    "FilaItem": {
+      "title": "FilaItem",
       "type": "object",
-      "description": "Represents the weekly schedule for a single machine, listing requisition numbers for each day.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the machine schedule record."
-        },
-        "machineName": {
-          "type": "string",
-          "description": "The name of the machine."
-        },
-        "monday": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of requisition numbers for Monday."
-        },
-        "tuesday": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of requisition numbers for Tuesday."
-        },
-        "wednesday": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of requisition numbers for Wednesday."
-        },
-        "thursday": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of requisition numbers for Thursday."
-        },
-        "friday": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of requisition numbers for Friday."
-        },
-        "saturday": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of requisition numbers for Saturday."
-        },
-        "sunday": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of requisition numbers for Sunday."
-        }
-      },
-      "required": [
-        "id",
-        "machineName"
-      ]
-    },
-    "PlanoSemanal": {
-      "title": "PlanoSemanal",
-      "type": "object",
-      "description": "Represents a single entry in the weekly production plan.",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "dataExecucao": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "site": {
-          "type": "string"
-        },
-        "requisicao": {
-          "type": "string"
-        },
-        "nomeDaPeca": {
-          "type": "string"
-        },
-        "quantidade": {
-          "type": "number"
-        },
-        "tecnico": {
-          "type": "string"
-        },
-        "observacao": {
-          "type": "string"
-        },
-        "equipamento": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "dataExecucao",
-        "site",
-        "requisicao",
-        "nomeDaPeca"
-      ]
+        "id": { "type": "string" },
+        "requisicao": { "type": "string" },
+        "nomeDaPeca": { "type": "string" },
+        "quantidade": { "type": "number" },
+        "setup": { "type": "number" },
+        "torno": { "type": "number" },
+        "centro": { "type": "number" },
+        "prog": { "type": "number" },
+        "site": { "type": "string" }
+      }
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password", "anonymous"]
   },
   "firestore": {
     "structure": [
@@ -194,71 +53,29 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profile information. Only the authenticated user can read/write their own profile.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user. This is the Firebase Auth UID."
-            }
-          ]
+          "schema": { "$ref": "#/backend/entities/User" },
+          "description": "Stores user profile information."
         }
       },
       {
-        "path": "/users/{userId}/machiningRecords/{recordId}",
+        "path": "/productionRecords/{recordId}",
         "definition": {
-          "entityName": "MachiningRecord",
-          "schema": {
-            "$ref": "#/backend/entities/MachiningRecord"
-          },
-          "description": "Stores machining records for a specific user. Includes denormalized 'userId' for authorization independence. Only the user with ID '{userId}' can read/write records in this path.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user who owns this machining record. This matches the Firebase Auth UID."
-            },
-            {
-              "name": "recordId",
-              "description": "The unique identifier for the machining record."
-            }
-          ]
+          "description": "Stores machining production records."
         }
       },
       {
-        "path": "/machineSchedules/{scheduleId}",
+        "path": "/lossRecords/{recordId}",
         "definition": {
-          "entityName": "MachineSchedule",
-          "schema": {
-            "$ref": "#/backend/entities/MachineSchedule"
-          },
-          "description": "Stores the weekly schedule for each machine.",
-          "params": [
-            {
-              "name": "scheduleId",
-              "description": "The unique identifier for the schedule document."
-            }
-          ]
+          "description": "Stores machining loss records."
         }
       },
       {
-        "path": "/planoSemanal/{planoId}",
+        "path": "/programacaoState/{stateId}",
         "definition": {
-          "entityName": "PlanoSemanal",
-          "schema": {
-            "$ref": "#/backend/entities/PlanoSemanal"
-          },
-          "description": "Stores the weekly production plan entries.",
-          "params": [
-            {
-              "name": "planoId",
-              "description": "The unique identifier for the plan entry."
-            }
-          ]
+          "description": "Stores the current state of production queue and timeline."
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to ensure secure and efficient data management for the Machining Insights application, focusing on user-owned machining records. It leverages path-based ownership to simplify security rules and enhance data isolation.\n\n*   **Authorization Independence:** The `MachiningRecord` documents are stored within user-specific subcollections (`/users/{userId}/machiningRecords/{recordId}`). This inherently ties each record to its owner and avoids any cross-collection `get()` calls for authorization. The `userId` field within each `MachiningRecord` is redundant but explicitly enforces the association and clarifies the intent.\n*   **QAPs (Queries and Permissions):** The structure facilitates secure list operations because access to `/users/{userId}/machiningRecords` is restricted to the authenticated user matching `{userId}`. This prevents unauthorized access to other users' records.\n*   **Structural Segregation:**  All documents within the `/users/{userId}/machiningRecords` collection share the same security posture (owned by the user with ID `{userId}`).\n*   **Predictable Schema:** The schema for `MachiningRecord` is well-defined, and fields such as `userId` are named semantically for clarity.\n*   **Path-Based Ownership:** The design uses hierarchical paths to represent the `User 1:N MachiningRecord` relationship, which provides a clear, secure, and efficient way to manage user-owned data."
+    "reasoning": "Using Firestore for all state management ensures consistency and stability within the prototype environment."
   }
 }

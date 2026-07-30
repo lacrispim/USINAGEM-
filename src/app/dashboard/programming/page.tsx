@@ -1,15 +1,15 @@
+
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { useDatabase } from '@/firebase';
-import { ref, onValue, set, push, update } from 'firebase/database';
+import { useFirestore, useDoc } from '@/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { 
   ChevronLeft, 
   ChevronRight, 
   Loader, 
-  Wand2,
   Eraser,
   CalendarDays,
   Settings2,
@@ -61,7 +61,7 @@ interface PlanejamentoItem {
   techKey: 'TORNO' | 'CENTRO' | 'ADM';
 }
 
-// --- Escala Técnica Oficial (Conforme imagem do time) ---
+// --- Escala Técnica Oficial (Conforme pedido) ---
 const TURNOS = [
   { id: '1', label: '1T', range: '06:00-14:00' },
   { id: '2', label: '2T', range: '14:00-22:00' },
@@ -143,7 +143,7 @@ const TimelineBar = ({ item }: { item: PlanejamentoItem }) => {
 };
 
 export default function ProgrammingPage() {
-  const database = useDatabase();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -153,69 +153,42 @@ export default function ProgrammingPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
 
+  // Listeners Firestore para o estado da Programação
+  const filaMemo = useMemo(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]);
+  const planoMemo = useMemo(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]);
+  
+  const { data: filaDoc } = useDoc(filaMemo);
+  const { data: planoDoc } = useDoc(planoMemo);
+
+  useEffect(() => {
+    if (filaDoc) setFila(filaDoc.data || []);
+    if (planoDoc) {
+      setPlanejamentoData(planoDoc.data || []);
+      setLoading(false);
+    } else if (planoDoc === null) {
+      setLoading(false);
+    }
+  }, [filaDoc, planoDoc]);
+
   const timelineDays = useMemo(() => [currentDate, addDays(currentDate, 1), addDays(currentDate, 2)], [currentDate]);
 
-  // Carregar Fila e Planejamento
-  useEffect(() => {
-    if (!database) return;
-    
-    const filaRef = ref(database, '/Fila_Producao');
-    const planRef = ref(database, '/Planejamento_V2');
-
-    const unsubFila = onValue(filaRef, (snap) => {
-      if (snap.exists()) {
-        const val = snap.val();
-        setFila(Array.isArray(val) ? val : Object.values(val));
-      } else {
-        setFila([]);
-      }
-    });
-
-    const unsubPlan = onValue(planRef, (snap) => {
-      if (snap.exists()) {
-        const val = snap.val();
-        setPlanejamentoData(Array.isArray(val) ? val : Object.values(val));
-      } else {
-        setPlanejamentoData([]);
-      }
-      setLoading(false);
-    });
-
-    return () => { unsubFila(); unsubPlan(); };
-  }, [database]);
-
-  // Motor de Planejamento Industrial
   const recalculatePlan = async (novaFila: JobBase[]) => {
-    if (!database) return;
+    if (!firestore) return;
     
-    const updates: Record<string, any> = {
-      '/Planejamento_V2': null, // Limpa o planejamento antigo no mesmo update
-      '/Fila_Producao': novaFila
-    };
-    
-    let techPointers: Record<string, number> = {}; // Minutos acumulados por técnico
+    const novosPlanItems: PlanejamentoItem[] = [];
+    let techPointers: Record<string, number> = {}; 
 
     // 1. Planejamento de Programação (Time ADM)
-    novaFila.forEach(job => {
+    novaFila.forEach((job, idx) => {
       if (job.prog > 0) {
-        // Distribui entre William ou Alisson no 1T
         const techsAdm = EQUIPE['ADM']['1'];
-        let bestTech = techsAdm[0];
-        let minTime = techPointers[bestTech.name] || 0;
-
-        techsAdm.forEach(t => {
-          const tTime = techPointers[t.name] || 0;
-          if (tTime < minTime) { minTime = tTime; bestTech = t; }
-        });
-
-        const techName = bestTech.name;
+        const techName = techsAdm[0].name;
         const currentTotal = techPointers[techName] || 0;
         const startOffset = currentTotal % SHIFT_MIN;
         const dayIdx = Math.floor(currentTotal / SHIFT_MIN);
 
-        const id = push(ref(database, 'temp')).key!;
-        updates[`/Planejamento_V2/${id}`] = {
-          id,
+        novosPlanItems.push({
+          id: `prog-${idx}-${Date.now()}`,
           dataExecucao: format(addDays(currentDate, dayIdx), 'dd/MM/yyyy'),
           tecnico: techName, equipamento: 'PROGRAMAÇÃO',
           requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca,
@@ -223,7 +196,7 @@ export default function ProgrammingPage() {
           tempoMinutos: job.prog, setupMinutos: 0, turno: '1',
           startOffsetMin: startOffset, tipoAtividade: 'PROGRAMACAO',
           techKey: 'ADM'
-        };
+        });
         techPointers[techName] = currentTotal + job.prog;
       }
     });
@@ -281,9 +254,8 @@ export default function ProgrammingPage() {
           }
 
           const dayIdx = Math.floor(globalTime / SHIFT_MIN);
-          const id = push(ref(database, 'temp')).key!;
-          updates[`/Planejamento_V2/${id}`] = {
-            id,
+          novosPlanItems.push({
+            id: `plan-${Math.random().toString(36).substr(2, 9)}`,
             dataExecucao: format(addDays(currentDate, dayIdx), 'dd/MM/yyyy'),
             tecnico: techName, equipamento: equipName,
             requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca,
@@ -291,10 +263,10 @@ export default function ProgrammingPage() {
             tempoMinutos: pInShift, setupMinutos: sInShift, turno: bestShift,
             startOffsetMin: startOffset, tipoAtividade: 'USINAGEM',
             techKey: techKey
-          };
+          });
 
           techPointers[techName] = globalTime + sInShift + pInShift;
-          if (dayIdx > 10) break;
+          if (dayIdx > 15) break; // Trava de segurança
         }
       });
     };
@@ -302,17 +274,13 @@ export default function ProgrammingPage() {
     distribute('torno');
     distribute('centro');
 
-    // Execução Atômica
+    // Salvamento Atômico no Firestore
     try {
-      await update(ref(database), updates);
+      await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: novaFila, updatedAt: serverTimestamp() });
+      await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: novosPlanItems, updatedAt: serverTimestamp() });
       toast({ title: "Plano Atualizado", description: "O cronograma foi recalculado com sucesso." });
     } catch (err: any) {
-      console.error("Erro ao salvar no RTD:", err);
-      toast({ 
-        title: "Erro ao salvar", 
-        description: "Falha na comunicação com o banco de dados. Verifique a internet.", 
-        variant: "destructive" 
-      });
+      toast({ title: "Erro ao salvar", description: "Verifique a conexão.", variant: "destructive" });
     }
   };
 
@@ -326,7 +294,7 @@ export default function ProgrammingPage() {
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !database) return;
+    if (!file || !firestore) return;
 
     setIsImporting(true);
     const reader = new FileReader();
@@ -337,34 +305,32 @@ export default function ProgrammingPage() {
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const json: any[] = XLSX.utils.sheet_to_json(firstSheet);
 
-        if (!json.length) throw new Error("Planilha vazia");
-
         const findVal = (row: any, keys: string[]) => {
           const k = Object.keys(row).find(k => keys.some(s => k.toLowerCase().trim() === s.toLowerCase().trim() || k.toLowerCase().includes(s.toLowerCase())));
           return k ? row[k] : undefined;
         };
 
         const novaFila: JobBase[] = json.map((row, i) => {
-          const req = String(findVal(row, ['req', 'requisicao', 'requisição', 'número', 'forms', 'nº forms']) || 'S/N');
-          const peca = String(findVal(row, ['peca', 'peça', 'nome', 'descrição', 'desc', 'nome da peça']) || 'SEM NOME');
-          const qtd = Number(findVal(row, ['qtd', 'quantidade', 'quantidade de peças']) || 1);
+          const req = String(findVal(row, ['req', 'requisicao', 'forms']) || 'S/N');
+          const peca = String(findVal(row, ['peca', 'peça', 'nome']) || 'SEM NOME');
+          const qtd = Number(findVal(row, ['qtd', 'quantidade']) || 1);
           
           return {
             id: `job-${i}-${Date.now()}`,
             requisicao: req,
             nomeDaPeca: peca,
             quantidade: isNaN(qtd) || qtd <= 0 ? 1 : qtd,
-            setup: Number(findVal(row, ['setup', 'tempo setup', 'tempo de setup', 'setup (min)']) || 0),
-            torno: Number(findVal(row, ['torno', 'tempo torno', 'usinagem torno', 'torno (min)']) || 0),
-            centro: Number(findVal(row, ['centro', 'tempo centro', 'usinagem centro', 'centro (min)']) || 0),
-            prog: Number(findVal(row, ['prog', 'programação', 'programacao', 'prog (min)']) || 0),
-            site: String(findVal(row, ['site', 'fabrica', 'fábrica']) || 'VALINHOS'),
+            setup: Number(findVal(row, ['setup', 'tempo setup']) || 0),
+            torno: Number(findVal(row, ['torno', 'tempo torno']) || 0),
+            centro: Number(findVal(row, ['centro', 'tempo centro']) || 0),
+            prog: Number(findVal(row, ['prog', 'programação']) || 0),
+            site: String(findVal(row, ['site', 'fabrica']) || 'VALINHOS'),
           };
         });
 
         await recalculatePlan(novaFila);
       } catch (err: any) {
-        toast({ title: "Erro na Importação", description: err.message || "Verifique o formato da planilha.", variant: "destructive" });
+        toast({ title: "Erro na Importação", description: "Verifique o formato da planilha.", variant: "destructive" });
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -375,7 +341,6 @@ export default function ProgrammingPage() {
 
   return (
     <div className="flex flex-col gap-8 bg-[#E4E9EE] min-h-screen -m-4 p-4 lg:-m-6 lg:p-6 font-['IBM_Plex_Sans']">
-      {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold tracking-tight text-[#101820] font-['Barlow_Condensed'] uppercase leading-none">PLANO DE CARGA CNC</h1>
@@ -407,12 +372,11 @@ export default function ProgrammingPage() {
         </div>
       </div>
 
-      {/* Timeline (Gantt) */}
       <div className="space-y-6">
         {loading ? (
           <div className="flex h-[400px] flex-col items-center justify-center gap-4 bg-white rounded-lg border shadow-sm">
             <Loader className="h-10 w-10 animate-spin text-[#5B36A8]" />
-            <span className="font-bold uppercase text-[10px] tracking-widest text-[#6C7C8B]">Sincronizando com Banco de Dados...</span>
+            <span className="font-bold uppercase text-[10px] tracking-widest text-[#6C7C8B]">Sincronizando com Firestore...</span>
           </div>
         ) : (
           timelineDays.map((day) => {
@@ -485,7 +449,6 @@ export default function ProgrammingPage() {
         )}
       </div>
 
-      {/* Fila de Produção (Controle de Sequência) */}
       <Card className="border-[#CBD5DD] shadow-lg">
         <CardHeader className="bg-[#F4F7F9] border-b border-[#E2E9EE]">
           <div className="flex items-center justify-between">
@@ -505,33 +468,21 @@ export default function ProgrammingPage() {
                 <TableHead className="font-bold">REQ.</TableHead>
                 <TableHead className="font-bold">PEÇA</TableHead>
                 <TableHead className="text-right font-bold">QTD</TableHead>
-                <TableHead className="text-right font-bold">SETUP</TableHead>
-                <TableHead className="text-right font-bold">TORNO</TableHead>
-                <TableHead className="text-right font-bold">CENTRO</TableHead>
+                <TableHead className="text-right font-bold">TOTAL (S+U)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {fila.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição na fila ativa</TableCell>
+                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição na fila ativa</TableCell>
                 </TableRow>
               ) : (
                 fila.map((job, index) => (
                   <TableRow key={job.id} className="hover:bg-[#F7FAFB] transition-colors">
                     <TableCell className="text-center">
                       <div className="flex flex-col items-center gap-1">
-                        <Button 
-                          variant="outline" size="icon" className="h-6 w-6 border-[#CBD5DD]" 
-                          onClick={() => moveItem(index, -1)} disabled={index === 0}
-                        >
-                          <ArrowUp className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="outline" size="icon" className="h-6 w-6 border-[#CBD5DD]" 
-                          onClick={() => moveItem(index, 1)} disabled={index === fila.length - 1}
-                        >
-                          <ArrowDown className="h-3 w-3" />
-                        </Button>
+                        <Button variant="outline" size="icon" className="h-6 w-6 border-[#CBD5DD]" onClick={() => moveItem(index, -1)} disabled={index === 0}><ArrowUp className="h-3 w-3" /></Button>
+                        <Button variant="outline" size="icon" className="h-6 w-6 border-[#CBD5DD]" onClick={() => moveItem(index, 1)} disabled={index === fila.length - 1}><ArrowDown className="h-3 w-3" /></Button>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -543,9 +494,7 @@ export default function ProgrammingPage() {
                     <TableCell className="font-mono font-bold text-sm">#{job.requisicao}</TableCell>
                     <TableCell className="uppercase text-xs font-medium text-[#3D4C5A]">{job.nomeDaPeca}</TableCell>
                     <TableCell className="text-right font-mono font-bold">{job.quantidade} pç</TableCell>
-                    <TableCell className="text-right font-mono text-xs text-[#6C7C8B]">{job.setup} min</TableCell>
-                    <TableCell className="text-right font-mono text-xs text-[#00707F]">{job.torno > 0 ? `${job.torno} min` : '—'}</TableCell>
-                    <TableCell className="text-right font-mono text-xs text-[#5B36A8]">{job.centro > 0 ? `${job.centro} min` : '—'}</TableCell>
+                    <TableCell className="text-right font-mono text-xs text-[#6C7C8B]">{job.setup + job.torno + job.centro} min</TableCell>
                   </TableRow>
                 ))
               )}
@@ -553,25 +502,6 @@ export default function ProgrammingPage() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Footer Info */}
-      <div className="bg-white p-6 rounded border border-[#CBD5DD] shadow-lg">
-          <h3 className="text-[#101820] font-['Barlow_Condensed'] text-xl uppercase font-bold mb-4 flex items-center gap-2">
-              <Settings2 className="h-5 w-5" /> Regras do Motor de Sequenciamento
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-[11px] text-[#8FA3B2] leading-relaxed">
-            <ul className="space-y-2">
-              <li>• <b className="text-[#3D4C5A]">Prioridade Dinâmica:</b> Use as setas na tabela acima para reordenar. O plano recalcula instantaneamente.</li>
-              <li>• <b className="text-[#3D4C5A]">Cálculo de Peças:</b> Dividimos o tempo total pela quantidade. O sistema "entrega" as peças no turno em que o ciclo se fecha.</li>
-              <li>• <b className="text-[#3D4C5A]">Fluxo Industrial:</b> Cada produção inicia com o Setup. Se o técnico mudar no meio do trabalho, o motor mantém a continuidade da contagem de peças.</li>
-            </ul>
-            <div className="flex flex-wrap gap-4">
-              <div className="flex items-center gap-2"><div className="h-3 w-6 bg-[#00707F] rounded-sm" /><span className="uppercase font-bold text-[9px]">Torno</span></div>
-              <div className="flex items-center gap-2"><div className="h-3 w-6 bg-[#5B36A8] rounded-sm" /><span className="uppercase font-bold text-[9px]">Centro</span></div>
-              <div className="flex items-center gap-2"><div className="h-3 w-6 rounded-sm" style={{ background: 'repeating-linear-gradient(45deg, #F0BC00 0 3px, #101820 3px 6px)' }} /><span className="uppercase font-bold text-[9px]">Setup</span></div>
-            </div>
-          </div>
-      </div>
     </div>
   );
 }
