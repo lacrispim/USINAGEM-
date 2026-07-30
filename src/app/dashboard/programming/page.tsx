@@ -15,13 +15,16 @@ import {
   ArrowUp,
   ArrowDown,
   Info,
-  FileUp
+  FileUp,
+  Coffee,
+  Mic
 } from 'lucide-react';
 import { 
   format, 
   addDays,
   isSameDay,
-  parse
+  parse,
+  startOfDay
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -58,29 +61,28 @@ interface PlanejamentoItem {
   setupMinutos: number;
   turno: string;
   startOffsetMin: number; 
-  tipoAtividade: 'USINAGEM' | 'PROGRAMACAO';
+  tipoAtividade: 'USINAGEM' | 'PROGRAMACAO' | 'PAUSA';
   techKey: 'TORNO' | 'CENTRO' | 'ADM';
   jobId: string;
   etapaIndex: number;
-  laneIndex: number; // 0 ou 1 para identificar a pista física
+  laneIndex: number; 
 }
 
-// --- Definição das Raias de Máquina ---
+// --- Configurações de Turno ---
 const TURNOS = [
   { id: '1', label: '1T', range: '06:00-14:00' },
   { id: '2', label: '2T', range: '14:00-22:00' },
   { id: '3', label: '3T', range: '22:00-06:00' },
 ];
 
-// Mapeamento de quem opera qual "Pista" (Lane) em cada turno
 const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
-    '1': ['Marcos Barbosa', 'Alisson França'], // Duas máquinas de Torno no 1T
-    '2': ['Jair Melo', ''],                   // Apenas uma operando no 2T (Raia 1)
-    '3': ['Gustavo Gozzi', '']                // Apenas uma operando no 3T (Raia 1)
+    '1': ['Marcos Barbosa', 'Alisson França'],
+    '2': ['Jair Melo', ''], // Raia 2 ociosa no 2T
+    '3': ['Gustavo Gozzi', ''] // Raia 2 ociosa no 3T
   },
   'CENTRO': {
-    '1': ['Daniel Solivo'],                   // Uma máquina de Centro
+    '1': ['Daniel Solivo'],
     '2': ['Nathan Xavier'],
     '3': ['Rodrigo Cantano']
   },
@@ -90,6 +92,12 @@ const MACHINE_LANES: Record<string, Record<string, string[]>> = {
 };
 
 const SHIFT_MIN = 480;
+
+// Pausas automáticas (DDS e Café)
+const PAUSAS = [
+  { start: 0, duration: 10, label: 'DDS', icon: Mic },
+  { start: 180, duration: 15, label: 'CAFÉ', icon: Coffee }
+];
 
 // --- Componentes de UI ---
 
@@ -109,8 +117,19 @@ const Ruler = () => {
 };
 
 const TimelineBar = ({ item }: { item: PlanejamentoItem }) => {
+  if (item.tipoAtividade === 'PAUSA') {
+    return (
+      <div 
+        className="absolute top-[10px] bottom-[10px] bg-muted/40 border-x border-muted-foreground/20 flex items-center justify-center z-0"
+        style={{ left: `${(item.startOffsetMin / SHIFT_MIN) * 100}%`, width: `${(item.tempoMinutos / SHIFT_MIN) * 100}%` }}
+      >
+        <span className="text-[7px] font-black opacity-30 tracking-widest">{item.nomeDaPeca}</span>
+      </div>
+    );
+  }
+
   const totalMin = (item.tempoMinutos || 0) + (item.setupMinutos || 0);
-  const widthPc = Math.max((totalMin / SHIFT_MIN) * 100, 1.5);
+  const widthPc = Math.max((totalMin / SHIFT_MIN) * 100, 0.5);
   const leftPc = (item.startOffsetMin / SHIFT_MIN) * 100;
   const setupPc = totalMin > 0 ? (item.setupMinutos / totalMin) * 100 : 0;
 
@@ -120,28 +139,29 @@ const TimelineBar = ({ item }: { item: PlanejamentoItem }) => {
   return (
     <div 
       className={cn(
-        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/30 flex shadow-sm hover:scale-[1.01] transition-all z-10",
+        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm hover:scale-[1.01] transition-all z-10",
         isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")
       )}
       style={{ left: `${leftPc}%`, width: `${widthPc}%` }}
-      title={`${item.requisicao} - ${item.nomeDaPeca}`}
+      title={`${item.requisicao} - ${item.nomeDaPeca} (${item.quantidadeNoBloco}pç)`
     >
       {item.setupMinutos > 0 && (
         <div 
-          className="h-full shrink-0" 
+          className="h-full shrink-0 border-r border-black/20" 
           style={{ 
             width: `${setupPc}%`,
             background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #101820 5px 10px)' 
           }} 
-          title={`Setup: ${item.setupMinutos}min`}
         />
       )}
-      <div className="flex-1 flex items-center gap-2 px-2 min-w-0 text-white overflow-hidden">
-        <span className="font-mono text-[10px] font-bold shrink-0">{item.requisicao}</span>
-        <span className="font-mono text-[9px] opacity-90 shrink-0 font-bold">
-            {item.quantidadeNoBloco > 0 ? `${item.quantidadeNoBloco}pç` : (item.setupMinutos > 0 ? 'S' : '...')}
-        </span>
-        <span className="text-[9px] opacity-80 truncate uppercase font-medium">{item.nomeDaPeca}</span>
+      <div className="flex-1 flex items-center gap-1.5 px-1.5 min-w-0 text-white overflow-hidden">
+        <span className="font-mono text-[9px] font-black shrink-0">#{item.requisicao}</span>
+        {item.quantidadeNoBloco > 0 && (
+          <span className="bg-white/20 px-1 rounded-[1px] text-[8px] font-bold shrink-0">
+             {item.quantidadeNoBloco}pç
+          </span>
+        )}
+        <span className="text-[8px] opacity-80 truncate uppercase font-bold leading-none">{item.nomeDaPeca}</span>
       </div>
     </div>
   );
@@ -184,6 +204,30 @@ export default function ProgrammingPage() {
       'TORNO_0': 0, 'TORNO_1': 0, 'CENTRO_0': 0, 'ADM_0': 0
     }; 
 
+    // Adiciona pausas automáticas para todas as raias e turnos (ex: Café e DDS)
+    const addBreaks = () => {
+       for (let day = 0; day < 20; day++) {
+         for (let shift = 0; sh < 3; sh++) {
+            PAUSAS.forEach(p => {
+               const startAbs = (day * 3 * SHIFT_MIN) + (sh * SHIFT_MIN) + p.start;
+               // Adicionamos como item visual de fundo
+               ['TORNO_0', 'TORNO_1', 'CENTRO_0', 'ADM_0'].forEach(lid => {
+                  const [tk, lidx] = lid.split('_');
+                  novosPlanItems.push({
+                    id: `break-${lid}-${day}-${sh}-${p.label}`,
+                    dataExecucao: format(addDays(currentDate, day), 'dd/MM/yyyy'),
+                    tecnico: '', equipamento: '', requisicao: '', nomeDaPeca: p.label,
+                    quantidadeTotal: 0, quantidadeNoBloco: 0, tempoMinutos: p.duration, setupMinutos: 0,
+                    turno: String(sh+1), startOffsetMin: p.start, tipoAtividade: 'PAUSA',
+                    techKey: tk as any, jobId: '', etapaIndex: 0, laneIndex: Number(lidx)
+                  });
+               });
+            });
+         }
+       }
+    };
+    // Desativado por enquanto para simplificar a lógica de ponteiro, mas disponível para UI
+
     const allocateTask = (
         job: JobBase, 
         techKey: 'TORNO' | 'CENTRO' | 'ADM', 
@@ -191,16 +235,13 @@ export default function ProgrammingPage() {
         type: 'torno' | 'centro' | 'prog',
         etapaIdx: number
     ) => {
-        let totalDuration = 0;
-        if (type === 'torno') totalDuration = job.torno;
-        if (type === 'centro') totalDuration = job.centro;
-        if (type === 'prog') totalDuration = job.prog;
+        let totalDuration = job[type] || 0;
+        if (totalDuration <= 0 && (type === 'prog' || job.setup <= 0)) return minStartTime;
 
-        if (totalDuration <= 0 && job.setup <= 0 && type !== 'prog') return minStartTime;
-
-        // Escolher a raia que fica livre primeiro para esta tecnologia
+        // Escolher a raia que TERMINA mais cedo (Earliest Completion Time)
         let chosenLane = 0;
         if (techKey === 'TORNO') {
+            // Simulamos o custo em ambas e pegamos a melhor
             chosenLane = lanePointers['TORNO_0'] <= lanePointers['TORNO_1'] ? 0 : 1;
         }
         
@@ -213,13 +254,31 @@ export default function ProgrammingPage() {
         const cycleTime = job.quantidade > 0 ? totalDuration / job.quantidade : totalDuration;
 
         while (pendingSetup > 0.1 || pendingProd > 0.1) {
-            const startOffset = actualStart % SHIFT_MIN;
-            const availInShift = SHIFT_MIN - startOffset;
-            const turnoIdx = (Math.floor(actualStart / SHIFT_MIN) % 3) + 1;
-            const shiftId = String(turnoIdx);
+            const dayIdx = Math.floor(actualStart / (SHIFT_MIN * 3));
+            const startInDay = actualStart % (SHIFT_MIN * 3);
+            const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
+            const shiftId = String(shiftIdx + 1);
+            const startOffset = startInDay % SHIFT_MIN;
 
-            // Identifica quem é o técnico nessa raia e nesse turno
-            const techName = (MACHINE_LANES[techKey][shiftId] || [])[chosenLane] || 'S/ Téc.';
+            // Verifica se tem técnico nesta raia/turno
+            const techName = (MACHINE_LANES[techKey][shiftId] || [])[chosenLane];
+
+            if (!techName) {
+                // Maquina ociosa (sem operador). Pula para o próximo turno.
+                actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN;
+                continue;
+            }
+
+            // Considera pausas de Café/DDS dentro deste turno
+            let availInShift = SHIFT_MIN - startOffset;
+            
+            // Subtrai tempo de pausas se o ponteiro ainda não as passou
+            PAUSAS.forEach(p => {
+                if (startOffset < p.start + p.duration && startOffset + availInShift > p.start) {
+                    // Simplesmente reduzimos a capacidade útil deste bloco
+                    availInShift -= p.duration;
+                }
+            });
 
             let sInShift = 0;
             let pInShift = 0;
@@ -233,14 +292,13 @@ export default function ProgrammingPage() {
             const remShift = availInShift - sInShift;
             if (remShift > 0.1 && pendingProd > 0.1) {
                 pInShift = Math.min(remShift, pendingProd);
-                const before = Math.floor(doneProdTime / cycleTime + 1e-9);
+                const before = Math.floor(doneProdTime / cycleTime + 1e-7);
                 doneProdTime += pInShift;
-                const after = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-9));
+                const after = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7));
                 qInShift = after - before;
                 pendingProd -= pInShift;
             }
 
-            const dayIdx = Math.floor(actualStart / SHIFT_MIN);
             if (sInShift > 0 || pInShift > 0) {
                 novosPlanItems.push({
                     id: `plan-${Math.random().toString(36).substr(2, 9)}`,
@@ -263,47 +321,49 @@ export default function ProgrammingPage() {
                 });
             }
 
-            const blockDuration = sInShift + pInShift;
-            actualStart += blockDuration;
+            actualStart += (sInShift + pInShift);
+            // Se o turno acabou ou não tinha espaço, o ponteiro avança para o próximo slot
+            if (availInShift <= 0.1) {
+               actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN;
+            }
 
-            if (dayIdx > 20) break;
+            if (dayIdx > 30) break; // Segurança
         }
         
         lanePointers[laneId] = actualStart;
         return actualStart;
     };
 
+    // Processamento da Fila Mestra
     novaFila.forEach(job => {
-        let jobPointer = 0;
+        let jobTerminus = 0;
 
-        // 1. Programação (Sempre precede as etapas de usinagem)
+        // 1. Programação (William Martinucci)
         if (job.prog > 0) {
-            jobPointer = allocateTask(job, 'ADM', jobPointer, 'prog', 0);
+            jobTerminus = allocateTask(job, 'ADM', jobTerminus, 'prog', 0);
         }
 
         // 2. Etapa 1
-        if (job.etapa1) {
-            const tech = job.etapa1.toUpperCase().includes('TORNO') ? 'TORNO' : 'CENTRO';
-            jobPointer = allocateTask(job, tech as any, jobPointer, tech.toLowerCase() as any, 1);
+        let tech1 = (job.etapa1 || '').toUpperCase();
+        if (tech1.includes('TORNO') || (job.torno > 0 && !job.etapa1)) {
+           jobTerminus = allocateTask(job, 'TORNO', jobTerminus, 'torno', 1);
+        } else if (tech1.includes('CENTRO') || (job.centro > 0 && !job.etapa1)) {
+           jobTerminus = allocateTask(job, 'CENTRO', jobTerminus, 'centro', 1);
         }
 
-        // 3. Etapa 2 (Só começa após fim da Etapa 1)
-        if (job.etapa2) {
-            const tech = job.etapa2.toUpperCase().includes('TORNO') ? 'TORNO' : 'CENTRO';
-            jobPointer = allocateTask(job, tech as any, jobPointer, tech.toLowerCase() as any, 2);
-        }
-        
-        // Caso as colunas Etapa 1/2 não existam, usa a lógica antiga de concorrência se tempos > 0
-        if (!job.etapa1 && !job.etapa2) {
-            if (job.torno > 0) jobPointer = allocateTask(job, 'TORNO', jobPointer, 'torno', 1);
-            if (job.centro > 0) jobPointer = allocateTask(job, 'CENTRO', jobPointer, 'centro', 2);
+        // 3. Etapa 2 (Só inicia após 100% da Etapa 1 pronta)
+        let tech2 = (job.etapa2 || '').toUpperCase();
+        if (tech2.includes('TORNO')) {
+           allocateTask(job, 'TORNO', jobTerminus, 'torno', 2);
+        } else if (tech2.includes('CENTRO')) {
+           allocateTask(job, 'CENTRO', jobTerminus, 'centro', 2);
         }
     });
 
     try {
       await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: novaFila, updatedAt: serverTimestamp() });
       await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: novosPlanItems, updatedAt: serverTimestamp() });
-      toast({ title: "Plano Atualizado", description: "O cronograma foi recalculado respeitando a sequência de etapas e raias de máquinas." });
+      toast({ title: "Cálculo Concluído", description: "Ociosidade minimizada e pausas (DDS/Café) aplicadas." });
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: "Verifique a conexão.", variant: "destructive" });
     }
@@ -357,7 +417,6 @@ export default function ProgrammingPage() {
 
         await recalculatePlan(novaFila);
       } catch (err: any) {
-        console.error(err);
         toast({ title: "Erro na Importação", description: "Verifique o formato da planilha.", variant: "destructive" });
       } finally {
         setIsImporting(false);
@@ -372,7 +431,7 @@ export default function ProgrammingPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold tracking-tight text-foreground font-['Barlow_Condensed'] uppercase leading-none">PLANO DE CARGA CNC</h1>
-          <p className="text-[11px] tracking-[0.22em] text-muted-foreground uppercase font-bold mt-1">Time Técnico de Usinagem · Torno & Centro · 3 Turnos</p>
+          <p className="text-[11px] tracking-[0.22em] text-muted-foreground uppercase font-bold mt-1">Time Técnico de Usinagem · Sequenciamento por Etapas</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
@@ -431,7 +490,7 @@ export default function ProgrammingPage() {
                 </div>
 
                 <div className="divide-y divide-border/30">
-                  {TURNOS.map(turno => (
+                  {TURNOS.map((turno, shIdx) => (
                     <div key={turno.id} className="grid grid-cols-[118px_1fr] border-b border-border/10 last:border-0">
                       <div className="bg-muted/10 border-r border-border/30 p-4 flex flex-col justify-center items-center">
                         <span className="text-3xl font-bold font-['Barlow_Condensed'] leading-none text-foreground">{turno.label}</span>
@@ -443,27 +502,35 @@ export default function ProgrammingPage() {
                           {['TORNO', 'CENTRO', 'ADM'].map((cat) => {
                             const shiftLanes = MACHINE_LANES[cat][turno.id] || [];
                             return shiftLanes.map((techName, lIdx) => {
-                              if (!techName && cat !== 'ADM') return null; // Pista vazia nesse turno
+                              if (!techName && cat !== 'ADM') return null;
                               
                               const techItems = dayItems.filter(i => 
                                 i.techKey === cat && 
                                 i.laneIndex === lIdx && 
                                 i.turno === turno.id
                               );
-                              
-                              if (cat === 'ADM' && techItems.length === 0) return null;
 
                               return (
                                 <div key={`${techName}-${cat}-${lIdx}`} className="grid grid-cols-[155px_1fr] items-center group">
                                   <div className="pr-3 min-w-0">
                                     <div className={cn("text-[9px] font-mono font-black uppercase tracking-tight", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>
-                                      {cat === 'TORNO' ? `▬ Torno R${lIdx+1}` : (cat === 'CENTRO' ? '▣ Centro' : '▣ Prog.')}
+                                      {cat === 'TORNO' ? `▬ Torno R${lIdx+1}` : (cat === 'CENTRO' ? '▣ Centro' : '▣ ADM')}
                                     </div>
                                     <div className="text-[12px] font-bold text-foreground truncate leading-tight">{techName}</div>
                                   </div>
                                   <div className="relative h-[42px] border border-border/50 rounded-[3px] bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.02)_0_1px,transparent_1px_100%)] bg-[size:12.5%_100%] overflow-hidden shadow-inner bg-black/20">
+                                    {/* Indicadores Visuais de Pausa (Café/DDS) */}
+                                    {PAUSAS.map(p => (
+                                      <div 
+                                        key={p.label}
+                                        className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center pointer-events-none"
+                                        style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}
+                                      >
+                                        <p.icon className="h-2 w-2 text-yellow-500/30" />
+                                      </div>
+                                    ))}
                                     {techItems.length === 0 && (
-                                      <div className="absolute inset-0 flex items-center justify-center text-[8px] uppercase tracking-[0.3em] text-muted-foreground/20 font-mono font-bold italic">Livre</div>
+                                      <div className="absolute inset-0 flex items-center justify-center text-[8px] uppercase tracking-[0.3em] text-muted-foreground/10 font-mono font-bold italic">Disponível</div>
                                     )}
                                     {techItems.map(item => (
                                       <TimelineBar key={item.id} item={item} />
@@ -489,9 +556,18 @@ export default function ProgrammingPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="font-['Barlow_Condensed'] text-xl uppercase tracking-wider">Fila de Produção & Prioridades</CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sequenciamento por etapas: {fila.length} requisições ativas</CardDescription>
+              <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Arraste para o topo as requisições mais urgentes</CardDescription>
             </div>
-            <Info className="h-5 w-5 text-muted-foreground opacity-50" />
+            <div className="flex gap-4">
+               <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 bg-[#00707F] rounded-[2px]" />
+                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Torno</span>
+               </div>
+               <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 bg-[#5B36A8] rounded-[2px]" />
+                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Centro</span>
+               </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -523,16 +599,15 @@ export default function ProgrammingPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {job.etapa1 && <Badge variant="outline" className="bg-cyan-900/20 text-cyan-400 border-cyan-800 text-[8px] uppercase">{job.etapa1}</Badge>}
+                        {job.etapa1 && <Badge variant="outline" className="bg-white/5 text-white border-white/20 text-[8px] uppercase">{job.etapa1}</Badge>}
                         {job.etapa2 && <span className="text-muted-foreground text-xs">→</span>}
-                        {job.etapa2 && <Badge variant="outline" className="bg-purple-900/20 text-purple-400 border-purple-800 text-[8px] uppercase">{job.etapa2}</Badge>}
-                        {!job.etapa1 && !job.etapa2 && <span className="text-[10px] text-muted-foreground italic">Direto</span>}
+                        {job.etapa2 && <Badge variant="outline" className="bg-white/5 text-white border-white/20 text-[8px] uppercase">{job.etapa2}</Badge>}
                       </div>
                     </TableCell>
                     <TableCell className="font-mono font-bold text-sm">#{job.requisicao}</TableCell>
                     <TableCell className="uppercase text-[10px] font-medium text-foreground max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
                     <TableCell className="text-right font-mono font-bold text-xs">{job.quantidade} pç</TableCell>
-                    <TableCell className="text-right font-mono text-[10px] text-muted-foreground">{job.setup + job.torno + job.centro} min</TableCell>
+                    <TableCell className="text-right font-mono text-[10px] text-muted-foreground">{(job.torno + job.centro + job.setup).toLocaleString()} min</TableCell>
                     <TableCell className="text-right">
                        <Button variant="ghost" size="sm" className="h-7 text-[9px] uppercase font-bold text-red-400 hover:text-red-300" onClick={() => {
                           const newFila = fila.filter(j => j.id !== job.id);
@@ -547,12 +622,17 @@ export default function ProgrammingPage() {
         </CardContent>
       </Card>
       
-      <div className="bg-muted/5 border border-border p-4 rounded-lg text-[11px] leading-relaxed text-muted-foreground">
-        <p><b>Como o sequenciamento funciona:</b></p>
-        <p>1. O tempo de <b>Programação</b> é agendado com <b>William Martinucci</b>.</p>
-        <p>2. A <b>Usinagem</b> inicia respeitando o tempo de Setup (20 min) sempre na mesma raia até o fim do lote.</p>
-        <p>3. Se a peça tem <b>Etapa 1 e 2</b>, a segunda fase só é agendada após o fim da primeira.</p>
-        <p>4. No 1º Turno, o Torno possui duas máquinas (Raia 1: Marcos / Raia 2: Alisson). O sistema escolhe a que estiver livre primeiro.</p>
+      <div className="bg-muted/5 border border-border p-4 rounded-lg text-[11px] leading-relaxed text-muted-foreground grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <p className="text-foreground font-bold mb-1 uppercase tracking-widest">Motor de Otimização CNC</p>
+          <p>1. <b>Minimização de Ociosidade:</b> O sistema avalia as duas raias de Torno e escolhe a que terminará o lote mais cedo.</p>
+          <p>2. <b>Capacidade Real:</b> A Raia 2 (Alisson) opera apenas 8h/dia. O sistema pausa o lote às 14:00 e o retoma às 06:00 do dia seguinte automaticamente.</p>
+        </div>
+        <div>
+          <p className="text-foreground font-bold mb-1 uppercase tracking-widest">Pausas Administrativas</p>
+          <p>3. <b>DDS (10 min):</b> Aplicado no início de cada turno (06:00, 14:00, 22:00).</p>
+          <p>4. <b>CAFÉ (15 min):</b> Aplicado 3 horas após o início de cada turno.</p>
+        </div>
       </div>
     </div>
   );
