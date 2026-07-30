@@ -83,7 +83,7 @@ const EQUIPE: Record<string, Record<string, { name: string; role: string }[]>> =
     '3': [{ name: 'Rodrigo Cantano', role: 'Téc. Prog./Op.' }]
   },
   'ADM': {
-    '1': [{ name: 'William Martinucci', role: 'Programador Centro' }, { name: 'Alisson França', role: 'Téc. ADM' }]
+    '1': [{ name: 'William Martinucci', role: 'Programador' }]
   }
 };
 
@@ -180,7 +180,6 @@ export default function ProgrammingPage() {
     const novosPlanItems: PlanejamentoItem[] = [];
     const techPointers: Record<string, number> = {}; 
 
-    // Função auxiliar para alocar tarefas seguindo o tempo acumulado
     const allocateTask = (
         job: JobBase, 
         techKey: 'TORNO' | 'CENTRO' | 'ADM', 
@@ -209,11 +208,9 @@ export default function ProgrammingPage() {
 
             const searchKey = type === 'prog' ? 'ADM' : techKey;
             
-            // Procura o técnico mais disponível respeitando o minStartTime da etapa anterior
             ['1', '2', '3'].forEach(sId => {
                 (EQUIPE[searchKey][sId] || []).forEach(t => {
                     const tTime = techPointers[t.name] || 0;
-                    // Priorizamos quem está livre mais cedo, mas deve ser >= minStartTime (término da Etapa 1)
                     if (tTime < minTimeAvailable) {
                         minTimeAvailable = tTime;
                         bestTech = t;
@@ -225,7 +222,6 @@ export default function ProgrammingPage() {
             if (!bestTech) break;
 
             const techName = (bestTech as any).name;
-            // O início real deve ser o maior entre: quando o técnico está livre OU quando a etapa anterior terminou
             let actualStart = Math.max(techPointers[techName] || 0, lastEndOffset);
             
             const startOffset = actualStart % SHIFT_MIN;
@@ -274,33 +270,28 @@ export default function ProgrammingPage() {
             techPointers[techName] = actualStart + blockDuration;
             lastEndOffset = actualStart + blockDuration;
 
-            if (dayIdx > 20) break; // Limite de segurança
+            if (dayIdx > 20) break;
         }
         return lastEndOffset;
     };
 
-    // Processamento da Fila seguindo a ordem de Etapas
     novaFila.forEach(job => {
         let jobPointer = 0;
 
-        // 1. Programação (Sempre primeiro se houver)
         if (job.prog > 0) {
             jobPointer = allocateTask(job, 'ADM', jobPointer, 'prog', 0);
         }
 
-        // 2. Etapa 1 (Sempre inicia respeitando o fim da Programação)
         if (job.etapa1) {
             const tech = job.etapa1.toUpperCase().includes('TORNO') ? 'TORNO' : 'CENTRO';
             jobPointer = allocateTask(job, tech as any, jobPointer, tech.toLowerCase() as any, 1);
         }
 
-        // 3. Etapa 2 (SÓ INICIA QUANDO A ETAPA 1 FOR TOTALMENTE CONCLUÍDA)
         if (job.etapa2) {
             const tech = job.etapa2.toUpperCase().includes('TORNO') ? 'TORNO' : 'CENTRO';
             jobPointer = allocateTask(job, tech as any, jobPointer, tech.toLowerCase() as any, 2);
         }
         
-        // Compatibilidade com formato antigo sem etapas definidas
         if (!job.etapa1 && !job.etapa2) {
             if (job.torno > 0) jobPointer = allocateTask(job, 'TORNO', jobPointer, 'torno', 1);
             if (job.centro > 0) jobPointer = allocateTask(job, 'CENTRO', jobPointer, 'centro', 2);
@@ -549,7 +540,7 @@ export default function ProgrammingPage() {
       
       <div className="bg-muted/5 border border-border p-4 rounded-lg text-[11px] leading-relaxed text-muted-foreground">
         <p><b>Como o sequenciamento funciona:</b></p>
-        <p>1. O tempo de <b>Programação</b> (Software) é agendado no 1º turno com William ou Alisson.</p>
+        <p>1. O tempo de <b>Programação</b> (Software) é agendado no 1º turno exclusivamente com <b>William Martinucci</b>.</p>
         <p>2. A <b>Etapa 1</b> (ex: Torno) inicia respeitando o tempo de Setup definido (ex: 20 min).</p>
         <p>3. A <b>Etapa 2</b> (ex: Centro) é agendada automaticamente <b>somente após</b> a conclusão de todo o lote da Etapa 1.</p>
         <p>4. O cálculo de peças por turno usa a fórmula: <code>(Tempo Disponível ÷ Ciclo Médio)</code>, descontando o Setup.</p>
