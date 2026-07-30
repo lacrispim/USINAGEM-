@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -40,8 +41,8 @@ interface JobBase {
   centro: number;
   prog: number;
   site: string;
-  etapa1: string; // 'Torno' ou 'Centro'
-  etapa2: string; // 'Torno' ou 'Centro'
+  etapa1: string;
+  etapa2: string;
 }
 
 interface PlanejamentoItem {
@@ -207,9 +208,12 @@ export default function ProgrammingPage() {
             let bestShift = '1';
 
             const searchKey = type === 'prog' ? 'ADM' : techKey;
+            
+            // Procura o técnico mais disponível respeitando o minStartTime da etapa anterior
             ['1', '2', '3'].forEach(sId => {
                 (EQUIPE[searchKey][sId] || []).forEach(t => {
                     const tTime = techPointers[t.name] || 0;
+                    // Priorizamos quem está livre mais cedo, mas deve ser >= minStartTime (término da Etapa 1)
                     if (tTime < minTimeAvailable) {
                         minTimeAvailable = tTime;
                         bestTech = t;
@@ -284,19 +288,19 @@ export default function ProgrammingPage() {
             jobPointer = allocateTask(job, 'ADM', jobPointer, 'prog', 0);
         }
 
-        // 2. Etapa 1
+        // 2. Etapa 1 (Sempre inicia respeitando o fim da Programação)
         if (job.etapa1) {
             const tech = job.etapa1.toUpperCase().includes('TORNO') ? 'TORNO' : 'CENTRO';
             jobPointer = allocateTask(job, tech as any, jobPointer, tech.toLowerCase() as any, 1);
         }
 
-        // 3. Etapa 2
+        // 3. Etapa 2 (SÓ INICIA QUANDO A ETAPA 1 FOR TOTALMENTE CONCLUÍDA)
         if (job.etapa2) {
             const tech = job.etapa2.toUpperCase().includes('TORNO') ? 'TORNO' : 'CENTRO';
             jobPointer = allocateTask(job, tech as any, jobPointer, tech.toLowerCase() as any, 2);
         }
         
-        // Caso não tenha etapa definida mas tenha tempos (Compatibilidade com formato antigo)
+        // Compatibilidade com formato antigo sem etapas definidas
         if (!job.etapa1 && !job.etapa2) {
             if (job.torno > 0) jobPointer = allocateTask(job, 'TORNO', jobPointer, 'torno', 1);
             if (job.centro > 0) jobPointer = allocateTask(job, 'CENTRO', jobPointer, 'centro', 2);
@@ -306,7 +310,7 @@ export default function ProgrammingPage() {
     try {
       await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: novaFila, updatedAt: serverTimestamp() });
       await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: novosPlanItems, updatedAt: serverTimestamp() });
-      toast({ title: "Plano Atualizado", description: "O cronograma foi recalculado seguindo o sequenciamento de etapas." });
+      toast({ title: "Plano Atualizado", description: "O cronograma foi recalculado respeitando a sequência de etapas." });
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: "Verifique a conexão.", variant: "destructive" });
     }
