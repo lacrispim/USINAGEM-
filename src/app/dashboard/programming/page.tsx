@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useDatabase } from '@/firebase';
-import { ref, onValue, set, push } from 'firebase/database';
+import { ref, onValue, set, push, update } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { 
@@ -16,7 +16,8 @@ import {
   Settings2,
   ArrowUp,
   ArrowDown,
-  Info
+  Info,
+  FileUp
 } from 'lucide-react';
 import { 
   format, 
@@ -65,7 +66,7 @@ interface PlanejamentoItem {
 const TURNOS = [
   { id: '1', label: '1T', range: '06:00-14:00' },
   { id: '2', label: '2T', range: '14:00-22:00' },
-  { id: '3', label: '3T', range: '22:00-06:00' },
+  { id: '3', label: '22:00-06:00' },
 ];
 
 const EQUIPE: Record<string, Record<string, { name: string; role: string }[]>> = {
@@ -163,13 +164,21 @@ export default function ProgrammingPage() {
     const planRef = ref(database, '/Planejamento_V2');
 
     const unsubFila = onValue(filaRef, (snap) => {
-      if (snap.exists()) setFila(Object.values(snap.val()));
-      else setFila([]);
+      if (snap.exists()) {
+        const val = snap.val();
+        setFila(Array.isArray(val) ? val : Object.values(val));
+      } else {
+        setFila([]);
+      }
     });
 
     const unsubPlan = onValue(planRef, (snap) => {
-      if (snap.exists()) setPlanejamentoData(Object.values(snap.val()));
-      else setPlanejamentoData([]);
+      if (snap.exists()) {
+        const val = snap.val();
+        setPlanejamentoData(Array.isArray(val) ? val : Object.values(val));
+      } else {
+        setPlanejamentoData([]);
+      }
       setLoading(false);
     });
 
@@ -180,7 +189,7 @@ export default function ProgrammingPage() {
   const recalculatePlan = async (novaFila: JobBase[]) => {
     if (!database) return;
     
-    const updates: any = {};
+    const updates: Record<string, any> = {};
     let techPointers: Record<string, number> = {}; // Minutos acumulados por técnico
 
     // 1. Planejamento de Programação (William ADM)
@@ -259,7 +268,8 @@ export default function ProgrammingPage() {
             pendingProd -= pInShift;
           }
 
-          const dayIdx = Math.floor(globalTime / (SHIFT_MIN * 3));
+          // Dia absoluto baseado no tempo acumulado do técnico
+          const dayIdx = Math.floor(globalTime / SHIFT_MIN / 3);
           const id = push(ref(database, 'temp')).key!;
           updates[`/Planejamento_V2/${id}`] = {
             id,
@@ -281,11 +291,15 @@ export default function ProgrammingPage() {
     distribute('torno');
     distribute('centro');
 
-    await set(ref(database, '/Planejamento_V2'), null);
-    await set(ref(database, '/Fila_Producao'), novaFila);
-    Object.keys(updates).forEach(async path => {
-      await set(ref(database, path), updates[path]);
-    });
+    // Execução atômica
+    try {
+      await set(ref(database, '/Planejamento_V2'), null);
+      await set(ref(database, '/Fila_Producao'), novaFila);
+      await update(ref(database), updates);
+      toast({ title: "Plano Atualizado", description: "O cronograma foi recalculado com sucesso." });
+    } catch (err) {
+      toast({ title: "Erro ao salvar", description: "Falha na comunicação com o banco de dados.", variant: "destructive" });
+    }
   };
 
   const moveItem = (index: number, direction: number) => {
@@ -304,36 +318,45 @@ export default function ProgrammingPage() {
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const workbook = XLSX.read(event.target?.result, { type: 'binary' });
-        const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json: any[] = XLSX.utils.sheet_to_json(firstSheet);
+
+        if (!json.length) throw new Error("Planilha vazia");
 
         const findVal = (row: any, keys: string[]) => {
-          const k = Object.keys(row).find(k => keys.some(s => k.toLowerCase().includes(s.toLowerCase())));
+          const k = Object.keys(row).find(k => keys.some(s => k.toLowerCase().trim() === s.toLowerCase().trim() || k.toLowerCase().includes(s.toLowerCase())));
           return k ? row[k] : undefined;
         };
 
-        const novaFila: JobBase[] = json.map((row, i) => ({
-          id: `job-${i}-${Date.now()}`,
-          requisicao: String(findVal(row, ['req', 'requisicao']) || 'S/N'),
-          nomeDaPeca: String(findVal(row, ['peca', 'nome', 'desc']) || 'SEM NOME'),
-          quantidade: Number(findVal(row, ['qtd', 'quantidade']) || 1),
-          setup: Number(findVal(row, ['setup']) || 0),
-          torno: Number(findVal(row, ['torno']) || 0),
-          centro: Number(findVal(row, ['centro']) || 0),
-          prog: Number(findVal(row, ['prog', 'programacao']) || 0),
-          site: String(findVal(row, ['site', 'fabrica']) || 'VALINHOS'),
-        }));
+        const novaFila: JobBase[] = json.map((row, i) => {
+          const req = String(findVal(row, ['req', 'requisicao', 'requisição', 'número', 'forms']) || 'S/N');
+          const peca = String(findVal(row, ['peca', 'peça', 'nome', 'descrição', 'desc']) || 'SEM NOME');
+          const qtd = Number(findVal(row, ['qtd', 'quantidade', 'quantidade de peças']) || 1);
+          
+          return {
+            id: `job-${i}-${Date.now()}`,
+            requisicao: req,
+            nomeDaPeca: peca,
+            quantidade: isNaN(qtd) ? 1 : qtd,
+            setup: Number(findVal(row, ['setup', 'tempo setup', 'tempo de setup']) || 0),
+            torno: Number(findVal(row, ['torno', 'tempo torno', 'usinagem torno']) || 0),
+            centro: Number(findVal(row, ['centro', 'tempo centro', 'usinagem centro']) || 0),
+            prog: Number(findVal(row, ['prog', 'programação', 'programacao']) || 0),
+            site: String(findVal(row, ['site', 'fabrica', 'fábrica']) || 'VALINHOS'),
+          };
+        });
 
         await recalculatePlan(novaFila);
-        toast({ title: "Importação Concluída", description: "O motor de sequenciamento gerou o plano." });
-      } catch (err) {
-        toast({ title: "Erro", description: "Verifique a planilha.", variant: "destructive" });
+      } catch (err: any) {
+        toast({ title: "Erro na Importação", description: err.message || "Verifique o formato da planilha.", variant: "destructive" });
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -363,9 +386,9 @@ export default function ProgrammingPage() {
             <Eraser className="h-4 w-4 mr-2" /> Limpar Plano
           </Button>
 
-          <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" />
+          <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls,.csv" />
           <Button variant="outline" size="sm" className="bg-[#101820] text-[#F0BC00] border-[#101820] font-bold text-[10px] uppercase h-11 shadow-lg" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
-            {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <Wand2 className="h-4 w-4 mr-2" />} Importar & Planejar Automático
+            {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar & Planejar Automático
           </Button>
         </div>
       </div>
@@ -538,4 +561,3 @@ export default function ProgrammingPage() {
     </div>
   );
 }
-
