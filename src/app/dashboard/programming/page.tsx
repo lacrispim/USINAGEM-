@@ -14,7 +14,6 @@ import {
   CalendarDays,
   ArrowUp,
   ArrowDown,
-  Info,
   FileUp,
   Coffee,
   Mic
@@ -24,7 +23,6 @@ import {
   addDays,
   isSameDay,
   parse,
-  startOfDay
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -78,8 +76,8 @@ const TURNOS = [
 const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Marcos Barbosa', 'Alisson França'],
-    '2': ['Jair Melo', ''], // Raia 2 ociosa no 2T
-    '3': ['Gustavo Gozzi', ''] // Raia 2 ociosa no 3T
+    '2': ['Jair Melo', ''], 
+    '3': ['Gustavo Gozzi', '']
   },
   'CENTRO': {
     '1': ['Daniel Solivo'],
@@ -93,7 +91,6 @@ const MACHINE_LANES: Record<string, Record<string, string[]>> = {
 
 const SHIFT_MIN = 480;
 
-// Pausas automáticas (DDS e Café)
 const PAUSAS = [
   { start: 0, duration: 10, label: 'DDS', icon: Mic },
   { start: 180, duration: 15, label: 'CAFÉ', icon: Coffee }
@@ -143,7 +140,7 @@ const TimelineBar = ({ item }: { item: PlanejamentoItem }) => {
         isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")
       )}
       style={{ left: `${leftPc}%`, width: `${widthPc}%` }}
-      title={`${item.requisicao} - ${item.nomeDaPeca} (${item.quantidadeNoBloco}pç)`
+      title={`${item.requisicao} - ${item.nomeDaPeca} (${item.quantidadeNoBloco}pç)`}
     >
       {item.setupMinutos > 0 && (
         <div 
@@ -204,30 +201,6 @@ export default function ProgrammingPage() {
       'TORNO_0': 0, 'TORNO_1': 0, 'CENTRO_0': 0, 'ADM_0': 0
     }; 
 
-    // Adiciona pausas automáticas para todas as raias e turnos (ex: Café e DDS)
-    const addBreaks = () => {
-       for (let day = 0; day < 20; day++) {
-         for (let shift = 0; sh < 3; sh++) {
-            PAUSAS.forEach(p => {
-               const startAbs = (day * 3 * SHIFT_MIN) + (sh * SHIFT_MIN) + p.start;
-               // Adicionamos como item visual de fundo
-               ['TORNO_0', 'TORNO_1', 'CENTRO_0', 'ADM_0'].forEach(lid => {
-                  const [tk, lidx] = lid.split('_');
-                  novosPlanItems.push({
-                    id: `break-${lid}-${day}-${sh}-${p.label}`,
-                    dataExecucao: format(addDays(currentDate, day), 'dd/MM/yyyy'),
-                    tecnico: '', equipamento: '', requisicao: '', nomeDaPeca: p.label,
-                    quantidadeTotal: 0, quantidadeNoBloco: 0, tempoMinutos: p.duration, setupMinutos: 0,
-                    turno: String(sh+1), startOffsetMin: p.start, tipoAtividade: 'PAUSA',
-                    techKey: tk as any, jobId: '', etapaIndex: 0, laneIndex: Number(lidx)
-                  });
-               });
-            });
-         }
-       }
-    };
-    // Desativado por enquanto para simplificar a lógica de ponteiro, mas disponível para UI
-
     const allocateTask = (
         job: JobBase, 
         techKey: 'TORNO' | 'CENTRO' | 'ADM', 
@@ -238,10 +211,9 @@ export default function ProgrammingPage() {
         let totalDuration = job[type] || 0;
         if (totalDuration <= 0 && (type === 'prog' || job.setup <= 0)) return minStartTime;
 
-        // Escolher a raia que TERMINA mais cedo (Earliest Completion Time)
+        // Se for Torno, testamos as duas lanes e pegamos a que termina antes (Greedy)
         let chosenLane = 0;
         if (techKey === 'TORNO') {
-            // Simulamos o custo em ambas e pegamos a melhor
             chosenLane = lanePointers['TORNO_0'] <= lanePointers['TORNO_1'] ? 0 : 1;
         }
         
@@ -253,29 +225,28 @@ export default function ProgrammingPage() {
         let doneProdTime = 0;
         const cycleTime = job.quantidade > 0 ? totalDuration / job.quantidade : totalDuration;
 
-        while (pendingSetup > 0.1 || pendingProd > 0.1) {
+        let guard = 0;
+        while ((pendingSetup > 0.1 || pendingProd > 0.1) && guard++ < 400) {
             const dayIdx = Math.floor(actualStart / (SHIFT_MIN * 3));
             const startInDay = actualStart % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const shiftId = String(shiftIdx + 1);
             const startOffset = startInDay % SHIFT_MIN;
 
-            // Verifica se tem técnico nesta raia/turno
             const techName = (MACHINE_LANES[techKey][shiftId] || [])[chosenLane];
 
+            // Se não tem técnico na lane/turno, pula para o próximo slot
             if (!techName) {
-                // Maquina ociosa (sem operador). Pula para o próximo turno.
                 actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN;
                 continue;
             }
 
-            // Considera pausas de Café/DDS dentro deste turno
             let availInShift = SHIFT_MIN - startOffset;
             
-            // Subtrai tempo de pausas se o ponteiro ainda não as passou
+            // Descontar pausas
             PAUSAS.forEach(p => {
                 if (startOffset < p.start + p.duration && startOffset + availInShift > p.start) {
-                    // Simplesmente reduzimos a capacidade útil deste bloco
+                    // Simplificação: apenas reduz a janela disponível
                     availInShift -= p.duration;
                 }
             });
@@ -322,28 +293,22 @@ export default function ProgrammingPage() {
             }
 
             actualStart += (sInShift + pInShift);
-            // Se o turno acabou ou não tinha espaço, o ponteiro avança para o próximo slot
             if (availInShift <= 0.1) {
+               // Força pulo de turno se esgotou a janela
                actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN;
             }
-
-            if (dayIdx > 30) break; // Segurança
         }
         
         lanePointers[laneId] = actualStart;
         return actualStart;
     };
 
-    // Processamento da Fila Mestra
     novaFila.forEach(job => {
         let jobTerminus = 0;
-
-        // 1. Programação (William Martinucci)
         if (job.prog > 0) {
             jobTerminus = allocateTask(job, 'ADM', jobTerminus, 'prog', 0);
         }
 
-        // 2. Etapa 1
         let tech1 = (job.etapa1 || '').toUpperCase();
         if (tech1.includes('TORNO') || (job.torno > 0 && !job.etapa1)) {
            jobTerminus = allocateTask(job, 'TORNO', jobTerminus, 'torno', 1);
@@ -351,7 +316,6 @@ export default function ProgrammingPage() {
            jobTerminus = allocateTask(job, 'CENTRO', jobTerminus, 'centro', 1);
         }
 
-        // 3. Etapa 2 (Só inicia após 100% da Etapa 1 pronta)
         let tech2 = (job.etapa2 || '').toUpperCase();
         if (tech2.includes('TORNO')) {
            allocateTask(job, 'TORNO', jobTerminus, 'torno', 2);
@@ -363,9 +327,9 @@ export default function ProgrammingPage() {
     try {
       await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: novaFila, updatedAt: serverTimestamp() });
       await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: novosPlanItems, updatedAt: serverTimestamp() });
-      toast({ title: "Cálculo Concluído", description: "Ociosidade minimizada e pausas (DDS/Café) aplicadas." });
-    } catch (err: any) {
-      toast({ title: "Erro ao salvar", description: "Verifique a conexão.", variant: "destructive" });
+      toast({ title: "Cálculo Concluído", description: "Plano atualizado com sucesso." });
+    } catch (err) {
+      toast({ title: "Erro ao salvar", description: "Falha na comunicação com o banco.", variant: "destructive" });
     }
   };
 
@@ -405,10 +369,10 @@ export default function ProgrammingPage() {
             requisicao: req,
             nomeDaPeca: peca,
             quantidade: isNaN(qtd) || qtd <= 0 ? 1 : qtd,
-            setup: Number(findVal(row, ['setup', 'tempo setup em minutos', 'tempo setup']) || 20),
-            torno: Number(findVal(row, ['torno', 'tempo de planejamento torno minutos todas as peças solicitadas', 'tempo torno']) || 0),
-            centro: Number(findVal(row, ['centro', 'tempo de planejamento centro minutos todas as peças solicitadas', 'tempo centro']) || 0),
-            prog: Number(findVal(row, ['prog', 'tempo programação minutos', 'programação']) || 0),
+            setup: Number(findVal(row, ['setup', 'tempo setup']) || 20),
+            torno: Number(findVal(row, ['torno', 'tempo de planejamento torno']) || 0),
+            centro: Number(findVal(row, ['centro', 'tempo de planejamento centro']) || 0),
+            prog: Number(findVal(row, ['prog', 'tempo programação']) || 0),
             site: String(findVal(row, ['site', 'fabrica']) || 'VALINHOS'),
             etapa1: String(findVal(row, ['etapa 1', 'etapa1']) || ''),
             etapa2: String(findVal(row, ['etapa 2', 'etapa2']) || ''),
@@ -416,7 +380,7 @@ export default function ProgrammingPage() {
         });
 
         await recalculatePlan(novaFila);
-      } catch (err: any) {
+      } catch (err) {
         toast({ title: "Erro na Importação", description: "Verifique o formato da planilha.", variant: "destructive" });
       } finally {
         setIsImporting(false);
@@ -490,7 +454,7 @@ export default function ProgrammingPage() {
                 </div>
 
                 <div className="divide-y divide-border/30">
-                  {TURNOS.map((turno, shIdx) => (
+                  {TURNOS.map((turno) => (
                     <div key={turno.id} className="grid grid-cols-[118px_1fr] border-b border-border/10 last:border-0">
                       <div className="bg-muted/10 border-r border-border/30 p-4 flex flex-col justify-center items-center">
                         <span className="text-3xl font-bold font-['Barlow_Condensed'] leading-none text-foreground">{turno.label}</span>
@@ -519,7 +483,6 @@ export default function ProgrammingPage() {
                                     <div className="text-[12px] font-bold text-foreground truncate leading-tight">{techName}</div>
                                   </div>
                                   <div className="relative h-[42px] border border-border/50 rounded-[3px] bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.02)_0_1px,transparent_1px_100%)] bg-[size:12.5%_100%] overflow-hidden shadow-inner bg-black/20">
-                                    {/* Indicadores Visuais de Pausa (Café/DDS) */}
                                     {PAUSAS.map(p => (
                                       <div 
                                         key={p.label}
