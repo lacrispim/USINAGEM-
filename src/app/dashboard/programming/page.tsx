@@ -68,7 +68,7 @@ interface PlanejamentoItem {
 const TURNOS = [
   { id: '1', label: '1T', range: '06:00-14:00' },
   { id: '2', label: '2T', range: '14:00-22:00' },
-  { id: '3', label: '22:00-06:00' },
+  { id: '3', label: '3T', range: '22:00-06:00' },
 ];
 
 const EQUIPE: Record<string, Record<string, { name: string; role: string }[]>> = {
