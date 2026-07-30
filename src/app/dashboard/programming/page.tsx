@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -62,7 +61,7 @@ interface PlanejamentoItem {
   techKey: 'TORNO' | 'CENTRO' | 'ADM';
 }
 
-// --- Escala Técnica Oficial ---
+// --- Escala Técnica Oficial (Conforme imagem do time) ---
 const TURNOS = [
   { id: '1', label: '1T', range: '06:00-14:00' },
   { id: '2', label: '2T', range: '14:00-22:00' },
@@ -185,17 +184,31 @@ export default function ProgrammingPage() {
     return () => { unsubFila(); unsubPlan(); };
   }, [database]);
 
-  // Motor de Planejamento (schedule)
+  // Motor de Planejamento Industrial
   const recalculatePlan = async (novaFila: JobBase[]) => {
     if (!database) return;
     
-    const updates: Record<string, any> = {};
+    const updates: Record<string, any> = {
+      '/Planejamento_V2': null, // Limpa o planejamento antigo no mesmo update
+      '/Fila_Producao': novaFila
+    };
+    
     let techPointers: Record<string, number> = {}; // Minutos acumulados por técnico
 
-    // 1. Planejamento de Programação (William ADM)
+    // 1. Planejamento de Programação (Time ADM)
     novaFila.forEach(job => {
       if (job.prog > 0) {
-        const techName = EQUIPE['ADM']['1'][0].name;
+        // Distribui entre William ou Alisson no 1T
+        const techsAdm = EQUIPE['ADM']['1'];
+        let bestTech = techsAdm[0];
+        let minTime = techPointers[bestTech.name] || 0;
+
+        techsAdm.forEach(t => {
+          const tTime = techPointers[t.name] || 0;
+          if (tTime < minTime) { minTime = tTime; bestTech = t; }
+        });
+
+        const techName = bestTech.name;
         const currentTotal = techPointers[techName] || 0;
         const startOffset = currentTotal % SHIFT_MIN;
         const dayIdx = Math.floor(currentTotal / SHIFT_MIN);
@@ -230,7 +243,6 @@ export default function ProgrammingPage() {
         const cycleTime = totalUsinagem / job.quantidade;
 
         while (pendingSetup > 0.1 || pendingProd > 0.1) {
-          // Achar técnico disponível (menor ponteiro de tempo)
           let bestTech = null;
           let minTime = Infinity;
           let bestShift = '1';
@@ -268,8 +280,7 @@ export default function ProgrammingPage() {
             pendingProd -= pInShift;
           }
 
-          // Dia absoluto baseado no tempo acumulado do técnico
-          const dayIdx = Math.floor(globalTime / SHIFT_MIN / 3);
+          const dayIdx = Math.floor(globalTime / SHIFT_MIN);
           const id = push(ref(database, 'temp')).key!;
           updates[`/Planejamento_V2/${id}`] = {
             id,
@@ -283,7 +294,7 @@ export default function ProgrammingPage() {
           };
 
           techPointers[techName] = globalTime + sInShift + pInShift;
-          if (dayIdx > 10) break; // Trava de segurança
+          if (dayIdx > 10) break;
         }
       });
     };
@@ -291,14 +302,17 @@ export default function ProgrammingPage() {
     distribute('torno');
     distribute('centro');
 
-    // Execução atômica
+    // Execução Atômica
     try {
-      await set(ref(database, '/Planejamento_V2'), null);
-      await set(ref(database, '/Fila_Producao'), novaFila);
       await update(ref(database), updates);
       toast({ title: "Plano Atualizado", description: "O cronograma foi recalculado com sucesso." });
-    } catch (err) {
-      toast({ title: "Erro ao salvar", description: "Falha na comunicação com o banco de dados.", variant: "destructive" });
+    } catch (err: any) {
+      console.error("Erro ao salvar no RTD:", err);
+      toast({ 
+        title: "Erro ao salvar", 
+        description: "Falha na comunicação com o banco de dados. Verifique a internet.", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -331,19 +345,19 @@ export default function ProgrammingPage() {
         };
 
         const novaFila: JobBase[] = json.map((row, i) => {
-          const req = String(findVal(row, ['req', 'requisicao', 'requisição', 'número', 'forms']) || 'S/N');
-          const peca = String(findVal(row, ['peca', 'peça', 'nome', 'descrição', 'desc']) || 'SEM NOME');
+          const req = String(findVal(row, ['req', 'requisicao', 'requisição', 'número', 'forms', 'nº forms']) || 'S/N');
+          const peca = String(findVal(row, ['peca', 'peça', 'nome', 'descrição', 'desc', 'nome da peça']) || 'SEM NOME');
           const qtd = Number(findVal(row, ['qtd', 'quantidade', 'quantidade de peças']) || 1);
           
           return {
             id: `job-${i}-${Date.now()}`,
             requisicao: req,
             nomeDaPeca: peca,
-            quantidade: isNaN(qtd) ? 1 : qtd,
-            setup: Number(findVal(row, ['setup', 'tempo setup', 'tempo de setup']) || 0),
-            torno: Number(findVal(row, ['torno', 'tempo torno', 'usinagem torno']) || 0),
-            centro: Number(findVal(row, ['centro', 'tempo centro', 'usinagem centro']) || 0),
-            prog: Number(findVal(row, ['prog', 'programação', 'programacao']) || 0),
+            quantidade: isNaN(qtd) || qtd <= 0 ? 1 : qtd,
+            setup: Number(findVal(row, ['setup', 'tempo setup', 'tempo de setup', 'setup (min)']) || 0),
+            torno: Number(findVal(row, ['torno', 'tempo torno', 'usinagem torno', 'torno (min)']) || 0),
+            centro: Number(findVal(row, ['centro', 'tempo centro', 'usinagem centro', 'centro (min)']) || 0),
+            prog: Number(findVal(row, ['prog', 'programação', 'programacao', 'prog (min)']) || 0),
             site: String(findVal(row, ['site', 'fabrica', 'fábrica']) || 'VALINHOS'),
           };
         });
@@ -398,7 +412,7 @@ export default function ProgrammingPage() {
         {loading ? (
           <div className="flex h-[400px] flex-col items-center justify-center gap-4 bg-white rounded-lg border shadow-sm">
             <Loader className="h-10 w-10 animate-spin text-[#5B36A8]" />
-            <span className="font-bold uppercase text-[10px] tracking-widest text-[#6C7C8B]">Processando Sequência Industrial...</span>
+            <span className="font-bold uppercase text-[10px] tracking-widest text-[#6C7C8B]">Sincronizando com Banco de Dados...</span>
           </div>
         ) : (
           timelineDays.map((day) => {
