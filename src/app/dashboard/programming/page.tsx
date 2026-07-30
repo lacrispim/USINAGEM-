@@ -2,9 +2,8 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { useDatabase, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useDatabase } from '@/firebase';
 import { ref, onValue, set, push } from 'firebase/database';
-import { collection, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { 
@@ -14,7 +13,6 @@ import {
   Wand2,
   Eraser,
   CalendarDays,
-  Clock,
   Settings2,
   ArrowUp,
   ArrowDown,
@@ -22,8 +20,6 @@ import {
 } from 'lucide-react';
 import { 
   format, 
-  startOfDay,
-  endOfDay,
   addDays,
   isSameDay,
   parse
@@ -62,6 +58,7 @@ interface PlanejamentoItem {
   turno: string;
   startOffsetMin: number; 
   tipoAtividade: 'USINAGEM' | 'PROGRAMACAO';
+  techKey: 'TORNO' | 'CENTRO' | 'ADM';
 }
 
 // --- Escala Técnica Oficial ---
@@ -112,8 +109,8 @@ const TimelineBar = ({ item }: { item: PlanejamentoItem }) => {
   const leftPc = (item.startOffsetMin / SHIFT_MIN) * 100;
   const setupPc = totalMin > 0 ? (item.setupMinutos / totalMin) * 100 : 0;
 
-  const isTorno = item.equipamento.includes('TORNO');
-  const isProg = item.tipoAtividade === 'PROGRAMACAO';
+  const isTorno = item.techKey === 'TORNO';
+  const isProg = item.techKey === 'ADM';
 
   return (
     <div 
@@ -202,7 +199,8 @@ export default function ProgrammingPage() {
           requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca,
           quantidadeTotal: job.quantidade, quantidadeNoBloco: 0,
           tempoMinutos: job.prog, setupMinutos: 0, turno: '1',
-          startOffsetMin: startOffset, tipoAtividade: 'PROGRAMACAO'
+          startOffsetMin: startOffset, tipoAtividade: 'PROGRAMACAO',
+          techKey: 'ADM'
         };
         techPointers[techName] = currentTotal + job.prog;
       }
@@ -270,7 +268,8 @@ export default function ProgrammingPage() {
             requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca,
             quantidadeTotal: job.quantidade, quantidadeNoBloco: qInShift,
             tempoMinutos: pInShift, setupMinutos: sInShift, turno: bestShift,
-            startOffsetMin: startOffset, tipoAtividade: 'USINAGEM'
+            startOffsetMin: startOffset, tipoAtividade: 'USINAGEM',
+            techKey: techKey
           };
 
           techPointers[techName] = globalTime + sInShift + pInShift;
@@ -283,7 +282,10 @@ export default function ProgrammingPage() {
     distribute('centro');
 
     await set(ref(database, '/Planejamento_V2'), null);
-    await set(ref(database, '/'), { ...updates, Fila_Producao: novaFila });
+    await set(ref(database, '/Fila_Producao'), novaFila);
+    Object.keys(updates).forEach(async path => {
+      await set(ref(database, path), updates[path]);
+    });
   };
 
   const moveItem = (index: number, direction: number) => {
@@ -328,6 +330,7 @@ export default function ProgrammingPage() {
         toast({ title: "Erro", description: "Verifique a planilha.", variant: "destructive" });
       } finally {
         setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
     reader.readAsBinaryString(file);
@@ -535,3 +538,4 @@ export default function ProgrammingPage() {
     </div>
   );
 }
+
