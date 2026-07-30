@@ -95,8 +95,6 @@ const EQUIPE: Record<string, Record<string, { name: string; role: string }[]>> =
   }
 };
 
-const factoryList = ["VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
-
 // --- Componentes de UI ---
 
 const Ruler = () => {
@@ -120,7 +118,7 @@ const TimelineBar = ({ item, realData }: { item: PlanejamentoItem, realData: any
   const leftPc = (item.startOffsetMin / 480) * 100;
   const setupPc = totalMin > 0 ? (item.setupMinutos / totalMin) * 100 : 0;
 
-  // Cálculo de progresso real baseado em registros de produção
+  // Progresso real
   const realMinutes = realData
     .filter(r => String(r.formsNumber) === String(item.requisicao))
     .reduce((acc, curr) => acc + (Number(curr.machiningTime) || 0), 0);
@@ -156,7 +154,6 @@ const TimelineBar = ({ item, realData }: { item: PlanejamentoItem, realData: any
         </span>
         <span className="text-[10px] opacity-80 truncate uppercase font-medium">{item.nomeDaPeca}</span>
       </div>
-      {/* Barra de Progresso Real na base */}
       <div className="absolute bottom-0 left-0 h-[2px] bg-black/30 w-full">
         <div className="h-full bg-white opacity-80" style={{ width: `${progress}%` }} />
       </div>
@@ -177,10 +174,9 @@ export default function ProgrammingPage() {
 
   const timelineDays = useMemo(() => [currentDate, addDays(currentDate, 1), addDays(currentDate, 2)], [currentDate]);
 
-  // Busca dados reais de produção para mostrar o progresso nas barras
   const productionQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'productionRecords'), where('date', '>=', startOfDay(currentDate)), where('date', '<=', endOfDays(addDays(currentDate, 5))));
+    return query(collection(firestore, 'productionRecords'), where('date', '>=', startOfDay(currentDate)), where('date', '<=', endOfDay(addDays(currentDate, 5))));
   }, [firestore, currentDate]);
 
   const { data: productionRecords } = useCollection(productionQuery);
@@ -217,8 +213,6 @@ export default function ProgrammingPage() {
 
         const SHIFT_MIN = 480; 
         const updates: any = {};
-        
-        // Ponteiros de tempo por TÉCNICO para evitar amontoamento
         let techTimePointers: Record<string, number> = {};
 
         const findVal = (row: any, keys: string[]) => {
@@ -236,7 +230,6 @@ export default function ProgrammingPage() {
           const progTotal = Number(findVal(row, ['prog', 'programacao']) || 0);
           const site = String(findVal(row, ['site', 'fabrica']) || 'VALINHOS DOVE');
 
-          // 1. Planejamento de Programação (William)
           if (progTotal > 0) {
              const techName = EQUIPE['ADM']['1'][0].name;
              const start = techTimePointers[techName] || 0;
@@ -251,7 +244,6 @@ export default function ProgrammingPage() {
              techTimePointers[techName] = start + progTotal;
           }
 
-          // 2. Planejamento de Usinagem (Torno e Centro)
           const tasks = [];
           if (tornoTotal > 0) tasks.push({ type: 'TORNO', total: tornoTotal, equip: 'TORNO CNC CENTUR 30' });
           if (centroTotal > 0) tasks.push({ type: 'CENTRO', total: centroTotal, equip: 'CENTRO DE USINAGEM D600' });
@@ -263,7 +255,6 @@ export default function ProgrammingPage() {
             const cycleTime = task.total / qtdTotal;
 
             while (pendingSetup > 0.1 || pendingProd > 0.1) {
-              // Encontra o técnico disponível com menor carga no momento
               const shiftOrder = ['1', '2', '3'];
               let chosenTech = null;
               let chosenShift = '1';
@@ -302,13 +293,10 @@ export default function ProgrammingPage() {
               const remShift = availInShift - timeToUse;
               if (remShift > 0.1 && pendingProd > 0.1) {
                 pInShift = Math.min(remShift, pendingProd);
-                
-                // Cálculo matemático de peças concluídas no bloco
                 const pcsBefore = Math.floor(doneProdTime / cycleTime + 0.001);
                 doneProdTime += pInShift;
                 const pcsAfter = Math.min(qtdTotal, Math.floor(doneProdTime / cycleTime + 0.001));
                 qInShift = pcsAfter - pcsBefore;
-                
                 pendingProd -= pInShift;
                 timeToUse += pInShift;
               }
@@ -324,16 +312,16 @@ export default function ProgrammingPage() {
               };
 
               techTimePointers[techName] = globalTime + timeToUse;
-              if (dayOffset > 7) break; // Trava de segurança
+              if (dayOffset > 7) break;
             }
           });
         });
 
         await set(ref(database, '/Planejamento_V2'), updates);
-        toast({ title: "Planejamento Concluído", description: "As requisições foram distribuídas matematicamente nos turnos." });
+        toast({ title: "Planejamento Concluído", description: "Requisições distribuídas matematicamente." });
       } catch (err) { 
         console.error(err); 
-        toast({ title: "Erro na Importação", description: "Verifique o formato da sua planilha.", variant: "destructive" });
+        toast({ title: "Erro na Importação", description: "Verifique o formato da planilha.", variant: "destructive" });
       } finally { 
         setIsImporting(false); 
         if (fileInputRef.current) fileInputRef.current.value = ''; 
@@ -351,23 +339,28 @@ export default function ProgrammingPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" size="sm" className="bg-white border-[#CBD5DD] text-[#3D4C5A] font-bold text-[10px] uppercase h-9 shadow-sm" onClick={clearAllPlanning}>
+          {/* Seletor de Data conforme solicitado */}
+          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg border shadow-sm h-11">
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-[#F4F7F9]" onClick={() => setCurrentDate(p => addDays(p, -1))}>
+              <ChevronLeft className="h-4 w-4 text-[#6C7C8B]" />
+            </Button>
+            <div className="flex items-center gap-3 font-bold text-sm min-w-[130px] justify-center text-[#101820]">
+              <CalendarDays className="h-4 w-4 text-[#6C7C8B]" />
+              <span>{format(currentDate, 'dd/MM/yyyy')}</span>
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-[#F4F7F9]" onClick={() => setCurrentDate(p => addDays(p, 1))}>
+              <ChevronRight className="h-4 w-4 text-[#6C7C8B]" />
+            </Button>
+          </div>
+
+          <Button variant="outline" size="sm" className="bg-white border-[#CBD5DD] text-[#3D4C5A] font-bold text-[10px] uppercase h-11 shadow-sm" onClick={clearAllPlanning}>
             <Eraser className="h-4 w-4 mr-2" /> Limpar Plano
           </Button>
 
           <input type="file" ref={fileInputRef} onChange={handleImportAndPlan} accept=".xlsx, .xls, .csv" className="hidden" />
-          <Button variant="outline" size="sm" className="bg-[#101820] text-[#F0BC00] border-[#101820] font-bold text-[10px] uppercase h-9 shadow-lg hover:bg-black" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+          <Button variant="outline" size="sm" className="bg-[#101820] text-[#F0BC00] border-[#101820] font-bold text-[10px] uppercase h-11 shadow-lg hover:bg-black" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
             {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <Wand2 className="h-4 w-4 mr-2" />} Importar & Planejar Automático
           </Button>
-
-          <div className="flex items-center gap-2 bg-white p-1 rounded border border-[#CBD5DD] shadow-sm">
-            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-            <div className="min-w-[140px] text-center font-bold flex items-center justify-center gap-2 text-xs">
-              <CalendarDays className="h-4 w-4 text-[#6C7C8B]" />
-              <span className="capitalize">{format(currentDate, 'dd/MM/yyyy', { locale: ptBR })}</span>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
-          </div>
         </div>
       </div>
 
@@ -456,7 +449,7 @@ export default function ProgrammingPage() {
                 <li>• <b className="text-white">Ciclo de Produção:</b> O sistema calcula `tempo ÷ quantidade` para determinar o ritmo real.</li>
                 <li>• <b className="text-white">Corte de Turno:</b> Peças que não terminam no turno são automaticamente carregadas para o próximo técnico da escala.</li>
                 <li>• <b className="text-white">Prioridade de Setup:</b> O tempo de preparação é alocado sempre no início da primeira raia da requisição.</li>
-                <li>• <b className="text-white">Escala Real:</b> O 1T do Torno conta com <b className="text-white">Marcos e Alisson</b> simultaneamente para carga pesada.</li>
+                <li>• <b className="text-white">Capacidade 1T:</b> Marcos e Alisson operam juntos para carga pesada no Torno.</li>
             </ul>
         </div>
         <div className="bg-white p-6 rounded border border-[#CBD5DD] shadow-lg">
@@ -488,10 +481,3 @@ export default function ProgrammingPage() {
     </div>
   );
 }
-
-function endOfDays(date: Date) {
-    const d = new Date(date);
-    d.setHours(23, 59, 59, 999);
-    return d;
-}
-
