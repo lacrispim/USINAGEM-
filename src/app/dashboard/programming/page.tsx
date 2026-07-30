@@ -62,28 +62,30 @@ interface PlanejamentoItem {
   techKey: 'TORNO' | 'CENTRO' | 'ADM';
   jobId: string;
   etapaIndex: number;
+  laneIndex: number; // 0 ou 1 para identificar a pista física
 }
 
-// --- Escala Técnica Oficial ---
+// --- Definição das Raias de Máquina ---
 const TURNOS = [
   { id: '1', label: '1T', range: '06:00-14:00' },
   { id: '2', label: '2T', range: '14:00-22:00' },
   { id: '3', label: '3T', range: '22:00-06:00' },
 ];
 
-const EQUIPE: Record<string, Record<string, { name: string; role: string }[]>> = {
+// Mapeamento de quem opera qual "Pista" (Lane) em cada turno
+const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
-    '1': [{ name: 'Marcos Barbosa', role: 'Téc. Prog./Op.' }, { name: 'Alisson França', role: 'Téc. Prog./Op.' }],
-    '2': [{ name: 'Jair Melo', role: 'Téc. Prog./Op.' }],
-    '3': [{ name: 'Gustavo Gozzi', role: 'Téc. Prog./Op.' }]
+    '1': ['Marcos Barbosa', 'Alisson França'], // Duas máquinas de Torno no 1T
+    '2': ['Jair Melo', ''],                   // Apenas uma operando no 2T (Raia 1)
+    '3': ['Gustavo Gozzi', '']                // Apenas uma operando no 3T (Raia 1)
   },
   'CENTRO': {
-    '1': [{ name: 'Daniel Solivo', role: 'Téc. Operador' }],
-    '2': [{ name: 'Nathan Xavier', role: 'Téc. Prog./Op.' }],
-    '3': [{ name: 'Rodrigo Cantano', role: 'Téc. Prog./Op.' }]
+    '1': ['Daniel Solivo'],                   // Uma máquina de Centro
+    '2': ['Nathan Xavier'],
+    '3': ['Rodrigo Cantano']
   },
   'ADM': {
-    '1': [{ name: 'William Martinucci', role: 'Programador' }]
+    '1': ['William Martinucci']
   }
 };
 
@@ -137,7 +139,7 @@ const TimelineBar = ({ item }: { item: PlanejamentoItem }) => {
       <div className="flex-1 flex items-center gap-2 px-2 min-w-0 text-white overflow-hidden">
         <span className="font-mono text-[10px] font-bold shrink-0">{item.requisicao}</span>
         <span className="font-mono text-[9px] opacity-90 shrink-0 font-bold">
-            {item.quantidadeNoBloco > 0 ? `${item.quantidadeNoBloco}pç` : (item.setupMinutos > 0 && item.tempoMinutos === 0 ? 'S' : '...')}
+            {item.quantidadeNoBloco > 0 ? `${item.quantidadeNoBloco}pç` : (item.setupMinutos > 0 ? 'S' : '...')}
         </span>
         <span className="text-[9px] opacity-80 truncate uppercase font-medium">{item.nomeDaPeca}</span>
       </div>
@@ -178,7 +180,9 @@ export default function ProgrammingPage() {
     if (!firestore) return;
     
     const novosPlanItems: PlanejamentoItem[] = [];
-    const techPointers: Record<string, number> = {}; 
+    const lanePointers: Record<string, number> = {
+      'TORNO_0': 0, 'TORNO_1': 0, 'CENTRO_0': 0, 'ADM_0': 0
+    }; 
 
     const allocateTask = (
         job: JobBase, 
@@ -194,38 +198,28 @@ export default function ProgrammingPage() {
 
         if (totalDuration <= 0 && job.setup <= 0 && type !== 'prog') return minStartTime;
 
+        // Escolher a raia que fica livre primeiro para esta tecnologia
+        let chosenLane = 0;
+        if (techKey === 'TORNO') {
+            chosenLane = lanePointers['TORNO_0'] <= lanePointers['TORNO_1'] ? 0 : 1;
+        }
+        
+        const laneId = `${techKey}_${chosenLane}`;
+        let actualStart = Math.max(lanePointers[laneId] || 0, minStartTime);
+        
         let pendingSetup = type === 'prog' ? 0 : job.setup;
         let pendingProd = totalDuration;
         let doneProdTime = 0;
         const cycleTime = job.quantidade > 0 ? totalDuration / job.quantidade : totalDuration;
-        
-        let lastEndOffset = minStartTime;
 
         while (pendingSetup > 0.1 || pendingProd > 0.1) {
-            let bestTech = null;
-            let minTimeAvailable = Infinity;
-            let bestShift = '1';
-
-            const searchKey = type === 'prog' ? 'ADM' : techKey;
-            
-            ['1', '2', '3'].forEach(sId => {
-                (EQUIPE[searchKey][sId] || []).forEach(t => {
-                    const tTime = techPointers[t.name] || 0;
-                    if (tTime < minTimeAvailable) {
-                        minTimeAvailable = tTime;
-                        bestTech = t;
-                        bestShift = sId;
-                    }
-                });
-            });
-
-            if (!bestTech) break;
-
-            const techName = (bestTech as any).name;
-            let actualStart = Math.max(techPointers[techName] || 0, lastEndOffset);
-            
             const startOffset = actualStart % SHIFT_MIN;
             const availInShift = SHIFT_MIN - startOffset;
+            const turnoIdx = (Math.floor(actualStart / SHIFT_MIN) % 3) + 1;
+            const shiftId = String(turnoIdx);
+
+            // Identifica quem é o técnico nessa raia e nesse turno
+            const techName = (MACHINE_LANES[techKey][shiftId] || [])[chosenLane] || 'S/ Téc.';
 
             let sInShift = 0;
             let pInShift = 0;
@@ -247,51 +241,59 @@ export default function ProgrammingPage() {
             }
 
             const dayIdx = Math.floor(actualStart / SHIFT_MIN);
-            novosPlanItems.push({
-                id: `plan-${Math.random().toString(36).substr(2, 9)}`,
-                dataExecucao: format(addDays(currentDate, dayIdx), 'dd/MM/yyyy'),
-                tecnico: techName, 
-                equipamento: type === 'prog' ? 'PROGRAMAÇÃO' : (techKey === 'TORNO' ? 'TORNO CNC' : 'CENTRO USINAGEM'),
-                requisicao: job.requisicao, 
-                nomeDaPeca: job.nomeDaPeca,
-                quantidadeTotal: job.quantidade, 
-                quantidadeNoBloco: qInShift,
-                tempoMinutos: pInShift, 
-                setupMinutos: sInShift, 
-                turno: bestShift,
-                startOffsetMin: startOffset, 
-                tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM',
-                techKey: searchKey as any,
-                jobId: job.id,
-                etapaIndex: etapaIdx
-            });
+            if (sInShift > 0 || pInShift > 0) {
+                novosPlanItems.push({
+                    id: `plan-${Math.random().toString(36).substr(2, 9)}`,
+                    dataExecucao: format(addDays(currentDate, dayIdx), 'dd/MM/yyyy'),
+                    tecnico: techName, 
+                    equipamento: type === 'prog' ? 'PROGRAMAÇÃO' : (techKey === 'TORNO' ? 'TORNO CNC' : 'CENTRO USINAGEM'),
+                    requisicao: job.requisicao, 
+                    nomeDaPeca: job.nomeDaPeca,
+                    quantidadeTotal: job.quantidade, 
+                    quantidadeNoBloco: qInShift,
+                    tempoMinutos: pInShift, 
+                    setupMinutos: sInShift, 
+                    turno: shiftId,
+                    startOffsetMin: startOffset, 
+                    tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM',
+                    techKey,
+                    jobId: job.id,
+                    etapaIndex: etapaIdx,
+                    laneIndex: chosenLane
+                });
+            }
 
             const blockDuration = sInShift + pInShift;
-            techPointers[techName] = actualStart + blockDuration;
-            lastEndOffset = actualStart + blockDuration;
+            actualStart += blockDuration;
 
             if (dayIdx > 20) break;
         }
-        return lastEndOffset;
+        
+        lanePointers[laneId] = actualStart;
+        return actualStart;
     };
 
     novaFila.forEach(job => {
         let jobPointer = 0;
 
+        // 1. Programação (Sempre precede as etapas de usinagem)
         if (job.prog > 0) {
             jobPointer = allocateTask(job, 'ADM', jobPointer, 'prog', 0);
         }
 
+        // 2. Etapa 1
         if (job.etapa1) {
             const tech = job.etapa1.toUpperCase().includes('TORNO') ? 'TORNO' : 'CENTRO';
             jobPointer = allocateTask(job, tech as any, jobPointer, tech.toLowerCase() as any, 1);
         }
 
+        // 3. Etapa 2 (Só começa após fim da Etapa 1)
         if (job.etapa2) {
             const tech = job.etapa2.toUpperCase().includes('TORNO') ? 'TORNO' : 'CENTRO';
             jobPointer = allocateTask(job, tech as any, jobPointer, tech.toLowerCase() as any, 2);
         }
         
+        // Caso as colunas Etapa 1/2 não existam, usa a lógica antiga de concorrência se tempos > 0
         if (!job.etapa1 && !job.etapa2) {
             if (job.torno > 0) jobPointer = allocateTask(job, 'TORNO', jobPointer, 'torno', 1);
             if (job.centro > 0) jobPointer = allocateTask(job, 'CENTRO', jobPointer, 'centro', 2);
@@ -301,7 +303,7 @@ export default function ProgrammingPage() {
     try {
       await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: novaFila, updatedAt: serverTimestamp() });
       await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: novosPlanItems, updatedAt: serverTimestamp() });
-      toast({ title: "Plano Atualizado", description: "O cronograma foi recalculado respeitando a sequência de etapas." });
+      toast({ title: "Plano Atualizado", description: "O cronograma foi recalculado respeitando a sequência de etapas e raias de máquinas." });
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: "Verifique a conexão.", variant: "destructive" });
     }
@@ -439,18 +441,25 @@ export default function ProgrammingPage() {
                         <Ruler />
                         <div className="space-y-3">
                           {['TORNO', 'CENTRO', 'ADM'].map((cat) => {
-                            const shiftTechs = EQUIPE[cat][turno.id] || [];
-                            return shiftTechs.map(techInfo => {
-                              const techItems = dayItems.filter(i => i.tecnico === techInfo.name && (i.techKey === cat || (cat === 'ADM' && i.tipoAtividade === 'PROGRAMACAO')));
-                              if (cat === 'ADM' && techItems.length === 0) return null;
+                            const shiftLanes = MACHINE_LANES[cat][turno.id] || [];
+                            return shiftLanes.map((techName, lIdx) => {
+                              if (!techName && cat !== 'ADM') return null; // Pista vazia nesse turno
                               
+                              const techItems = dayItems.filter(i => 
+                                i.techKey === cat && 
+                                i.laneIndex === lIdx && 
+                                i.turno === turno.id
+                              );
+                              
+                              if (cat === 'ADM' && techItems.length === 0) return null;
+
                               return (
-                                <div key={`${techInfo.name}-${cat}`} className="grid grid-cols-[155px_1fr] items-center group">
+                                <div key={`${techName}-${cat}-${lIdx}`} className="grid grid-cols-[155px_1fr] items-center group">
                                   <div className="pr-3 min-w-0">
                                     <div className={cn("text-[9px] font-mono font-black uppercase tracking-tight", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>
-                                      {cat === 'TORNO' ? '▬ Torno' : (cat === 'CENTRO' ? '▣ Centro' : '▣ Prog.')}
+                                      {cat === 'TORNO' ? `▬ Torno R${lIdx+1}` : (cat === 'CENTRO' ? '▣ Centro' : '▣ Prog.')}
                                     </div>
-                                    <div className="text-[12px] font-bold text-foreground truncate leading-tight">{techInfo.name}</div>
+                                    <div className="text-[12px] font-bold text-foreground truncate leading-tight">{techName}</div>
                                   </div>
                                   <div className="relative h-[42px] border border-border/50 rounded-[3px] bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.02)_0_1px,transparent_1px_100%)] bg-[size:12.5%_100%] overflow-hidden shadow-inner bg-black/20">
                                     {techItems.length === 0 && (
@@ -540,10 +549,10 @@ export default function ProgrammingPage() {
       
       <div className="bg-muted/5 border border-border p-4 rounded-lg text-[11px] leading-relaxed text-muted-foreground">
         <p><b>Como o sequenciamento funciona:</b></p>
-        <p>1. O tempo de <b>Programação</b> (Software) é agendado no 1º turno exclusivamente com <b>William Martinucci</b>.</p>
-        <p>2. A <b>Etapa 1</b> (ex: Torno) inicia respeitando o tempo de Setup definido (ex: 20 min).</p>
-        <p>3. A <b>Etapa 2</b> (ex: Centro) é agendada automaticamente <b>somente após</b> a conclusão de todo o lote da Etapa 1.</p>
-        <p>4. O cálculo de peças por turno usa a fórmula: <code>(Tempo Disponível ÷ Ciclo Médio)</code>, descontando o Setup.</p>
+        <p>1. O tempo de <b>Programação</b> é agendado com <b>William Martinucci</b>.</p>
+        <p>2. A <b>Usinagem</b> inicia respeitando o tempo de Setup (20 min) sempre na mesma raia até o fim do lote.</p>
+        <p>3. Se a peça tem <b>Etapa 1 e 2</b>, a segunda fase só é agendada após o fim da primeira.</p>
+        <p>4. No 1º Turno, o Torno possui duas máquinas (Raia 1: Marcos / Raia 2: Alisson). O sistema escolhe a que estiver livre primeiro.</p>
       </div>
     </div>
   );
