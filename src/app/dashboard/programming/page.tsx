@@ -2,8 +2,10 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { useFirestore, useDoc } from '@/firebase';
+import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { 
@@ -16,7 +18,8 @@ import {
   ArrowDown,
   FileUp,
   Coffee,
-  Mic
+  Mic,
+  AlertCircle
 } from 'lucide-react';
 import { 
   format, 
@@ -73,6 +76,8 @@ const TURNOS = [
   { id: '3', label: '3T', range: '22:00-06:00' },
 ];
 
+// Lane 0: Marcos(1T)->Jair(2T)->Gustavo(3T)
+// Lane 1: Alisson(1T)->Ocioso(2T)->Ocioso(3T)
 const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Marcos Barbosa', 'Alisson França'],
@@ -114,16 +119,7 @@ const Ruler = () => {
 };
 
 const TimelineBar = ({ item }: { item: PlanejamentoItem }) => {
-  if (item.tipoAtividade === 'PAUSA') {
-    return (
-      <div 
-        className="absolute top-[10px] bottom-[10px] bg-muted/40 border-x border-muted-foreground/20 flex items-center justify-center z-0"
-        style={{ left: `${(item.startOffsetMin / SHIFT_MIN) * 100}%`, width: `${(item.tempoMinutos / SHIFT_MIN) * 100}%` }}
-      >
-        <span className="text-[7px] font-black opacity-30 tracking-widest">{item.nomeDaPeca}</span>
-      </div>
-    );
-  }
+  if (item.tipoAtividade === 'PAUSA') return null;
 
   const totalMin = (item.tempoMinutos || 0) + (item.setupMinutos || 0);
   const widthPc = Math.max((totalMin / SHIFT_MIN) * 100, 0.5);
@@ -193,10 +189,15 @@ export default function ProgrammingPage() {
 
   const timelineDays = useMemo(() => [currentDate, addDays(currentDate, 1), addDays(currentDate, 2)], [currentDate]);
 
+  const sanitizeData = (data: any) => {
+    return JSON.parse(JSON.stringify(data, (key, value) => value === undefined ? null : value));
+  };
+
   const recalculatePlan = async (novaFila: JobBase[]) => {
     if (!firestore) return;
     
     const novosPlanItems: PlanejamentoItem[] = [];
+    // Pistas independentes para Torno (Lane 0 e 1), Centro e ADM
     const lanePointers: Record<string, number> = {
       'TORNO_0': 0, 'TORNO_1': 0, 'CENTRO_0': 0, 'ADM_0': 0
     }; 
@@ -211,7 +212,7 @@ export default function ProgrammingPage() {
         let totalDuration = job[type] || 0;
         if (totalDuration <= 0 && (type === 'prog' || job.setup <= 0)) return minStartTime;
 
-        // Se for Torno, testamos as duas lanes e pegamos a que termina antes (Greedy)
+        // Lógica Greedy: Escolhe a raia que termina o lote mais cedo
         let chosenLane = 0;
         if (techKey === 'TORNO') {
             chosenLane = lanePointers['TORNO_0'] <= lanePointers['TORNO_1'] ? 0 : 1;
@@ -226,7 +227,7 @@ export default function ProgrammingPage() {
         const cycleTime = job.quantidade > 0 ? totalDuration / job.quantidade : totalDuration;
 
         let guard = 0;
-        while ((pendingSetup > 0.1 || pendingProd > 0.1) && guard++ < 400) {
+        while ((pendingSetup > 0.1 || pendingProd > 0.1) && guard++ < 800) {
             const dayIdx = Math.floor(actualStart / (SHIFT_MIN * 3));
             const startInDay = actualStart % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
@@ -235,32 +236,42 @@ export default function ProgrammingPage() {
 
             const techName = (MACHINE_LANES[techKey][shiftId] || [])[chosenLane];
 
-            // Se não tem técnico na lane/turno, pula para o próximo slot
+            // Se não tem técnico na lane/turno (ex: Alisson no 2T), pula para o 1T do próximo dia
             if (!techName) {
-                actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN;
+                actualStart = (dayIdx + 1) * 3 * SHIFT_MIN; 
                 continue;
             }
 
             let availInShift = SHIFT_MIN - startOffset;
             
-            // Descontar pausas
-            PAUSAS.forEach(p => {
-                if (startOffset < p.start + p.duration && startOffset + availInShift > p.start) {
-                    // Simplificação: apenas reduz a janela disponível
-                    availInShift -= p.duration;
-                }
-            });
+            // Lógica de Janelas Produtivas (Desconta pausas)
+            let winStart = startOffset;
+            let winEnd = SHIFT_MIN;
 
+            // Encontrar a primeira pausa que colida com o início do técnico
+            for (const p of PAUSAS) {
+                if (winStart < p.start + p.duration && winStart >= p.start) {
+                    winStart = p.start + p.duration;
+                }
+            }
+            
+            // Se o técnico inicia após o fim do turno por causa de pausas, pula turno
+            if (winStart >= SHIFT_MIN) {
+                actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN;
+                continue;
+            }
+
+            const effectiveAvail = SHIFT_MIN - winStart;
             let sInShift = 0;
             let pInShift = 0;
             let qInShift = 0;
 
             if (pendingSetup > 0.1) {
-                sInShift = Math.min(pendingSetup, availInShift);
+                sInShift = Math.min(pendingSetup, effectiveAvail);
                 pendingSetup -= sInShift;
             }
 
-            const remShift = availInShift - sInShift;
+            const remShift = effectiveAvail - sInShift;
             if (remShift > 0.1 && pendingProd > 0.1) {
                 pInShift = Math.min(remShift, pendingProd);
                 const before = Math.floor(doneProdTime / cycleTime + 1e-7);
@@ -283,7 +294,7 @@ export default function ProgrammingPage() {
                     tempoMinutos: pInShift, 
                     setupMinutos: sInShift, 
                     turno: shiftId,
-                    startOffsetMin: startOffset, 
+                    startOffsetMin: winStart, 
                     tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM',
                     techKey,
                     jobId: job.id,
@@ -292,9 +303,10 @@ export default function ProgrammingPage() {
                 });
             }
 
-            actualStart += (sInShift + pInShift);
-            if (availInShift <= 0.1) {
-               // Força pulo de turno se esgotou a janela
+            actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
+            
+            // Se esgotou o turno, pula para o próximo
+            if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) {
                actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN;
             }
         }
@@ -303,12 +315,16 @@ export default function ProgrammingPage() {
         return actualStart;
     };
 
+    // Processa a fila respeitando a precedência rigorosa Etapa 1 -> Etapa 2
     novaFila.forEach(job => {
         let jobTerminus = 0;
+        
+        // 1. Programação ADM (Sempre o William no 1T)
         if (job.prog > 0) {
             jobTerminus = allocateTask(job, 'ADM', jobTerminus, 'prog', 0);
         }
 
+        // 2. Etapa 1
         let tech1 = (job.etapa1 || '').toUpperCase();
         if (tech1.includes('TORNO') || (job.torno > 0 && !job.etapa1)) {
            jobTerminus = allocateTask(job, 'TORNO', jobTerminus, 'torno', 1);
@@ -316,6 +332,7 @@ export default function ProgrammingPage() {
            jobTerminus = allocateTask(job, 'CENTRO', jobTerminus, 'centro', 1);
         }
 
+        // 3. Etapa 2 (Só inicia após término total da Etapa 1)
         let tech2 = (job.etapa2 || '').toUpperCase();
         if (tech2.includes('TORNO')) {
            allocateTask(job, 'TORNO', jobTerminus, 'torno', 2);
@@ -325,11 +342,21 @@ export default function ProgrammingPage() {
     });
 
     try {
-      await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: novaFila, updatedAt: serverTimestamp() });
-      await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: novosPlanItems, updatedAt: serverTimestamp() });
+      const sanitizedFila = sanitizeData(novaFila);
+      const sanitizedPlano = sanitizeData(novosPlanItems);
+
+      await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitizedFila, updatedAt: serverTimestamp() });
+      await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitizedPlano, updatedAt: serverTimestamp() });
       toast({ title: "Cálculo Concluído", description: "Plano atualizado com sucesso." });
-    } catch (err) {
-      toast({ title: "Erro ao salvar", description: "Falha na comunicação com o banco.", variant: "destructive" });
+    } catch (err: any) {
+      console.error("Firestore Error:", err);
+      const permissionError = new FirestorePermissionError({
+        path: 'programacaoState/fila',
+        operation: 'write',
+        requestResourceData: { fila: novaFila }
+      });
+      errorEmitter.emit('permission-error', permissionError);
+      toast({ title: "Erro na comunicação", description: "Falha ao sincronizar dados.", variant: "destructive" });
     }
   };
 
@@ -360,7 +387,7 @@ export default function ProgrammingPage() {
         };
 
         const novaFila: JobBase[] = json.map((row, i) => {
-          const req = String(findVal(row, ['req', 'requisicao', 'forms']) || 'S/N');
+          const req = String(findVal(row, ['req', 'requisicao', 'forms', 'nº forms']) || 'S/N');
           const peca = String(findVal(row, ['peca', 'peça', 'nome']) || 'SEM NOME');
           const qtd = Number(findVal(row, ['qtd', 'quantidade']) || 1);
           
@@ -370,8 +397,8 @@ export default function ProgrammingPage() {
             nomeDaPeca: peca,
             quantidade: isNaN(qtd) || qtd <= 0 ? 1 : qtd,
             setup: Number(findVal(row, ['setup', 'tempo setup']) || 20),
-            torno: Number(findVal(row, ['torno', 'tempo de planejamento torno']) || 0),
-            centro: Number(findVal(row, ['centro', 'tempo de planejamento centro']) || 0),
+            torno: Number(findVal(row, ['torno', 'tempo de planejamento torno', 'torno minutos']) || 0),
+            centro: Number(findVal(row, ['centro', 'tempo de planejamento centro', 'centro minutos']) || 0),
             prog: Number(findVal(row, ['prog', 'tempo programação']) || 0),
             site: String(findVal(row, ['site', 'fabrica']) || 'VALINHOS'),
             etapa1: String(findVal(row, ['etapa 1', 'etapa1']) || ''),
@@ -381,6 +408,7 @@ export default function ProgrammingPage() {
 
         await recalculatePlan(novaFila);
       } catch (err) {
+        console.error(err);
         toast({ title: "Erro na Importação", description: "Verifique o formato da planilha.", variant: "destructive" });
       } finally {
         setIsImporting(false);
