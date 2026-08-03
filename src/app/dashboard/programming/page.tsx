@@ -39,7 +39,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +49,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DialogTrigger } from '@radix-ui/react-dialog';
 
 interface JobBase {
   id: string;
@@ -157,6 +157,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
         <span className="font-mono text-[9px] font-black shrink-0">#{item.requisicao}</span>
         {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[8px] font-bold shrink-0">{item.quantidadeNoBloco}pç</span>}
         <span className="text-[8px] opacity-80 truncate uppercase font-bold leading-none">{item.nomeDaPeca}</span>
+        <span className="text-[6px] ml-auto opacity-60 font-black border border-white/20 px-0.5 rounded shrink-0">{item.site?.substring(0,3)}</span>
         
         {item.isConcluded && (
           <div className="absolute right-1 top-1/2 -translate-y-1/2">
@@ -179,7 +180,6 @@ export default function ProgrammingPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Estado para novo item manual
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState<Partial<JobBase>>({
     requisicao: '',
@@ -207,20 +207,11 @@ export default function ProgrammingPage() {
 
   const toggleConcluded = async (itemId: string) => {
     if (!firestore || !planejamentoData) return;
-    
-    const updatedPlano = planejamentoData.map(item => 
-      item.id === itemId ? { ...item, isConcluded: !item.isConcluded } : item
-    );
-    
+    const updatedPlano = planejamentoData.map(item => item.id === itemId ? { ...item, isConcluded: !item.isConcluded } : item);
     setPlanejamentoData(updatedPlano);
-    
     const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
-    
     try {
-      await setDoc(doc(firestore, 'programacaoState', 'plano'), { 
-        data: sanitize(updatedPlano), 
-        updatedAt: serverTimestamp() 
-      });
+      await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(updatedPlano), updatedAt: serverTimestamp() });
     } catch (e) {
       toast({ title: "Erro", description: "Falha ao salvar status.", variant: "destructive" });
     }
@@ -231,10 +222,8 @@ export default function ProgrammingPage() {
     const key = `${format(day, 'yyyy-MM-dd')}_${shiftId}`;
     const newDisabled = { ...disabledShifts, [key]: !disabledShifts[key] };
     setDisabledShifts(newDisabled);
-    
     try {
       await setDoc(doc(firestore, 'programacaoState', 'config'), { disabledShifts: newDisabled, updatedAt: serverTimestamp() });
-      toast({ title: "Turno Atualizado", description: `Turno ${shiftId} ${newDisabled[key] ? 'desativado' : 'ativado'}.` });
       recalculatePlan(fila, newDisabled);
     } catch (e) {
       toast({ title: "Erro", description: "Falha ao salvar configuração.", variant: "destructive" });
@@ -244,25 +233,18 @@ export default function ProgrammingPage() {
   const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts) => {
     if (!firestore) return;
     const novosPlanItems: PlanejamentoItem[] = [];
-    
-    const lanePointers: Record<string, number> = { 
-        'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 
-    }; 
-
+    const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
     const jobCompletionTimes: Record<string, number> = {};
 
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
         let prodTime = Number(job[type]) || 0;
         let setupTime = (type === 'torno' || type === 'centro') ? (Number(job.setup) || 20) : 0;
-        
         if (prodTime <= 0 && setupTime <= 0 && type !== 'prog') return minStartTime;
         if (type === 'prog' && prodTime <= 0) return minStartTime;
         
         const chosenLane = 0;
         const laneId = `${techKey}_${chosenLane}`;
-        
         let actualPointer = Math.max(lanePointers[laneId] || 0, minStartTime);
-        
         let pendingSetup = setupTime;
         let pendingProd = prodTime;
         let doneProdTime = 0;
@@ -275,11 +257,9 @@ export default function ProgrammingPage() {
             const startInDay = actualPointer % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const startOffset = startInDay % SHIFT_MIN;
-            
             const dayDate = addDays(currentDate, dayIdx);
             const shiftKey = `${format(dayDate, 'yyyy-MM-dd')}_${shiftIdx + 1}`;
             const isShiftDisabled = currentDisabled[shiftKey];
-
             const techName = MACHINE_LANES[techKey][String(shiftIdx + 1)]?.[chosenLane];
 
             if (isShiftDisabled || !techName) {
@@ -288,21 +268,12 @@ export default function ProgrammingPage() {
             }
 
             let winStart = startOffset;
-            for (const p of PAUSAS) { 
-                if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) {
-                    winStart = p.start + p.duration;
-                }
-            }
-            
-            if (winStart >= SHIFT_MIN - 1) { 
-                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
-                continue; 
-            }
+            for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) winStart = p.start + p.duration; }
+            if (winStart >= SHIFT_MIN - 1) { actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN); continue; }
 
             const effectiveAvail = SHIFT_MIN - winStart;
             let sInShift = pendingSetup > 0 ? Math.min(pendingSetup, effectiveAvail) : 0;
             pendingSetup -= sInShift;
-            
             let pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
             let qInShift = 0;
             
@@ -338,48 +309,28 @@ export default function ProgrammingPage() {
                     site: job.site || 'VALINHOS'
                 });
             }
-            
             actualPointer = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
-            
-            if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) {
-                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
-            }
+            if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
         }
         lanePointers[laneId] = actualPointer;
         return actualPointer;
     };
 
-    // Prioridade 1: Programação (ADM)
-    novaFila.forEach(job => {
-        allocateTask(job, 'ADM', 0, 'prog');
-    });
-
-    // Prioridade 2: Etapa 1
+    novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
     novaFila.forEach(job => {
         const e1 = String(job.etapa1 || '').toUpperCase();
-        if (e1.includes('TORNO')) {
-            jobCompletionTimes[job.id] = allocateTask(job, 'TORNO', 0, 'torno');
-        } else if (e1.includes('CENTRO')) {
-            jobCompletionTimes[job.id] = allocateTask(job, 'CENTRO', 0, 'centro');
-        } else {
-            jobCompletionTimes[job.id] = 0;
-        }
+        if (e1.includes('TORNO')) jobCompletionTimes[job.id] = allocateTask(job, 'TORNO', 0, 'torno');
+        else if (e1.includes('CENTRO')) jobCompletionTimes[job.id] = allocateTask(job, 'CENTRO', 0, 'centro');
+        else jobCompletionTimes[job.id] = 0;
     });
-
-    // Prioridade 3: Etapa 2
     novaFila.forEach(job => {
         const e2 = String(job.etapa2 || '').toUpperCase();
         const minStart = jobCompletionTimes[job.id] || 0;
-        
-        if (e2.includes('TORNO')) {
-            allocateTask(job, 'TORNO', minStart, 'torno');
-        } else if (e2.includes('CENTRO')) {
-            allocateTask(job, 'CENTRO', minStart, 'centro');
-        }
+        if (e2.includes('TORNO')) allocateTask(job, 'TORNO', minStart, 'torno');
+        else if (e2.includes('CENTRO')) allocateTask(job, 'CENTRO', minStart, 'centro');
     });
 
     const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
-
     await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
     await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
   };
@@ -413,7 +364,6 @@ export default function ProgrammingPage() {
           etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || ''),
           etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
       }));
-      
       await recalculatePlan(novaFila);
       setIsImporting(false);
     };
@@ -422,12 +372,10 @@ export default function ProgrammingPage() {
 
   const handleAddManual = async () => {
     if (!newItem.requisicao || !newItem.nomeDaPeca) {
-      toast({ title: "Erro", description: "Preencha ao menos Requisição e Nome da Peça.", variant: "destructive" });
-      return;
+      toast({ title: "Erro", description: "Preencha Requisição e Peça.", variant: "destructive" }); return;
     }
-
     const job: JobBase = {
-      id: `job-manual-${Date.now()}`,
+      id: `job-m-${Date.now()}`,
       requisicao: newItem.requisicao || 'S/N',
       nomeDaPeca: newItem.nomeDaPeca || 'SEM NOME',
       quantidade: Number(newItem.quantidade) || 1,
@@ -439,31 +387,12 @@ export default function ProgrammingPage() {
       etapa1: newItem.etapa1 || '',
       etapa2: newItem.etapa2 || ''
     };
-
-    const novaFila = [...fila, job];
-    setFila(novaFila);
-    await recalculatePlan(novaFila);
-    setIsAddDialogOpen(false);
-    setNewItem({
-      requisicao: '',
-      nomeDaPeca: '',
-      quantidade: 1,
-      setup: 20,
-      torno: 0,
-      centro: 0,
-      prog: 0,
-      site: 'VALINHOS DOVE',
-      etapa1: '',
-      etapa2: ''
-    });
-    toast({ title: "Sucesso", description: "Requisição adicionada manualmente." });
+    const nf = [...fila, job]; setFila(nf); await recalculatePlan(nf); setIsAddDialogOpen(false);
+    setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS DOVE', etapa1: '', etapa2: '' });
   };
 
   const handleDeleteManual = async (id: string) => {
-    const novaFila = fila.filter(j => j.id !== id);
-    setFila(novaFila);
-    await recalculatePlan(novaFila);
-    toast({ title: "Excluído", description: "Requisição removida da fila." });
+    const nf = fila.filter(j => j.id !== id); setFila(nf); await recalculatePlan(nf);
   };
 
   return (
@@ -483,82 +412,24 @@ export default function ProgrammingPage() {
               <Button variant="secondary" className="h-10 text-[10px] font-black uppercase"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Adicionar Requisição Manual</DialogTitle>
-                <DialogDescription>Preencha os dados da peça para inserir na fila de produção.</DialogDescription>
-              </DialogHeader>
+              <DialogHeader><DialogTitle>Adicionar Requisição Manual</DialogTitle></DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Requisição</Label>
-                    <Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} placeholder="Ex: M0008" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Nome da Peça</Label>
-                    <Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} placeholder="Ex: Eixo Motor" />
-                  </div>
+                  <div className="space-y-2"><Label>Requisição</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} /></div>
+                  <div className="space-y-2"><Label>Nome da Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} /></div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Fábrica (Site)</Label>
-                  <Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}>
-                    <SelectTrigger><SelectValue placeholder="Selecione a Fábrica" /></SelectTrigger>
-                    <SelectContent>
-                      {FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Quantidade</Label>
-                    <Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Setup (min)</Label>
-                    <Input type="number" value={newItem.setup} onChange={e => setNewItem({...newItem, setup: Number(e.target.value)})} />
-                  </div>
+                  <div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div>
+                  <div className="space-y-2"><Label>Setup (min)</Label><Input type="number" value={newItem.setup} onChange={e => setNewItem({...newItem, setup: Number(e.target.value)})} /></div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Torno (min)</Label>
-                    <Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Centro (min)</Label>
-                    <Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Prog (min)</Label>
-                    <Input type="number" value={newItem.prog} onChange={e => setNewItem({...newItem, prog: Number(e.target.value)})} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Etapa 1</Label>
-                    <Select value={newItem.etapa1} onValueChange={v => setNewItem({...newItem, etapa1: v})}>
-                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="null">Nenhuma</SelectItem>
-                        <SelectItem value="TORNO">TORNO</SelectItem>
-                        <SelectItem value="CENTRO">CENTRO</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Etapa 2</Label>
-                    <Select value={newItem.etapa2} onValueChange={v => setNewItem({...newItem, etapa2: v})}>
-                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="null">Nenhuma</SelectItem>
-                        <SelectItem value="TORNO">TORNO</SelectItem>
-                        <SelectItem value="CENTRO">CENTRO</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <div className="space-y-2"><Label>Torno (min)</Label><Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} /></div>
+                  <div className="space-y-2"><Label>Centro (min)</Label><Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})} /></div>
+                  <div className="space-y-2"><Label>Prog (min)</Label><Input type="number" value={newItem.prog} onChange={e => setNewItem({...newItem, prog: Number(e.target.value)})} /></div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button onClick={handleAddManual} className="w-full">Adicionar na Fila</Button>
-              </DialogFooter>
+              <DialogFooter><Button onClick={handleAddManual} className="w-full">Adicionar na Fila</Button></DialogFooter>
             </DialogContent>
           </Dialog>
 
@@ -579,10 +450,6 @@ export default function ProgrammingPage() {
                             <span className="text-xl font-bold font-['Barlow_Condensed'] uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
                         </div>
-                        <div className="flex gap-4 font-mono text-[11px] text-muted-foreground">
-                            <span>PEÇAS: <b className="text-foreground text-sm">{dayItems.reduce((a, b) => a + b.quantidadeNoBloco, 0)}</b></span>
-                            <span>OCUPAÇÃO: <b className="text-foreground text-sm">{(dayItems.reduce((a, b) => a + b.tempoMinutos + b.setupMinutos, 0) / 60).toFixed(1)}h / {SHIFT_MIN * 3 / 60}h</b></span>
-                        </div>
                     </div>
                     {TURNOS.map(t => {
                         const shiftKey = `${format(day, 'yyyy-MM-dd')}_${t.id}`;
@@ -591,46 +458,20 @@ export default function ProgrammingPage() {
                             <div key={t.id} className={cn("grid grid-cols-[100px_1fr] border-b border-border/20 last:border-0 relative", isDisabled && "bg-stripes")}>
                                 <div className="bg-muted/10 border-r border-border/20 p-4 flex flex-col justify-center items-center gap-2">
                                     <span className={cn("text-2xl font-bold font-['Barlow_Condensed']", isDisabled ? "text-muted-foreground" : "text-foreground")}>{t.label}</span>
-                                    <span className="text-[9px] font-mono text-muted-foreground font-bold">{t.range}</span>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className={cn("h-6 w-6 rounded-full", isDisabled ? "text-destructive hover:text-destructive" : "text-green-500 hover:text-green-600")}
-                                        onClick={() => toggleShift(day, t.id)}
-                                        title={isDisabled ? "Ativar Turno" : "Desativar Turno"}
-                                    >
-                                        {isDisabled ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
-                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => toggleShift(day, t.id)}>{isDisabled ? <PowerOff className="h-3.5 w-3.5 text-destructive" /> : <Power className="h-3.5 w-3.5 text-green-500" />}</Button>
                                 </div>
                                 <div className="p-4 bg-card/40">
-                                    {isDisabled ? (
-                                        <div className="h-[150px] flex items-center justify-center opacity-30 select-none">
-                                            <span className="text-2xl font-black font-['Barlow_Condensed'] tracking-[10px] uppercase -rotate-6">Turno Desativado</span>
-                                        </div>
-                                    ) : (
+                                    {!isDisabled && (
                                         <>
                                             <Ruler />
                                             {['TORNO', 'CENTRO', 'ADM'].map(cat => (MACHINE_LANES[cat][t.id] || []).map((tech, lIdx) => tech && (
                                                 <div key={`${tech}-${lIdx}`} className="grid grid-cols-[155px_1fr] items-center mb-3">
-                                                    <div className="pr-3 truncate">
-                                                        <div className={cn("text-[9px] font-mono font-black uppercase", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>
-                                                            {cat === 'TORNO' ? `Torno R${lIdx+1}` : cat}
-                                                        </div>
-                                                        <div className="text-[11px] font-bold truncate">{tech}</div>
-                                                    </div>
+                                                    <div className="pr-3 truncate"><div className={cn("text-[9px] font-mono font-black uppercase", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>{cat}</div><div className="text-[11px] font-bold truncate">{tech}</div></div>
                                                     <div className="relative h-[38px] border border-border/50 rounded bg-black/20 overflow-hidden">
                                                         {PAUSAS.map(p => (
-                                                            <div 
-                                                                key={p.label} 
-                                                                className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" 
-                                                                style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}
-                                                            >
-                                                                <p.icon className="h-2 w-2 text-yellow-500/30" />
-                                                            </div>
+                                                            <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-2 w-2 text-yellow-500/30" /></div>
                                                         ))}
-                                                        {dayItems.filter(i => i.techKey === cat && i.laneIndex === lIdx && i.turno === t.id).map(item => (
-                                                            <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />
-                                                        ))}
+                                                        {dayItems.filter(i => i.techKey === cat && i.laneIndex === lIdx && i.turno === t.id).map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
                                                     </div>
                                                 </div>
                                             )))}
@@ -646,28 +487,24 @@ export default function ProgrammingPage() {
       </div>
       
       <Card className="shadow-lg border-border">
-        <CardHeader className="bg-muted/5 border-b">
-            <CardTitle className="font-['Barlow_Condensed'] text-xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle>
-        </CardHeader>
+        <CardHeader className="bg-muted/5 border-b"><CardTitle className="font-['Barlow_Condensed'] text-xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle></CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
                 <TableRow>
                     <TableHead className="w-20 text-center">AÇÕES</TableHead>
                     <TableHead>FÁBRICA / SITE</TableHead>
-                    <TableHead>FLUXO / STATUS</TableHead>
+                    <TableHead>FLUXO</TableHead>
                     <TableHead>REQ.</TableHead>
                     <TableHead>PEÇA</TableHead>
                     <TableHead className="text-right">QTD</TableHead>
-                    <TableHead className="text-right">TOTAL</TableHead>
+                    <TableHead className="text-right">TEMPO</TableHead>
                     <TableHead className="w-10"></TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
               {fila.length === 0 ? (
-                <TableRow>
-                    <TableCell colSpan={8} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição</TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição</TableCell></TableRow>
               ) : fila.map((job, idx) => (
                 <TableRow key={job.id} className="hover:bg-muted/5">
                   <TableCell className="text-center">
@@ -678,22 +515,20 @@ export default function ProgrammingPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-[10px] font-black uppercase">{job.site || 'VALINHOS DOVE'}</span>
+                        <MapPin className="h-3 w-3 text-primary" />
+                        <span className="text-[10px] font-black uppercase text-foreground">{job.site || 'VALINHOS DOVE'}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                         {(!job.etapa1 && !job.etapa2) ? (
-                            <Badge variant="destructive" className="text-[8px] animate-pulse flex items-center gap-1">
-                                <AlertCircle className="h-3 w-3" /> AGUARDANDO DEFINIÇÃO
-                            </Badge>
+                            <Badge variant="destructive" className="text-[8px] animate-pulse">AGUARDANDO</Badge>
                         ) : (
-                            <>
-                                {job.etapa1 && <Badge variant="outline" className="text-[9px] bg-primary/10">{job.etapa1}</Badge>}
-                                {job.etapa2 && <span className="text-muted-foreground text-xs">→</span>}
-                                {job.etapa2 && <Badge variant="outline" className="text-[9px] bg-primary/20">{job.etapa2}</Badge>}
-                            </>
+                            <div className="flex items-center gap-1 text-[9px] font-bold">
+                                {job.etapa1 && <span className="bg-primary/10 px-1 rounded">{job.etapa1}</span>}
+                                {job.etapa2 && <span>→</span>}
+                                {job.etapa2 && <span className="bg-primary/20 px-1 rounded">{job.etapa2}</span>}
+                            </div>
                         )}
                     </div>
                   </TableCell>
@@ -701,11 +536,7 @@ export default function ProgrammingPage() {
                   <TableCell className="uppercase text-[10px] font-medium max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
                   <TableCell className="text-right font-mono font-bold">{job.quantidade} pç</TableCell>
                   <TableCell className="text-right text-[10px] text-muted-foreground">{Number(job.torno) + Number(job.centro) + Number(job.setup)} min</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteManual(job.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+                  <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteManual(job.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
                 </TableRow>
               ))}
             </TableBody>
