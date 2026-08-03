@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter, CalendarDays, Factory, History, Pencil } from 'lucide-react';
+import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter, CalendarDays, Factory, History, Pencil, Clock } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -286,7 +286,11 @@ export default function ProductionRegistryPage() {
   };
 
   const exportToExcel = (data: any[], name: string) => {
-    const ws = XLSX.utils.json_to_sheet(data.map(r => ({ ...r, date: r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date })));
+    const ws = XLSX.utils.json_to_sheet(data.map(r => ({ 
+        ...r, 
+        date: r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date,
+        apontamento: r.createdAt?.toDate ? format(r.createdAt.toDate(), 'HH:mm:ss') : '-'
+    })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Dados");
     XLSX.writeFile(wb, `${name}.xlsx`);
@@ -487,12 +491,27 @@ export default function ProductionRegistryPage() {
         </CardHeader>
         <CardContent>
             <Table>
-                <TableHeader><TableRow><TableHead>Técnico</TableHead><TableHead>Data</TableHead><TableHead>Fábrica</TableHead><TableHead>Nº Forms</TableHead><TableHead>Atividade</TableHead><TableHead>Produzido</TableHead><TableHead>Tempo</TableHead><TableHead>Ações</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Técnico</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead className="text-primary font-bold"><div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Apontamento</div></TableHead>
+                        <TableHead>Fábrica</TableHead>
+                        <TableHead>Nº Forms</TableHead>
+                        <TableHead>Atividade</TableHead>
+                        <TableHead>Produzido</TableHead>
+                        <TableHead>Tempo</TableHead>
+                        <TableHead>Ações</TableHead>
+                    </TableRow>
+                </TableHeader>
                 <TableBody>
                     {filteredProductionRecords.map(r => (
                         <TableRow key={r.id}>
                             <TableCell>{r.operatorId}</TableCell>
                             <TableCell>{r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date}</TableCell>
+                            <TableCell className="text-primary font-mono text-[11px] font-bold">
+                                {r.createdAt?.toDate ? format(r.createdAt.toDate(), 'HH:mm') : '-'}
+                            </TableCell>
                             <TableCell>{r.factory}</TableCell>
                             <TableCell className="font-mono font-bold">#{r.formsNumber}</TableCell>
                             <TableCell><Badge variant="outline">{r.activityType}</Badge></TableCell>
@@ -518,12 +537,25 @@ export default function ProductionRegistryPage() {
         </CardHeader>
         <CardContent>
             <Table>
-                <TableHeader><TableRow><TableHead>Técnico</TableHead><TableHead>Data</TableHead><TableHead>Fábrica</TableHead><TableHead>Motivo</TableHead><TableHead>Tempo Perdido</TableHead><TableHead>Ações</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Técnico</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead className="text-primary font-bold"><div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Apontamento</div></TableHead>
+                        <TableHead>Fábrica</TableHead>
+                        <TableHead>Motivo</TableHead>
+                        <TableHead>Tempo Perdido</TableHead>
+                        <TableHead>Ações</TableHead>
+                    </TableRow>
+                </TableHeader>
                 <TableBody>
                     {filteredLossRecords.map(r => (
                         <TableRow key={r.id}>
                             <TableCell>{r.operatorId}</TableCell>
                             <TableCell>{r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date}</TableCell>
+                            <TableCell className="text-primary font-mono text-[11px] font-bold">
+                                {r.createdAt?.toDate ? format(r.createdAt.toDate(), 'HH:mm') : '-'}
+                            </TableCell>
                             <TableCell>{r.factory}</TableCell>
                             <TableCell><Badge className="bg-yellow-500 text-black">{r.lossReason}</Badge></TableCell>
                             <TableCell className="text-red-500 font-bold">{r.timeLost} min</TableCell>
