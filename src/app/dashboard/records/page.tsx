@@ -75,9 +75,18 @@ const normalizeOperatorName = (name: any) => {
 const normalizeFactoryName = (name: any): string => {
   if (!name) return 'N/A';
   const n = String(name).toUpperCase().trim();
-  if (n.includes('VALINHOS DOVE') || n.includes('VALINHOS SABONETE')) return 'VALINHOS (DOVE/SABONETE)';
+  // Consolida Valinhos Dove e Sabonete em uma única unidade visual
+  if (n.includes('VALINHOS DOVE') || n.includes('VALINHOS SABONETE') || n === 'VALINHOS') {
+    return 'VALINHOS (DOVE/SABONETE)';
+  }
   if (n.includes('VINHEDO')) return 'VINHEDO';
-  if (n.includes('AGUAI')) return 'AGUAÍ';
+  if (n.includes('AGUAI') || n.includes('AGUAÍ')) return 'AGUAÍ';
+  if (n.includes('POUSO ALEGRE')) return 'POUSO ALEGRE';
+  if (n.includes('INDAIATUBA')) return 'INDAIATUBA';
+  if (n.includes('SUAPE')) return 'SUAPE';
+  if (n.includes('IGARASSU')) return 'IGARASSU';
+  if (n.includes('GARANHUNS')) return 'GARANHUNS';
+  if (n.includes('TORRE')) return 'TORRE';
   return n;
 };
 
@@ -158,48 +167,64 @@ export default function RecordsPage() {
   const plannedVsMachinedData = useMemo(() => {
     const dataMap: { [factory: string]: any } = {};
     const getOrCreate = (factory: string) => {
-      if (!dataMap[factory]) dataMap[factory] = { totalPlanejado: 0, totalRealizado: 0 };
+      if (!dataMap[factory]) {
+        dataMap[factory] = { 
+            totalPlanejado: 0, 
+            totalRealizado: 0,
+            totalDisponivel: availableHoursBudget[factory] || 0
+        };
+      }
       return dataMap[factory];
     };
 
+    // 1. Processar Horas Planejadas (do Cronograma Visual)
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record.site || 'VALINHOS');
       const d = getOrCreate(factory);
-      // No 'plano', o tempo já está dividido por turnos
+      
       const time = (Number(record.tempoMinutos || 0) + Number(record.setupMinutos || 0)) / 60;
-      
       const type = String(record.tipoAtividade || 'USINAGEM').toUpperCase();
-      const planKey = `plan_${type === 'PROGRAMACAO' ? 'PROGRAMACAO' : 'PRODUCAO'}`;
       
+      // Categoriza por tipo para o Tooltip detalhado
+      const planKey = `plan_${type.includes('PROGRAMACAO') ? 'PROGRAMACAO' : 'PRODUCAO'}`;
       d[planKey] = (d[planKey] || 0) + time;
       d.totalPlanejado += time;
     });
     
+    // 2. Processar Horas Realizadas (Apontamentos de Produção)
     operatorFilteredProductionRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const d = getOrCreate(factory);
         const hours = (Number(record.machiningTime) || 0) / 60;
-        d.totalRealizado += hours;
         
         const type = String(record.activityType || 'PRODUCAO').toUpperCase().includes('PROGRAMACAO') ? 'PROGRAMACAO' : 'PRODUCAO';
         const key = `real_${type}`;
         d[key] = (d[key] || 0) + hours;
+        d.totalRealizado += hours;
     });
 
+    // 3. Processar Perdas (Apontamentos de Perdas)
     operatorFilteredLossRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const d = getOrCreate(factory);
         const hours = (Number(record.timeLost) || 0) / 60;
         const reason = String(record.lossReason || 'PERDA').toUpperCase();
-        const key = `real_${reason}`;
+        
+        // Simplifica o motivo para o gráfico
+        let catKey = 'PERDA';
+        if (reason.includes('SETUP')) catKey = 'SETUP';
+        else if (reason.includes('CAFÉ')) catKey = 'TEMPO DE CAFÉ';
+        else if (reason.includes('LIMPEZA')) catKey = 'LIMPEZA PLANEJADA';
+        else if (reason.includes('DDS') || reason.includes('ADM')) catKey = 'DDS, APONTAMENTO HORAS, ATIVIDADE ADM';
+        
+        const key = `real_${catKey}`;
         d[key] = (d[key] || 0) + hours;
         d.totalRealizado += hours;
     });
 
     return Object.keys(dataMap).map(factory => ({
         name: factory,
-        ...dataMap[factory],
-        totalDisponivel: availableHoursBudget[factory] || 0
+        ...dataMap[factory]
     })).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
   }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords]);
 
@@ -305,4 +330,3 @@ export default function RecordsPage() {
     </div>
   );
 }
-
