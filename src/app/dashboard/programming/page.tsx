@@ -68,9 +68,9 @@ const TURNOS = [
 
 const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
-    '1': ['Marcos Barbosa', 'Alisson França'],
-    '2': ['Jair Melo', ''], 
-    '3': ['Gustavo Gozzi', '']
+    '1': ['Marcos Barbosa'],
+    '2': ['Jair Melo'], 
+    '3': ['Gustavo Gozzi']
   },
   'CENTRO': {
     '1': ['Daniel Solivo'],
@@ -156,7 +156,7 @@ export default function ProgrammingPage() {
     const novosPlanItems: PlanejamentoItem[] = [];
     
     const lanePointers: Record<string, number> = { 
-        'TORNO_0': 0, 'TORNO_1': 0, 'CENTRO_0': 0, 'ADM_0': 0 
+        'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 
     }; 
 
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
@@ -166,19 +166,7 @@ export default function ProgrammingPage() {
         if (prodTime <= 0 && setupTime <= 0 && type !== 'prog') return minStartTime;
         if (type === 'prog' && prodTime <= 0) return minStartTime;
         
-        let chosenLane = 0;
-        if (techKey === 'TORNO') {
-            const p0 = lanePointers['TORNO_0'];
-            const p1 = lanePointers['TORNO_1'];
-            if (p1 <= p0) {
-                const shiftOfP1 = Math.floor((p1 % (SHIFT_MIN * 3)) / SHIFT_MIN);
-                if (shiftOfP1 === 0) chosenLane = 1;
-                else chosenLane = 0;
-            } else {
-                chosenLane = 0;
-            }
-        }
-        
+        const chosenLane = 0;
         const laneId = `${techKey}_${chosenLane}`;
         let actualPointer = Math.max(lanePointers[laneId] || 0, minStartTime);
         let pendingSetup = setupTime;
@@ -195,9 +183,8 @@ export default function ProgrammingPage() {
             const startOffset = startInDay % SHIFT_MIN;
             
             const techName = MACHINE_LANES[techKey][String(shiftIdx + 1)]?.[chosenLane];
-            const isAlissonLane = techKey === 'TORNO' && chosenLane === 1;
 
-            if ((isAlissonLane && shiftIdx !== 0) || !techName) {
+            if (!techName) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue;
             }
@@ -273,10 +260,6 @@ export default function ProgrammingPage() {
             tFinishEtapa1 = allocateTask(job, 'TORNO', tProg, 'torno');
         } else if (e1.includes('CENTRO')) {
             tFinishEtapa1 = allocateTask(job, 'CENTRO', tProg, 'centro');
-        } else if (job.torno > 0) {
-            tFinishEtapa1 = allocateTask(job, 'TORNO', tProg, 'torno');
-        } else if (job.centro > 0) {
-            tFinishEtapa1 = allocateTask(job, 'CENTRO', tProg, 'centro');
         }
 
         const e2 = String(job.etapa2 || '').toUpperCase();
@@ -292,7 +275,7 @@ export default function ProgrammingPage() {
     await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
     await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
     
-    toast({ title: "Plano Atualizado", description: `As tarefas foram sequenciadas respeitando o limite de 7h.` });
+    toast({ title: "Plano Atualizado", description: `As tarefas foram sequenciadas com base nas Etapas 1 e 2.` });
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
