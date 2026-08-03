@@ -258,7 +258,7 @@ export function OperatorPerformanceChart({
                     )}
                 </Bar>
               ))}
-              <Legend verticalAlign="top" height={36} />
+              <Legend verticalAlign="bottom" height={36} />
             </BarChart>
           </ChartContainer>
         </ResponsiveContainer>
