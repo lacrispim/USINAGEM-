@@ -19,6 +19,8 @@ import {
   Mic,
   AlertCircle,
   Check,
+  Power,
+  PowerOff
 } from 'lucide-react';
 import { format, addDays, isSameDay, parse, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -148,18 +150,21 @@ export default function ProgrammingPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fila, setFila] = useState<JobBase[]>([]);
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
+  const [disabledShifts, setDisabledShifts] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const { data: filaDoc } = useDoc(useMemo(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]));
   const { data: planoDoc } = useDoc(useMemo(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]));
+  const { data: configDoc } = useDoc(useMemo(() => firestore ? doc(firestore, 'programacaoState', 'config') : null, [firestore]));
 
   useEffect(() => {
     if (filaDoc) setFila(filaDoc.data || []);
+    if (configDoc) setDisabledShifts(configDoc.disabledShifts || {});
     if (planoDoc) { setPlanejamentoData(planoDoc.data || []); setLoading(false); }
     else if (planoDoc === null) setLoading(false);
-  }, [filaDoc, planoDoc]);
+  }, [filaDoc, planoDoc, configDoc]);
 
   const toggleConcluded = async (itemId: string) => {
     if (!firestore || !planejamentoData) return;
@@ -177,29 +182,35 @@ export default function ProgrammingPage() {
         data: sanitize(updatedPlano), 
         updatedAt: serverTimestamp() 
       });
-      toast({ 
-        title: "Status Atualizado", 
-        description: "Progresso salvo no banco de dados." 
-      });
     } catch (e) {
-      toast({ 
-        title: "Erro", 
-        description: "Falha ao salvar status de conclusão.", 
-        variant: "destructive" 
-      });
+      toast({ title: "Erro", description: "Falha ao salvar status.", variant: "destructive" });
     }
   };
 
-  const recalculatePlan = async (novaFila: JobBase[]) => {
+  const toggleShift = async (day: Date, shiftId: string) => {
+    if (!firestore) return;
+    const key = `${format(day, 'yyyy-MM-dd')}_${shiftId}`;
+    const newDisabled = { ...disabledShifts, [key]: !disabledShifts[key] };
+    setDisabledShifts(newDisabled);
+    
+    try {
+      await setDoc(doc(firestore, 'programacaoState', 'config'), { disabledShifts: newDisabled, updatedAt: serverTimestamp() });
+      toast({ title: "Turno Atualizado", description: `Turno ${shiftId} ${newDisabled[key] ? 'desativado' : 'ativado'}.` });
+      // Recalcula o plano para refletir a nova disponibilidade
+      recalculatePlan(fila, newDisabled);
+    } catch (e) {
+      toast({ title: "Erro", description: "Falha ao salvar configuração.", variant: "destructive" });
+    }
+  };
+
+  const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts) => {
     if (!firestore) return;
     const novosPlanItems: PlanejamentoItem[] = [];
     
-    // Pointers independentes por raia para maximizar ocupação
     const lanePointers: Record<string, number> = { 
         'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 
     }; 
 
-    // Mapeamento de quando cada JOB termina sua primeira etapa para liberar a segunda
     const jobCompletionTimes: Record<string, number> = {};
 
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
@@ -212,7 +223,6 @@ export default function ProgrammingPage() {
         const chosenLane = 0;
         const laneId = `${techKey}_${chosenLane}`;
         
-        // O trabalho começa no máximo entre a disponibilidade da máquina e o término da etapa anterior
         let actualPointer = Math.max(lanePointers[laneId] || 0, minStartTime);
         
         let pendingSetup = setupTime;
@@ -228,15 +238,18 @@ export default function ProgrammingPage() {
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const startOffset = startInDay % SHIFT_MIN;
             
+            const dayDate = addDays(currentDate, dayIdx);
+            const shiftKey = `${format(dayDate, 'yyyy-MM-dd')}_${shiftIdx + 1}`;
+            const isShiftDisabled = currentDisabled[shiftKey];
+
             const techName = MACHINE_LANES[techKey][String(shiftIdx + 1)]?.[chosenLane];
 
-            // Se o turno atual não tem técnico (ex: Alisson no 2T/3T), pula para o próximo turno
-            if (!techName) {
+            // Pula se o turno estiver desativado ou se não houver técnico mapeado
+            if (isShiftDisabled || !techName) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue;
             }
 
-            // Respeita as Pausas (DDS e Café)
             let winStart = startOffset;
             for (const p of PAUSAS) { 
                 if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) {
@@ -244,7 +257,6 @@ export default function ProgrammingPage() {
                 }
             }
             
-            // Se as pausas ou o horário já consumiram o turno, pula para o próximo
             if (winStart >= SHIFT_MIN - 1) { 
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue; 
@@ -270,7 +282,7 @@ export default function ProgrammingPage() {
             if (sInShift > 0 || pInShift > 0) {
                 novosPlanItems.push({ 
                     id: `pl-${Math.random().toString(36).substr(2, 9)}`, 
-                    dataExecucao: format(addDays(currentDate, dayIdx), 'dd/MM/yyyy'), 
+                    dataExecucao: format(dayDate, 'dd/MM/yyyy'), 
                     tecnico: techName, 
                     equipamento: type.toUpperCase(), 
                     requisicao: job.requisicao, 
@@ -291,7 +303,6 @@ export default function ProgrammingPage() {
             
             actualPointer = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
             
-            // Se preencheu o turno exatamente, garante que o próximo inicie no turno seguinte
             if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
             }
@@ -300,7 +311,6 @@ export default function ProgrammingPage() {
         return actualPointer;
     };
 
-    // Primeiro aloca todas as etapas 1 para maximizar a ocupação das máquinas logo no início
     novaFila.forEach(job => {
         allocateTask(job, 'ADM', 0, 'prog');
         
@@ -314,7 +324,6 @@ export default function ProgrammingPage() {
         }
     });
 
-    // Depois aloca as etapas 2, respeitando o término das respectivas etapas 1
     novaFila.forEach(job => {
         const e2 = String(job.etapa2 || '').toUpperCase();
         const minStart = jobCompletionTimes[job.id] || 0;
@@ -330,8 +339,6 @@ export default function ProgrammingPage() {
 
     await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
     await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
-    
-    toast({ title: "Plano Otimizado", description: `A carga horária foi distribuída para preencher lacunas nos turnos 2T e 3T.` });
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -345,10 +352,6 @@ export default function ProgrammingPage() {
       const findVal = (row: any, keys: string[]) => {
           for (const key of keys) {
               const rowKey = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
-              if (rowKey !== undefined) return row[rowKey];
-          }
-          for (const key of keys) {
-              const rowKey = Object.keys(row).find(k => k.toLowerCase().trim().includes(key.toLowerCase().trim()));
               if (rowKey !== undefined) return row[rowKey];
           }
           return undefined;
@@ -385,7 +388,7 @@ export default function ProgrammingPage() {
           <Button variant="outline" className="h-10" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
           <div className="flex items-center gap-2 font-bold min-w-[120px] justify-center"><CalendarDays className="h-4 w-4 text-primary" />{format(currentDate, 'dd/MM/yyyy')}</div>
           <Button variant="outline" className="h-10" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
-          <Button variant="outline" className="h-10 text-[10px] font-black uppercase" onClick={() => recalculatePlan([])}><Eraser className="h-4 w-4 mr-2" /> Limpar</Button>
+          <Button variant="outline" className="h-10 text-[10px] font-black uppercase" onClick={() => recalculatePlan([], disabledShifts)}><Eraser className="h-4 w-4 mr-2" /> Limpar</Button>
           <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
           <Button className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase shadow-lg" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha</Button>
         </div>
@@ -404,44 +407,65 @@ export default function ProgrammingPage() {
                         </div>
                         <div className="flex gap-4 font-mono text-[11px] text-muted-foreground">
                             <span>PEÇAS: <b className="text-foreground text-sm">{dayItems.reduce((a, b) => a + b.quantidadeNoBloco, 0)}</b></span>
-                            <span>OCUPAÇÃO: <b className="text-foreground text-sm">{(dayItems.reduce((a, b) => a + b.tempoMinutos + b.setupMinutos, 0) / 60).toFixed(1)}h / 21h</b></span>
+                            <span>OCUPAÇÃO: <b className="text-foreground text-sm">{(dayItems.reduce((a, b) => a + b.tempoMinutos + b.setupMinutos, 0) / 60).toFixed(1)}h / {SHIFT_MIN * 3 / 60}h</b></span>
                         </div>
                     </div>
-                    {TURNOS.map(t => (
-                        <div key={t.id} className="grid grid-cols-[100px_1fr] border-b border-border/20 last:border-0">
-                            <div className="bg-muted/10 border-r border-border/20 p-4 flex flex-col justify-center items-center">
-                                <span className="text-2xl font-bold font-['Barlow_Condensed'] text-foreground">{t.label}</span>
-                                <span className="text-[9px] font-mono text-muted-foreground font-bold">{t.range}</span>
-                            </div>
-                            <div className="p-4 bg-card/40">
-                                <Ruler />
-                                {['TORNO', 'CENTRO', 'ADM'].map(cat => (MACHINE_LANES[cat][t.id] || []).map((tech, lIdx) => tech && (
-                                    <div key={`${tech}-${lIdx}`} className="grid grid-cols-[155px_1fr] items-center mb-3">
-                                        <div className="pr-3 truncate">
-                                            <div className={cn("text-[9px] font-mono font-black uppercase", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>
-                                                {cat === 'TORNO' ? `Torno R${lIdx+1}` : cat}
-                                            </div>
-                                            <div className="text-[11px] font-bold truncate">{tech}</div>
+                    {TURNOS.map(t => {
+                        const shiftKey = `${format(day, 'yyyy-MM-dd')}_${t.id}`;
+                        const isDisabled = disabledShifts[shiftKey];
+                        return (
+                            <div key={t.id} className={cn("grid grid-cols-[100px_1fr] border-b border-border/20 last:border-0 relative", isDisabled && "bg-stripes")}>
+                                <div className="bg-muted/10 border-r border-border/20 p-4 flex flex-col justify-center items-center gap-2">
+                                    <span className={cn("text-2xl font-bold font-['Barlow_Condensed']", isDisabled ? "text-muted-foreground" : "text-foreground")}>{t.label}</span>
+                                    <span className="text-[9px] font-mono text-muted-foreground font-bold">{t.range}</span>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className={cn("h-6 w-6 rounded-full", isDisabled ? "text-destructive hover:text-destructive" : "text-green-500 hover:text-green-600")}
+                                        onClick={() => toggleShift(day, t.id)}
+                                        title={isDisabled ? "Ativar Turno" : "Desativar Turno"}
+                                    >
+                                        {isDisabled ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
+                                    </Button>
+                                </div>
+                                <div className="p-4 bg-card/40">
+                                    {isDisabled ? (
+                                        <div className="h-[150px] flex items-center justify-center opacity-30 select-none">
+                                            <span className="text-2xl font-black font-['Barlow_Condensed'] tracking-[10px] uppercase -rotate-6">Turno Desativado</span>
                                         </div>
-                                        <div className="relative h-[38px] border border-border/50 rounded bg-black/20 overflow-hidden">
-                                            {PAUSAS.map(p => (
-                                                <div 
-                                                    key={p.label} 
-                                                    className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" 
-                                                    style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}
-                                                >
-                                                    <p.icon className="h-2 w-2 text-yellow-500/30" />
+                                    ) : (
+                                        <>
+                                            <Ruler />
+                                            {['TORNO', 'CENTRO', 'ADM'].map(cat => (MACHINE_LANES[cat][t.id] || []).map((tech, lIdx) => tech && (
+                                                <div key={`${tech}-${lIdx}`} className="grid grid-cols-[155px_1fr] items-center mb-3">
+                                                    <div className="pr-3 truncate">
+                                                        <div className={cn("text-[9px] font-mono font-black uppercase", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>
+                                                            {cat === 'TORNO' ? `Torno R${lIdx+1}` : cat}
+                                                        </div>
+                                                        <div className="text-[11px] font-bold truncate">{tech}</div>
+                                                    </div>
+                                                    <div className="relative h-[38px] border border-border/50 rounded bg-black/20 overflow-hidden">
+                                                        {PAUSAS.map(p => (
+                                                            <div 
+                                                                key={p.label} 
+                                                                className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" 
+                                                                style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}
+                                                            >
+                                                                <p.icon className="h-2 w-2 text-yellow-500/30" />
+                                                            </div>
+                                                        ))}
+                                                        {dayItems.filter(i => i.techKey === cat && i.laneIndex === lIdx && i.turno === t.id).map(item => (
+                                                            <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            ))}
-                                            {dayItems.filter(i => i.techKey === cat && i.laneIndex === lIdx && i.turno === t.id).map(item => (
-                                                <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )))}
+                                            )))}
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             );
         })}
@@ -501,6 +525,12 @@ export default function ProgrammingPage() {
           </Table>
         </CardContent>
       </Card>
+      
+      <style jsx global>{`
+        .bg-stripes {
+          background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.05) 0px, rgba(255, 255, 255, 0.05) 10px, transparent 10px, transparent 20px);
+        }
+      `}</style>
     </div>
   );
 }
