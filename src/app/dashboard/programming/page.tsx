@@ -286,22 +286,34 @@ export default function ProgrammingPage() {
       const workbook = XLSX.read(new Uint8Array(event.target?.result as ArrayBuffer), { type: 'array' });
       const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
       
+      /**
+       * Função robusta para encontrar valores nas colunas do Excel.
+       * A ordem no array 'keys' dita a prioridade da busca.
+       */
       const findVal = (row: any, keys: string[]) => {
-          const k = Object.keys(row).find(k => keys.some(s => k.toLowerCase().trim() === s.toLowerCase().trim()));
-          if (k) return row[k];
-          const kPartial = Object.keys(row).find(k => keys.some(s => k.toLowerCase().trim().includes(s.toLowerCase().trim())));
-          return kPartial ? row[kPartial] : undefined;
+          // Primeiro passamos procurando por correspondência EXATA (ignorando case/espaços)
+          for (const key of keys) {
+              const rowKey = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
+              if (rowKey !== undefined) return row[rowKey];
+          }
+          // Segundo passamos procurando por correspondência PARCIAL (.includes)
+          for (const key of keys) {
+              const rowKey = Object.keys(row).find(k => k.toLowerCase().trim().includes(key.toLowerCase().trim()));
+              if (rowKey !== undefined) return row[rowKey];
+          }
+          return undefined;
       };
 
       const novaFila: JobBase[] = json.map((row, i) => ({
           id: `job-${i}-${Date.now()}`,
-          requisicao: String(findVal(row, ['Requisição2', 'req', 'requisicao', 'forms', 'Nº forms']) || 'S/N'),
+          // PRIORIDADE: 'requisição' antes de 'Requisição2'
+          requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
           nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
           quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
           setup: Number(findVal(row, ['Tempo setup TORNO', 'Tempo setup CENTRO', 'setup', 'Setup Minutos']) || 20),
           torno: Number(findVal(row, ['Tempo de Planejamento Torno Minutos todas as peças solicitadas', 'torno', 'torno minutos', 'torno min']) || 0),
           centro: Number(findVal(row, ['Tempo de Planejamento Centro Minutos todas as peças solicitadas', 'centro', 'centro minutos', 'centro min']) || 0),
-          prog: Number(findVal(row, ['Tempo Programação Minutos', 'prog', 'programação', 'Programação Minutos']) || 0),
+          prog: Number(findVal(row, ['Tempo de Planejamento Programação Minutos todas as peças solicitadas', 'Tempo Programação Minutos', 'prog', 'programação', 'Programação Minutos']) || 0),
           site: String(findVal(row, ['site', 'fabrica', 'Fábrica']) || 'VALINHOS'),
           etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || ''),
           etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
