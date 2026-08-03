@@ -18,7 +18,7 @@ import {
   Coffee,
   Mic,
 } from 'lucide-react';
-import { format, addDays, isSameDay, parse } from 'date-fns';
+import { format, addDays, isSameDay, parse, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -81,7 +81,7 @@ const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   }
 };
 
-// Jornada ajustada para 7 horas úteis
+// Jornada de 7 horas úteis (420 minutos)
 const SHIFT_MIN = 420; 
 const PAUSAS = [
   { start: 0, duration: 10, label: 'DDS', icon: Mic },
@@ -154,6 +154,10 @@ export default function ProgrammingPage() {
   const recalculatePlan = async (novaFila: JobBase[]) => {
     if (!firestore) return;
     const novosPlanItems: PlanejamentoItem[] = [];
+    
+    // Ponteiros de tempo global (em minutos) por Raia
+    // Raia 0 = Marcos/Jair/Gustavo (24h)
+    // Raia 1 = Alisson (Apenas 1T - 7h/dia)
     const lanePointers: Record<string, number> = { 
         'TORNO_0': 0, 
         'TORNO_1': 0, 
@@ -165,7 +169,12 @@ export default function ProgrammingPage() {
         let totalDuration = job[type] || 0;
         if (totalDuration <= 0 && type !== 'prog') return minStartTime;
         
-        let chosenLane = techKey === 'TORNO' ? (lanePointers['TORNO_0'] <= lanePointers['TORNO_1'] ? 0 : 1) : 0;
+        // Decisão de Raia: Marcos (0) ou Alisson (1) no Torno. Para o resto, sempre 0.
+        let chosenLane = 0;
+        if (techKey === 'TORNO') {
+            chosenLane = lanePointers['TORNO_0'] <= lanePointers['TORNO_1'] ? 0 : 1;
+        }
+        
         const laneId = `${techKey}_${chosenLane}`;
         let actualStart = Math.max(lanePointers[laneId] || 0, minStartTime);
         let pendingSetup = type === 'prog' ? 0 : 20;
@@ -173,34 +182,40 @@ export default function ProgrammingPage() {
         let doneProdTime = 0;
         const cycleTime = job.quantidade > 0 ? totalDuration / job.quantidade : totalDuration;
 
-        while (pendingSetup > 0.1 || pendingProd > 0.1) {
+        while (pendingSetup > 0.01 || pendingProd > 0.01) {
             const dayIdx = Math.floor(actualStart / (SHIFT_MIN * 3));
             const startInDay = actualStart % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
-            const shiftId = String(shiftIdx + 1);
             const startOffset = startInDay % SHIFT_MIN;
-            const techName = MACHINE_LANES[techKey][shiftId]?.[chosenLane];
+            
+            // Verifica se há técnico para esta raia neste turno
+            const techName = MACHINE_LANES[techKey][String(shiftIdx + 1)]?.[chosenLane];
 
-            if (!techName) { 
-                actualStart = (dayIdx + 1) * 3 * SHIFT_MIN; 
-                continue; 
+            // Se for a Raia do Alisson (Torno 1) e não for o 1º Turno (0), pula para o 1º turno do próximo dia
+            const isAlissonLane = techKey === 'TORNO' && chosenLane === 1;
+            if ((isAlissonLane && shiftIdx !== 0) || !techName) {
+                actualStart = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
+                continue;
             }
 
+            // Calcula tempo livre no turno atual respeitando as pausas
             let winStart = startOffset;
             for (const p of PAUSAS) { 
-                if (winStart < p.start + p.duration && winStart >= p.start) {
+                if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) {
                     winStart = p.start + p.duration;
                 }
             }
             
-            if (winStart >= SHIFT_MIN) { 
-                actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN; 
+            // Se o tempo de início pulou para fora do turno de 7h, vai para o próximo turno
+            if (winStart >= SHIFT_MIN - 1) { 
+                actualStart = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue; 
             }
 
             const effectiveAvail = SHIFT_MIN - winStart;
-            let sInShift = pendingSetup > 0.1 ? Math.min(pendingSetup, effectiveAvail) : 0;
+            let sInShift = pendingSetup > 0 ? Math.min(pendingSetup, effectiveAvail) : 0;
             pendingSetup -= sInShift;
+            
             let pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
             let qInShift = 0;
             
@@ -223,7 +238,7 @@ export default function ProgrammingPage() {
                     quantidadeNoBloco: qInShift, 
                     tempoMinutos: pInShift, 
                     setupMinutos: sInShift, 
-                    turno: shiftId, 
+                    turno: String(shiftIdx + 1), 
                     startOffsetMin: winStart, 
                     tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', 
                     techKey, 
@@ -232,38 +247,49 @@ export default function ProgrammingPage() {
                 });
             }
             
-            actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
+            actualStart += (sInShift + pInShift + (winStart - startOffset));
+            
+            // Se preencheu o turno até o fim (7h), garante que o próximo bloco comece no turno seguinte
             if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) {
-                actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN;
+                actualStart = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
             }
         }
         lanePointers[laneId] = actualStart;
         return actualStart;
     };
 
+    // Processa a fila respeitando as dependências
     novaFila.forEach(job => {
-        let t1 = 0;
-        if (job.prog > 0) t1 = allocateTask(job, 'ADM', 0, 'prog');
-        let jobTerminus = t1;
+        // A Programação é o gatilho inicial
+        let tInit = allocateTask(job, 'ADM', 0, 'prog');
         
-        // Etapa 1
+        // Etapa 1 e Etapa 2 podem ser dinâmicas
+        let finishEtapa1 = tInit;
+        
         if (job.etapa1.includes('TORNO') || (job.torno > 0 && !job.etapa1)) {
-            jobTerminus = allocateTask(job, 'TORNO', t1, 'torno');
+            finishEtapa1 = allocateTask(job, 'TORNO', tInit, 'torno');
         } else if (job.etapa1.includes('CENTRO') || (job.centro > 0 && !job.etapa1)) {
-            jobTerminus = allocateTask(job, 'CENTRO', t1, 'centro');
+            finishEtapa1 = allocateTask(job, 'CENTRO', tInit, 'centro');
         }
         
-        // Etapa 2 (Sempre inicia após o término total da Etapa 1)
         if (job.etapa2.includes('TORNO')) {
-            allocateTask(job, 'TORNO', jobTerminus, 'torno');
+            allocateTask(job, 'TORNO', finishEtapa1, 'torno');
         } else if (job.etapa2.includes('CENTRO')) {
-            allocateTask(job, 'CENTRO', jobTerminus, 'centro');
+            allocateTask(job, 'CENTRO', finishEtapa1, 'centro');
         }
     });
 
-    await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: novaFila, updatedAt: serverTimestamp() });
-    await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: novosPlanItems, updatedAt: serverTimestamp() });
-    toast({ title: "Sucesso", description: "Plano atualizado com base em 7h/turno." });
+    // Sanitização para o Firestore (evita undefined)
+    const sanitizedFila = novaFila.map(f => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v === undefined ? null : v])));
+    const sanitizedPlano = novosPlanItems.map(p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v === undefined ? null : v])));
+
+    await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitizedFila, updatedAt: serverTimestamp() });
+    await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitizedPlano, updatedAt: serverTimestamp() });
+    
+    toast({ 
+      title: "Plano Atualizado", 
+      description: `Capacidade de 7h por turno aplicada com transbordo de carga.` 
+    });
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -304,7 +330,7 @@ export default function ProgrammingPage() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
             <h1 className="text-3xl font-bold uppercase font-['Barlow_Condensed']">Plano de Carga CNC</h1>
-            <p className="text-[11px] tracking-widest text-muted-foreground uppercase font-bold">Time Técnico · Jornada 7h Úteis</p>
+            <p className="text-[11px] tracking-widest text-muted-foreground uppercase font-bold">Time Técnico · Jornada 7h Disponíveis</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" className="h-10" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
