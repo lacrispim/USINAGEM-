@@ -18,6 +18,7 @@ import {
   Coffee,
   Mic,
   AlertCircle,
+  Check,
 } from 'lucide-react';
 import { format, addDays, isSameDay, parse, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -57,7 +58,8 @@ interface PlanejamentoItem {
   tipoAtividade: 'USINAGEM' | 'PROGRAMACAO' | 'PAUSA';
   techKey: 'TORNO' | 'CENTRO' | 'ADM';
   jobId: string;
-  laneIndex: number; 
+  laneIndex: number;
+  isConcluded?: boolean;
 }
 
 const TURNOS = [
@@ -97,7 +99,7 @@ const Ruler = () => {
   return <div className="relative h-[18px] ml-[155px] border-b border-border/50 mb-1">{marks}</div>;
 };
 
-const TimelineBar = React.memo(({ item }: { item: PlanejamentoItem }) => {
+const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, onToggle: (id: string) => void }) => {
   const totalMin = (item.tempoMinutos || 0) + (item.setupMinutos || 0);
   const widthPc = Math.max((totalMin / SHIFT_MIN) * 100, 0.5);
   const leftPc = (item.startOffsetMin / SHIFT_MIN) * 100;
@@ -108,12 +110,14 @@ const TimelineBar = React.memo(({ item }: { item: PlanejamentoItem }) => {
 
   return (
     <div 
+      onClick={() => onToggle(item.id)}
       className={cn(
-        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm hover:scale-[1.01] transition-all z-10", 
-        isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")
+        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm hover:scale-[1.01] transition-all z-10 cursor-pointer group", 
+        isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]"),
+        item.isConcluded && "opacity-40 grayscale-[0.5] border-green-500 border-2"
       )} 
       style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
-      title={`#${item.requisicao} - ${item.nomeDaPeca}`}
+      title={`#${item.requisicao} - ${item.nomeDaPeca} ${item.isConcluded ? '(Concluído)' : ''}`}
     >
       {item.setupMinutos > 0 && (
         <div 
@@ -123,10 +127,16 @@ const TimelineBar = React.memo(({ item }: { item: PlanejamentoItem }) => {
            <span className="text-[7px] font-black text-white bg-black/50 px-0.5 rounded-sm">S</span>
         </div>
       )}
-      <div className="flex-1 flex items-center gap-1.5 px-1.5 min-w-0 text-white overflow-hidden">
+      <div className="flex-1 flex items-center gap-1.5 px-1.5 min-w-0 text-white overflow-hidden relative">
         <span className="font-mono text-[9px] font-black shrink-0">#{item.requisicao}</span>
         {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[8px] font-bold shrink-0">{item.quantidadeNoBloco}pç</span>}
         <span className="text-[8px] opacity-80 truncate uppercase font-bold leading-none">{item.nomeDaPeca}</span>
+        
+        {item.isConcluded && (
+          <div className="absolute right-1 top-1/2 -translate-y-1/2">
+            <Check className="h-3 w-3 text-green-400 stroke-[4px]" />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -150,6 +160,35 @@ export default function ProgrammingPage() {
     if (planoDoc) { setPlanejamentoData(planoDoc.data || []); setLoading(false); }
     else if (planoDoc === null) setLoading(false);
   }, [filaDoc, planoDoc]);
+
+  const toggleConcluded = async (itemId: string) => {
+    if (!firestore || !planejamentoData) return;
+    
+    const updatedPlano = planejamentoData.map(item => 
+      item.id === itemId ? { ...item, isConcluded: !item.isConcluded } : item
+    );
+    
+    setPlanejamentoData(updatedPlano);
+    
+    const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
+    
+    try {
+      await setDoc(doc(firestore, 'programacaoState', 'plano'), { 
+        data: sanitize(updatedPlano), 
+        updatedAt: serverTimestamp() 
+      });
+      toast({ 
+        title: "Status Atualizado", 
+        description: "Progresso salvo no banco de dados." 
+      });
+    } catch (e) {
+      toast({ 
+        title: "Erro", 
+        description: "Falha ao salvar status de conclusão.", 
+        variant: "destructive" 
+      });
+    }
+  };
 
   const recalculatePlan = async (novaFila: JobBase[]) => {
     if (!firestore) return;
@@ -245,7 +284,8 @@ export default function ProgrammingPage() {
                     tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', 
                     techKey, 
                     jobId: job.id, 
-                    laneIndex: chosenLane 
+                    laneIndex: chosenLane,
+                    isConcluded: false
                 });
             }
             
@@ -394,7 +434,7 @@ export default function ProgrammingPage() {
                                                 </div>
                                             ))}
                                             {dayItems.filter(i => i.techKey === cat && i.laneIndex === lIdx && i.turno === t.id).map(item => (
-                                                <TimelineBar key={item.id} item={item} />
+                                                <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />
                                             ))}
                                         </div>
                                     </div>
