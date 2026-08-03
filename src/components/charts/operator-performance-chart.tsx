@@ -181,6 +181,62 @@ export function OperatorPerformanceChart({
     return config;
   }, [activeCategories]);
   
+  const CustomPerformanceTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const p = payload[0].payload;
+      
+      const renderSection = (title: string, prefix: string, total: number, colorClass: string) => {
+        const relevantEntries = activeCategories
+          .map(cat => ({
+            label: CATEGORY_STYLES[cat]?.label || cat,
+            value: p[`${prefix}_${cat}`] || 0,
+            color: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR
+          }))
+          .filter(item => item.value > 0);
+
+        if (relevantEntries.length === 0) return null;
+
+        return (
+          <div className="space-y-1">
+            <div className="flex justify-between items-center border-b border-white/10 pb-1 mb-1">
+              <span className={cn("text-[10px] font-black uppercase", colorClass)}>{title}</span>
+              <span className={cn("text-xs font-black", colorClass)}>{total.toFixed(1)}h</span>
+            </div>
+            {relevantEntries.map((item, idx) => (
+              <div key={idx} className="flex justify-between items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-[10px] text-muted-foreground">{item.label}</span>
+                </div>
+                <span className="text-[10px] font-bold tabular-nums">{item.value.toFixed(1)}h</span>
+              </div>
+            ))}
+          </div>
+        );
+      };
+
+      return (
+        <div className="rounded-lg border bg-card p-3 shadow-xl min-w-[16rem] space-y-4">
+          <p className="font-black text-sm uppercase tracking-wider border-b border-primary/20 pb-1">{label}</p>
+          
+          {renderSection("Planejado", "plan", p.planTotal, "text-muted-foreground")}
+          {renderSection("Realizado", "real", p.realTotal, "text-white")}
+
+          <div className="pt-2 border-t border-primary/20 flex justify-between items-center">
+            <span className="text-[9px] font-black uppercase text-muted-foreground">Aderência ao Plano</span>
+            <span className={cn(
+              "text-xs font-black", 
+              p.planTotal > 0 && (p.realTotal / p.planTotal) >= 0.9 ? "text-green-400" : "text-yellow-400"
+            )}>
+              {p.planTotal > 0 ? ((p.realTotal / p.planTotal) * 100).toFixed(0) : 0}%
+            </span>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   const maxVal = Math.max(...chartData.map(d => Math.max(d.planTotal, d.realTotal)), 0);
   const xAxisDomainMax = Math.max(10, Math.ceil(maxVal) + 2);
 
@@ -208,7 +264,7 @@ export function OperatorPerformanceChart({
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
                 />
               <XAxis type="number" domain={[0, xAxisDomainMax]} unit="h" tickLine={false} axisLine={false} className="text-[10px]" />
-              <ChartTooltip cursor={{ fill: 'hsl(var(--accent))', opacity: 0.05 }} />
+              <ChartTooltip content={<CustomPerformanceTooltip />} cursor={{ fill: 'hsl(var(--accent))', opacity: 0.05 }} />
               
               <ReferenceLine x={7} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2}>
                   <Label value="Meta 7h" position="top" fill="#ef4444" fontSize={10} fontWeight="bold" />
