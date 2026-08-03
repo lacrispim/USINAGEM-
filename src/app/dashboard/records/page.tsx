@@ -12,19 +12,17 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import {
-  Hourglass,
-  Loader,
-  Package,
-  TriangleAlert,
   PlusCircle,
   CalendarIcon,
   User,
   Filter,
+  BarChart3,
+  CalendarDays,
 } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { collection, query, where, limit } from 'firebase/firestore';
-import { getYear, getMonth, format, startOfDay, endOfDay, getISOWeek, endOfMonth, startOfISOWeek, endOfISOWeek, setISOWeek, parse } from 'date-fns';
+import { format, startOfDay, endOfDay, endOfMonth, parse } from 'date-fns';
 import {
   Select,
   SelectContent,
@@ -37,12 +35,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 
-import { MachiningTimeTrendChart } from '@/components/charts/machining-time-trend-chart';
 import { OperatorPerformanceChart } from '@/components/charts/operator-performance-chart';
 import { PlannedVsMachinedChart } from '@/components/charts/planned-vs-machined-chart';
-import { MonthlyOeeEvolutionChart } from '@/components/charts/monthly-oee-evolution-chart';
 import { OeeLossWaterfallChart } from '@/components/charts/oee-loss-waterfall-chart';
-import { DailyPdlMplLossChart } from '@/components/charts/daily-pdl-mpl-loss-chart';
 import { AvailableVsActualChart } from '@/components/charts/available-vs-actual-chart';
 
 const months = [
@@ -85,23 +80,13 @@ const normalizeFactoryName = (name: any): string => {
   return n;
 };
 
-const getCategoryKey = (reason: string): string => {
-  const r = String(reason || '').toUpperCase().trim();
-  if (r === '' || r === 'USINAGEM' || r === 'PRODUCAO') return 'PRODUCAO';
-  if (r.includes('PROGRAMACAO')) return 'PROGRAMACAO';
-  if (r.includes('SETUP')) return 'SETUP';
-  return r;
-};
-
 export default function RecordsPage() {
   const firestore = useFirestore();
   const [isClient, setIsClient] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>('');
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  const [selectedWeek, setSelectedWeek] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth()));
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
-  const [selectedLossReason, setSelectedLossReason] = useState<string>('all');
 
   const [planejamentoData, setPlanejamentoData] = useState<any[]>([]);
   const [loadingPlanejamento, setLoadingPlanejamento] = useState(true);
@@ -137,8 +122,8 @@ export default function RecordsPage() {
     return { startDate: start, endDate: end };
   }, [selectedDate, selectedYear, selectedMonth, isClient]);
 
-  const prodQuery = useMemoFirebase(() => firestore && startDate && endDate ? query(collection(firestore, 'productionRecords'), where('date', '>=', startDate), where('date', '<=', endDate), limit(500)) : null, [firestore, startDate, endDate]);
-  const lossQuery = useMemoFirebase(() => firestore && startDate && endDate ? query(collection(firestore, 'lossRecords'), where('date', '>=', startDate), where('date', '<=', endDate), limit(500)) : null, [firestore, startDate, endDate]);
+  const prodQuery = useMemoFirebase(() => firestore && startDate && endDate ? query(collection(firestore, 'productionRecords'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000)) : null, [firestore, startDate, endDate]);
+  const lossQuery = useMemoFirebase(() => firestore && startDate && endDate ? query(collection(firestore, 'lossRecords'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000)) : null, [firestore, startDate, endDate]);
 
   const { data: productionRecords, isLoading: loadingProduction } = useCollection(prodQuery);
   const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossQuery);
@@ -172,12 +157,31 @@ export default function RecordsPage() {
       const d = getOrCreate(factory);
       const time = (record.tempoMinutos || 0) / 60;
       d.totalPlanejado += time;
+      
+      const type = record.tipoAtividade === 'PROGRAMACAO' ? 'PROGRAMACAO' : 'PRODUCAO';
+      const key = `plan_${type}`;
+      d[key] = (d[key] || 0) + time;
     });
     
     operatorFilteredProductionRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const d = getOrCreate(factory);
-        d.totalRealizado += (Number(record.machiningTime) || 0) / 60;
+        const hours = (Number(record.machiningTime) || 0) / 60;
+        d.totalRealizado += hours;
+        
+        const type = String(record.activityType || 'PRODUCAO').toUpperCase().includes('PROGRAMACAO') ? 'PROGRAMACAO' : 'PRODUCAO';
+        const key = `real_${type}`;
+        d[key] = (d[key] || 0) + hours;
+    });
+
+    operatorFilteredLossRecords.forEach(record => {
+        const factory = normalizeFactoryName(record.factory);
+        const d = getOrCreate(factory);
+        const hours = (Number(record.timeLost) || 0) / 60;
+        const reason = String(record.lossReason || 'PERDA').toUpperCase();
+        const key = `real_${reason}`;
+        d[key] = (d[key] || 0) + hours;
+        d.totalRealizado += hours;
     });
 
     return Object.keys(dataMap).map(factory => ({
@@ -185,7 +189,7 @@ export default function RecordsPage() {
         ...dataMap[factory],
         totalDisponivel: availableHoursJune[factory] || 0
     })).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
-  }, [filteredPlanejamentoData, operatorFilteredProductionRecords]);
+  }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords]);
 
   if (!isClient) return null;
 
@@ -193,58 +197,102 @@ export default function RecordsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Visão Supervisor</h1>
-          <p className="text-muted-foreground">Análise de produtividade e eficiência baseada no Cloud Firestore.</p>
+          <p className="text-muted-foreground">Análise consolidada de produtividade e eficiência industrial.</p>
         </div>
-        <Button asChild><Link href="/dashboard/production-registry"><PlusCircle className="mr-2 h-4 w-4" />Novo Registro</Link></Button>
+        <div className="flex items-center gap-3">
+            <Button variant="outline" asChild><Link href="/dashboard/programming">Ver Cronograma</Link></Button>
+            <Button asChild><Link href="/dashboard/production-registry"><PlusCircle className="mr-2 h-4 w-4" />Novo Registro</Link></Button>
+        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-start gap-2 bg-card p-3 rounded-lg border shadow-sm">
-          <div className="grid w-full sm:max-w-[120px] gap-1.5">
-              <Label className="text-[10px] font-black uppercase text-muted-foreground">Mês</Label>
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="h-8 text-xs font-bold"><SelectValue /></SelectTrigger>
+      <div className="flex flex-wrap items-end gap-3 bg-card p-4 rounded-lg border shadow-sm">
+          <div className="grid w-full sm:max-w-[100px] gap-1.5">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground">Ano</Label>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="2024">2024</SelectItem>
+                      <SelectItem value="2025">2025</SelectItem>
+                  </SelectContent>
+              </Select>
+          </div>
+          <div className="grid w-full sm:max-w-[140px] gap-1.5">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground">Mês Referência</Label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="h-9 text-xs font-bold">
+                    <div className="flex items-center gap-2">
+                        <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                        <SelectValue />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Ano Inteiro</SelectItem>
                       {months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
                   </SelectContent>
               </Select>
           </div>
+          <div className="grid w-full sm:max-w-[160px] gap-1.5">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground">Filtrar por Dia</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("h-9 text-xs font-bold justify-start", !selectedDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                    {selectedDate ? format(selectedDate, "dd/MM/yyyy") : "Selecionar Dia"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus />
+                </PopoverContent>
+              </Popover>
+          </div>
           <div className="grid w-full sm:max-w-[200px] gap-1.5">
-              <Label className="text-[10px] font-black uppercase text-muted-foreground">Técnico</Label>
+              <Label className="text-[10px] font-black uppercase text-muted-foreground">Técnico Responsável</Label>
               <Select value={selectedOperator || 'all'} onValueChange={setSelectedOperator}>
-                  <SelectTrigger className="h-8 text-xs font-bold"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-xs font-bold">
+                    <div className="flex items-center gap-2">
+                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                        <SelectValue placeholder="Todos os Técnicos" />
+                    </div>
+                  </SelectTrigger>
                   <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="all">Todos os Técnicos</SelectItem>
                       {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
                   </SelectContent>
               </Select>
           </div>
+          {(selectedDate || selectedOperator !== 'all' || selectedMonth !== String(new Date().getMonth())) && (
+              <Button variant="ghost" size="sm" onClick={() => { setSelectedDate(undefined); setSelectedOperator('all'); setSelectedMonth(String(new Date().getMonth())); }} className="h-9 text-xs text-destructive hover:bg-destructive/10">Limpar Filtros</Button>
+          )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Planejado vs Realizado por Técnico</CardTitle>
-          <CardDescription>Comparativo de horas baseado no novo motor Firestore.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <OperatorPerformanceChart 
-            productionData={operatorFilteredProductionRecords}
-            lossData={operatorFilteredLossRecords}
-            plannedData={filteredPlanejamentoData}
-            loading={isLoading}
-            selectedOperator={selectedOperator}
-            onOperatorSelect={setSelectedOperator}
-          />
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-6">
+        <Card>
+            <CardHeader>
+            <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /> Performance: Planejado vs Realizado</CardTitle>
+            <CardDescription>Comparativo de horas baseado nos registros de produção e perdas do Firestore.</CardDescription>
+            </CardHeader>
+            <CardContent>
+            <OperatorPerformanceChart 
+                productionData={operatorFilteredProductionRecords}
+                lossData={operatorFilteredLossRecords}
+                plannedData={filteredPlanejamentoData}
+                loading={isLoading}
+                selectedOperator={selectedOperator}
+                onOperatorSelect={setSelectedOperator}
+            />
+            </CardContent>
+        </Card>
 
-      <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
-      <AvailableVsActualChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
-      
-      <OeeLossWaterfallChart productionData={operatorFilteredProductionRecords} lossData={operatorFilteredLossRecords} loading={isLoading} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
+            <AvailableVsActualChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
+        </div>
+        
+        <OeeLossWaterfallChart productionData={operatorFilteredProductionRecords} lossData={operatorFilteredLossRecords} loading={isLoading} />
+      </div>
     </div>
   );
 }

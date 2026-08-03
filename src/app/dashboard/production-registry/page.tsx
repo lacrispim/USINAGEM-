@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter, CalendarDays, Factory } from 'lucide-react';
+import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter, CalendarDays, Factory, History } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -62,71 +63,40 @@ import * as XLSX from 'xlsx';
 import { Label } from '@/components/ui/label';
 
 const months = [
-    { value: '0', label: 'Janeiro' },
-    { value: '1', label: 'Fevereiro' },
-    { value: '2', label: 'Março' },
-    { value: '3', label: 'Abril' },
-    { value: '4', label: 'Maio' },
-    { value: '5', label: 'Junho' },
-    { value: '6', label: 'Julho' },
-    { value: '7', label: 'Agosto' },
-    { value: '8', label: 'Setembro' },
-    { value: '9', label: 'Outubro' },
-    { value: '10', label: 'Novembro' },
-    { value: '11', label: 'Dezembro' },
+    { value: '0', label: 'Janeiro' }, { value: '1', label: 'Fevereiro' }, { value: '2', label: 'Março' },
+    { value: '3', label: 'Abril' }, { value: '4', label: 'Maio' }, { value: '5', label: 'Junho' },
+    { value: '6', label: 'Julho' }, { value: '7', label: 'Agosto' }, { value: '8', label: 'Setembro' },
+    { value: '9', label: 'Outubro' }, { value: '10', label: 'Novembro' }, { value: '11', label: 'Dezembro' },
 ];
 
 const lossReasonDetails = [
     { value: "MANUTENÇÃO PLANEJADA", description: "LUBRIFICAÇÃO DA MÁQUINA" },
     { value: "TEMPO DE CAFÉ", description: "PARADA PARA CAFÉ" },
     { value: "LIMPEZA PLANEJADA", description: "LIMPEZA DA MÁQUINA, ÁREA, E CAÇAMBA" },
-    { value: "SETUP", description: "SETUP PLANEJADO DE MÁQUINA E SETUP EMERGENCIAL (TROCA DE PEÇA PARA USINAGEM CORRETIVA)" },
-    { value: "DDS, APONTAMENTO HORAS, ATIVIDADE ADM", description: "DDS, APONTAMENTO HORAS, REUNIÕES, EXAME MÉDICO, TROCA DE TURNO, ATIVIDADE ADM PLANEJADA" },
-    { value: "INSPEÇÃO & VALIDAÇÃO DAS PEÇAS", description: "INSPEÇÃO DE QUALIDADE DAS PEÇAS" },
-    { value: "QUEBRA", description: "QUEBRA DO FERRAMENTAL, COLIZÃO, TRAVAMENTO DE ESTEIRA, ETC" },
+    { value: "SETUP", description: "SETUP PLANEJADO DE MÁQUINA E SETUP EMERGENCIAL" },
+    { value: "DDS, APONTAMENTO HORAS, ATIVIDADE ADM", description: "DDS, APONTAMENTO HORAS, REUNIÕES, ETC" },
+    { value: "INSPEÇÃO & VALIDAÇÃO DAS PEÇAS", description: "INSPEÇÃO DE QUALIDADE" },
+    { value: "QUEBRA", description: "QUEBRA DO FERRAMENTAL, COLIZÃO, ETC" },
     { value: "FALHA DE PROCESSO", description: "FALTA DE AR COMPRIMIDO E ENERGIA" },
     { value: "ABSENTEÍSMO", description: "FALTA DE MÃO DE OBRA" },
-    { value: "FALTA DE MATERIAL & FERRAMENTA", description: "FALTA DE AÇO, FALTA DE FERRAMENTA DE CORTE, FALTA DE ÓLEO" },
-    { value: "MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS", description: "RECEBIMENTO DE MATERIAL, MOVIMETANÇÃO DE MATERIA PRIMA E EQUIPAMENTOS, EX: PALETEIRA" },
-    { value: "PEQUENAS PARADAS", description: "PEQUENAS PARADAS NÃO PROGRAMADAS, ABAIXO DE 10 MINUTOS" },
-    { value: "AJUSTES CORRETIVOS DE PROCESSOS", description: "AJUSTES NÃO PLANEJADOS NECESSÁRIOS PARA FABRICAR A PEÇA (SEM CONSIDERAR O SETUP)" },
-    { value: "VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)", description: "MÁQUINA OPERANDO ABAIXO DO NOMINAL POR ALGUM PROBLEMA" },
-    { value: "RETRABALHO", description: "RETRABALHO DE OPERAÇÕES OU PEÇAS JÁ REALIZADAS" },
-    { value: "SERVIÇOS DE BANCADA/SERRA", description: "ATIVIDADES DE BANCADA OU OPERAÇÃO DE SERRA" },
-    { value: "AUXÍLIO EM MAQUINA", description: "AJUDA EM OUTRA MÁQUINA OU OPERAÇÃO" },
-    { value: "AUXÍLIO AS FÁBRICAS", description: "AUXÍLIO PRESTADO DIRETAMENTE ÀS FÁBRICAS" }
+    { value: "FALTA DE MATERIAL & FERRAMENTA", description: "FALTA DE AÇO, FERRAMENTA, ÓLEO" },
+    { value: "MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS", description: "RECEBIMENTO E MOVIMENTAÇÃO" },
+    { value: "PEQUENAS PARADAS", description: "PARADAS NÃO PROGRAMADAS < 10 MIN" },
+    { value: "AJUSTES CORRETIVOS DE PROCESSOS", description: "AJUSTES NÃO PLANEJADOS" },
+    { value: "VELOCIDADE REDUZIDA", description: "MÁQUINA OPERANDO ABAIXO DO NOMINAL" },
+    { value: "RETRABALHO", description: "RETRABALHO DE OPERAÇÕES" },
+    { value: "SERVIÇOS DE BANCADA/SERRA", description: "ATIVIDADES DE APOIO" },
+    { value: "AUXÍLIO EM MAQUINA", description: "AJUDA EM OUTRA MÁQUINA" },
+    { value: "AUXÍLIO AS FÁBRICAS", description: "AUXÍLIO DIRETO ÀS FÁBRICAS" }
 ];
 
-const lossReasonOptions = lossReasonDetails.map(item => item.value);
-
-const operatorList = [
-    "Alisson Franca",
-    "Daniel Solivo",
-    "Rodrigo Cantano",
-    "Gustavo Gozzi",
-    "William Martinucci",
-    "Nathan Xavier",
-    "Jair Melo",
-    "Marcos Barbosa"
-];
-
-const factoryList = [
-    "VALINHOS DOVE",
-    "VALINHOS SABONETE",
-    "VINHEDO",
-    "POUSO ALEGRE",
-    "INDAIATUBA",
-    "AGUAÍ",
-    "SUAPE",
-    "IGARASSU",
-    "GARANHUNS",
-    "TORRE"
-];
+const operatorList = ["Alisson França", "Daniel Solivo", "Rodrigo Cantano", "Gustavo Gozzi", "William Martinucci", "Nathan Xavier", "Jair Melo", "Marcos Barbosa"];
+const factoryList = ["VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
-  date: z.string().min(1, 'A data da produção é obrigatória.'),
-  factory: z.string().min(1, 'A seleção da fábrica é obrigatória.'),
+  date: z.string().min(1, 'Data é obrigatória.'),
+  factory: z.string().min(1, 'Fábrica é obrigatória.'),
   formsNumber: z.string().optional(),
   activityType: z.string().optional(),
   machine: z.string().optional(),
@@ -135,17 +105,15 @@ const productionFormSchema = z.object({
   machiningTime: z.coerce.number().optional(),
   status: z.string().optional(),
   observations: z.string().optional(),
-  toolCount: z.coerce.number().optional(),
-  fixtureType: z.string().optional(),
 });
 
 const lossFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
-  date: z.string().min(1, 'A data da perda é obrigatória.'),
+  date: z.string().min(1, 'Data é obrigatória.'),
   machine: z.string().optional(),
   lossReason: z.string().optional(),
   deadPartsQuantity: z.coerce.number().optional(),
-  factory: z.string().min(1, 'A seleção da fábrica é obrigatória.'),
+  factory: z.string().min(1, 'Fábrica é obrigatória.'),
   timeLost: z.coerce.number().optional(),
   observations: z.string().optional(),
   formsNumber: z.string().optional(),
@@ -154,641 +122,12 @@ const lossFormSchema = z.object({
 type ProductionFormValues = z.infer<typeof productionFormSchema>;
 type LossFormValues = z.infer<typeof lossFormSchema>;
 
-const initialProductionValues = {
-  operatorId: '',
-  date: '',
-  factory: '',
-  formsNumber: '',
-  activityType: '',
-  machine: '',
-  quantityProduced: 0,
-  operationsNumber: '',
-  machiningTime: 0,
-  status: 'Em produção',
-  observations: '',
-  toolCount: 0,
-  fixtureType: '',
-};
-
-const initialLossValues = {
-    operatorId: '',
-    date: '',
-    machine: '',
-    lossReason: '',
-    deadPartsQuantity: 0,
-    factory: '',
-    timeLost: 0,
-    observations: '',
-    formsNumber: '',
-};
-
-const ProductionFormContent = () => {
-    const { toast } = useToast();
-    const firestore = useFirestore();
-    const [isClient, setIsClient] = useState(false);
-
-    const productionForm = useForm<ProductionFormValues>({
-        resolver: zodResolver(productionFormSchema),
-        defaultValues: initialProductionValues,
-    });
-
-    useEffect(() => {
-        setIsClient(true);
-        productionForm.reset({
-            ...initialProductionValues,
-            date: format(new Date(), 'dd/MM/yyyy'),
-        });
-    }, [productionForm]);
-
-    const machiningTime = useWatch({
-        control: productionForm.control,
-        name: 'machiningTime',
-    });
-    
-    const selectedMachine = useWatch({
-        control: productionForm.control,
-        name: 'machine',
-    });
-
-    async function onProductionSubmit(values: ProductionFormValues) {
-        if (!firestore) return;
-        try {
-            const date = parse(values.date, 'dd/MM/yyyy', new Date());
-            await addDoc(collection(firestore, 'productionRecords'), {
-                ...values,
-                date,
-                createdAt: serverTimestamp(),
-            });
-            toast({
-                title: 'Produção Registrada',
-                description: 'Os dados de produção foram salvos com sucesso.',
-            });
-            productionForm.reset({
-                ...initialProductionValues,
-                date: format(new Date(), 'dd/MM/yyyy'),
-            });
-        } catch (error: any) {
-            console.error('Error adding production record: ', error);
-            toast({
-                title: 'Erro',
-                description: 'Não foi possível salvar o registro de produção.',
-                variant: 'destructive',
-            });
-        }
-    }
-    
-    if (!isClient) return null;
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Registro de Produção</CardTitle>
-                <CardDescription>
-                Insira os dados de produção da sua atividade.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Form {...productionForm}>
-                <form
-                    onSubmit={productionForm.handleSubmit(onProductionSubmit)}
-                    className="space-y-4"
-                >
-                    <FormField
-                      control={productionForm.control}
-                      name="operatorId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>ID do Operador</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione o técnico" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={productionForm.control}
-                      name="date"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Data da Produção</FormLabel>
-                          <FormControl>
-                            <Input placeholder="dd/MM/yyyy" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                    control={productionForm.control}
-                    name="factory"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Fábrica *</FormLabel>
-                        <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                        >
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecione a fábrica (obrigatório)" />
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                     <FormField
-                        control={productionForm.control}
-                        name="status"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Status</FormLabel>
-                            <Select
-                                onValueChange={field.onChange}
-                                value={field.value}
-                            >
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione o status" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                <SelectItem value="Fila de produção">Fila de produção</SelectItem>
-                                <SelectItem value="Em produção">Em produção</SelectItem>
-                                <SelectItem value="Encerrado">Encerrado</SelectItem>
-                                <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
-                                <SelectItem value="Rejeitado">Rejeitado</SelectItem>
-                                <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
-                                <SelectItem value="PROGRAMA CONCLUÍDO">PROGRAMA CONCLUÍDO</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                    <FormField
-                    control={productionForm.control}
-                    name="formsNumber"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Número do forms</FormLabel>
-                        <FormControl>
-                            <Input placeholder="Ex: F-1024" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={productionForm.control}
-                    name="activityType"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Tipo de Atividade</FormLabel>
-                        <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                        >
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecione o tipo" />
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                            <SelectItem value="USINAGEM">USINAGEM</SelectItem>
-                            <SelectItem value="PROGRAMACAO">PROGRAMAÇÃO</SelectItem>
-                            <SelectItem value="PRIMEIRA PEÇA">PRIMEIRA PEÇA</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={productionForm.control}
-                    name="machine"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Máquina</FormLabel>
-                        <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                        >
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecione a máquina" />
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="TORNO CNC CENTUR 30">TORNO CNC CENTUR 30</SelectItem>
-                              <SelectItem value="CENTRO DE USINAGEM D600">CENTRO DE USINAGEM D600</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    {selectedMachine === 'CENTRO DE USINAGEM D600' && (
-                        <>
-                            <FormField
-                            control={productionForm.control}
-                            name="toolCount"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Número de Ferramentas Distintas</FormLabel>
-                                <FormControl>
-                                    <Input type="number" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                            />
-                            <FormField
-                            control={productionForm.control}
-                            name="fixtureType"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Tipo de Fixação</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Ex: Morsa, Dispositivo" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                            />
-                        </>
-                    )}
-                    <FormField
-                    control={productionForm.control}
-                    name="quantityProduced"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Quantidade Produzida</FormLabel>
-                        <FormControl>
-                            <Input type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={productionForm.control}
-                    name="operationsNumber"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Número de Operações</FormLabel>
-                        <FormControl>
-                            <Input placeholder="Ex: 5" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={productionForm.control}
-                    name="machiningTime"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Tempo de Usinagem (minutos)</FormLabel>
-                        <FormControl>
-                            <Input type="number" value={field.value || ''} onChange={(e) => field.onChange(e.target.valueAsNumber)} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                     <FormField
-                      control={productionForm.control}
-                      name="observations"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Observações</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Adicione qualquer observação relevante"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <ProductionTimer
-                        title="Cronômetro de Produção"
-                        initialTimeInMinutes={machiningTime || 0}
-                        onTimeChange={(time) => {
-                            productionForm.setValue('machiningTime', time);
-                        }}
-                    />
-                    <Button type="submit" className="w-full">
-                    Registrar Produção
-                    </Button>
-                </form>
-                </Form>
-            </CardContent>
-        </Card>
-    );
-};
-
-const LossFormContent = () => {
-    const { toast } = useToast();
-    const firestore = useFirestore();
-    const [isClient, setIsClient] = useState(false);
-
-    const lossForm = useForm<LossFormValues>({
-        resolver: zodResolver(lossFormSchema),
-        defaultValues: initialLossValues,
-    });
-
-    const selectedLossReason = useWatch({
-        control: lossForm.control,
-        name: 'lossReason',
-    });
-
-    useEffect(() => {
-        if (selectedLossReason) {
-            const detail = lossReasonDetails.find(item => item.value === selectedLossReason);
-            if (detail) {
-                lossForm.setValue('observations', detail.description);
-            }
-        }
-    }, [selectedLossReason, lossForm]);
-
-    useEffect(() => {
-        setIsClient(true);
-        lossForm.reset({
-            ...initialLossValues,
-            date: format(new Date(), 'dd/MM/yyyy'),
-        });
-    }, [lossForm]);
-
-    const timeLost = useWatch({
-        control: lossForm.control,
-        name: 'timeLost',
-    });
-
-    async function onLossSubmit(values: LossFormValues) {
-        if (!firestore) return;
-        try {
-            const date = parse(values.date, 'dd/MM/yyyy', new Date());
-            await addDoc(collection(firestore, 'lossRecords'), {
-                ...values,
-                date,
-                createdAt: serverTimestamp(),
-            });
-
-            toast({
-                title: 'Perda Registrada',
-                description: 'O registro de perda foi salvo com sucesso.',
-            });
-
-            lossForm.reset({
-                ...initialLossValues,
-                date: format(new Date(), 'dd/MM/yyyy'),
-            });
-        } catch (error: any) {
-            console.error('Error adding loss record: ', error);
-            toast({
-                title: 'Erro',
-                description: 'Não foi possível salvar o registro de perda.',
-                variant: 'destructive',
-            });
-        }
-    }
-    
-    if (!isClient) return null;
-
-    return (
-        <Card>
-              <CardHeader>
-                <CardTitle>Registro de Perda</CardTitle>
-                <CardDescription>
-                  Registre peças perdidas e o tempo de inatividade.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...lossForm}>
-                  <form
-                    onSubmit={lossForm.handleSubmit(onLossSubmit)}
-                    className="space-y-4"
-                  >
-                    <FormField
-                      control={lossForm.control}
-                      name="operatorId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>ID do Operador</FormLabel>
-                           <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione o técnico" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={lossForm.control}
-                      name="date"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Data da Perda</FormLabel>
-                          <FormControl>
-                            <Input placeholder="dd/MM/yyyy" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={lossForm.control}
-                      name="factory"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Fábrica *</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione a fábrica (obrigatório)" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                        control={lossForm.control}
-                        name="formsNumber"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Número do forms</FormLabel>
-                            <FormControl>
-                                <Input placeholder="Ex: F-1024" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                    <FormField
-                      control={lossForm.control}
-                      name="machine"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Máquina</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione a máquina" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                               <SelectItem value="TORNO CNC CENTUR 30">TORNO CNC CENTUR 30</SelectItem>
-                               <SelectItem value="CENTRO DE USINAGEM D600">CENTRO DE USINAGEM D600</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={lossForm.control}
-                      name="lossReason"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Motivo da Perda</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione um motivo" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {lossReasonOptions.map(reason => <SelectItem key={reason} value={reason}>{reason}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={lossForm.control}
-                      name="deadPartsQuantity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Quantidade de Peças Mortas</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={lossForm.control}
-                      name="timeLost"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tempo Perdido (minutos)</FormLabel>
-                          <FormControl>
-                             <Input type="number" value={field.value || ''} onChange={(e) => field.onChange(e.target.valueAsNumber)} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={lossForm.control}
-                      name="observations"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Observações</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Adicione qualquer observação relevante"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <ProductionTimer 
-                        title="Cronômetro de Perda"
-                        initialTimeInMinutes={timeLost || 0}
-                        onTimeChange={(time) => {
-                            lossForm.setValue('timeLost', time);
-                        }}
-                     />
-                    <Button
-                      type="submit"
-                      variant="destructive"
-                      className="w-full"
-                    >
-                      Registrar Perda
-                    </Button>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-    );
-};
-
-const statusColorMap: { [key: string]: string } = {
-    'Fila de produção': 'bg-gray-500',
-    'Em produção': 'bg-yellow-500 text-black',
-    'Encerrado': 'bg-green-500',
-    'Inspeção/Qualidade': 'bg-purple-500',
-    'Rejeitado': 'bg-red-500',
-    'Serviços Externos': 'bg-blue-500',
-    'PROGRAMA CONCLUÍDO': 'bg-amber-700',
-};
-
 export default function ProductionRegistryPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [editedRecord, setEditedRecord] = useState<any | null>(null);
-  
-  const [editingLossRecordId, setEditingLossRecordId] = useState<string | null>(null);
-  const [editedLossRecord, setEditedLossRecord] = useState<any | null>(null);
-  
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
   const [selectedFactory, setSelectedFactory] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -796,678 +135,252 @@ export default function ProductionRegistryPage() {
   const [formsFilter, setFormsFilter] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  const productionRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(200)) : null
-  , [firestore]);
-  const { data: productionRecords, isLoading: loadingProduction } = useCollection(productionRecordsQuery);
+  const productionForm = useForm<ProductionFormValues>({
+    resolver: zodResolver(productionFormSchema),
+    defaultValues: { date: format(new Date(), 'dd/MM/yyyy'), status: 'Em produção' }
+  });
+
+  const lossForm = useForm<LossFormValues>({
+    resolver: zodResolver(lossFormSchema),
+    defaultValues: { date: format(new Date(), 'dd/MM/yyyy') }
+  });
+
+  const productionRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(300)) : null, [firestore]);
+  const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(300)) : null, [firestore]);
   
-  const lossRecordsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(200)) : null
-  , [firestore]);
+  const { data: productionRecords, isLoading: loadingProduction } = useCollection(productionRecordsQuery);
   const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossRecordsQuery);
 
   const filteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
-    
     if (selectedCategory !== 'all' && selectedCategory !== 'PRODUCAO') return [];
 
     return productionRecords.filter(record => {
       const recordDate = record.date?.toDate ? record.date.toDate() : null;
       if (!recordDate) return false;
-
-      if (selectedDate) {
-        const isSameDay = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
-        if (!isSameDay) return false;
-      } else if (selectedMonth !== 'all') {
-          const monthIdx = parseInt(selectedMonth);
-          if (recordDate.getMonth() !== monthIdx) return false;
-          if (recordDate.getFullYear() !== new Date().getFullYear()) return false;
-      }
-
-      const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
-      const factoryMatch = selectedFactory === 'all' || record.factory === selectedFactory;
-      const formsMatch = !formsFilter || (record.formsNumber && 
-        record.formsNumber.toLowerCase().includes(formsFilter.toLowerCase()));
-
-      return operatorMatch && formsMatch && factoryMatch;
+      if (selectedDate && (recordDate < startOfDay(selectedDate) || recordDate > endOfDay(selectedDate))) return false;
+      if (selectedMonth !== 'all' && recordDate.getMonth() !== parseInt(selectedMonth)) return false;
+      if (selectedOperator !== 'all' && record.operatorId !== selectedOperator) return false;
+      if (selectedFactory !== 'all' && record.factory !== selectedFactory) return false;
+      if (formsFilter && !record.formsNumber?.toLowerCase().includes(formsFilter.toLowerCase())) return false;
+      return true;
     });
   }, [productionRecords, selectedOperator, selectedFactory, selectedDate, selectedMonth, formsFilter, selectedCategory]);
 
   const filteredLossRecords = useMemo(() => {
     if (!lossRecords) return [];
-
     if (selectedCategory === 'PRODUCAO') return [];
 
-     return lossRecords.filter(record => {
+    return lossRecords.filter(record => {
       const recordDate = record.date?.toDate ? record.date.toDate() : null;
       if (!recordDate) return false;
-
-      if (selectedDate) {
-        const isSameDay = recordDate >= startOfDay(selectedDate) && recordDate <= endOfDay(selectedDate);
-        if (!isSameDay) return false;
-      } else if (selectedMonth !== 'all') {
-          const monthIdx = parseInt(selectedMonth);
-          if (recordDate.getMonth() !== monthIdx) return false;
-          if (recordDate.getFullYear() !== new Date().getFullYear()) return false;
-      }
-
-      const operatorMatch = selectedOperator === 'all' || record.operatorId === selectedOperator;
-      const factoryMatch = selectedFactory === 'all' || record.factory === selectedFactory;
-      const formsMatch = !formsFilter || (record.formsNumber && 
-        record.formsNumber.toLowerCase().includes(formsFilter.toLowerCase()));
-      
-      const categoryMatch = selectedCategory === 'all' || record.lossReason === selectedCategory;
-
-      return operatorMatch && formsMatch && categoryMatch && factoryMatch;
+      if (selectedDate && (recordDate < startOfDay(selectedDate) || recordDate > endOfDay(selectedDate))) return false;
+      if (selectedMonth !== 'all' && recordDate.getMonth() !== parseInt(selectedMonth)) return false;
+      if (selectedOperator !== 'all' && record.operatorId !== selectedOperator) return false;
+      if (selectedFactory !== 'all' && record.factory !== selectedFactory) return false;
+      if (formsFilter && !record.formsNumber?.toLowerCase().includes(formsFilter.toLowerCase())) return false;
+      if (selectedCategory !== 'all' && record.lossReason !== selectedCategory) return false;
+      return true;
     });
   }, [lossRecords, selectedOperator, selectedFactory, selectedDate, selectedMonth, formsFilter, selectedCategory]);
 
-  const handleDelete = async (collectionName: string, id: string) => {
+  async function onProductionSubmit(values: ProductionFormValues) {
     if (!firestore) return;
     try {
-      await deleteDoc(doc(firestore, collectionName, id));
-      toast({
-        title: 'Registro Excluído',
-        description: 'O registro foi excluído com sucesso.',
-      });
-    } catch (error: any) {
-      console.error('Error deleting record: ', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível excluir o registro.',
-        variant: 'destructive',
-      });
-    }
-  };
+      await addDoc(collection(firestore, 'productionRecords'), { ...values, date: parse(values.date, 'dd/MM/yyyy', new Date()), createdAt: serverTimestamp() });
+      toast({ title: 'Sucesso', description: 'Produção registrada com sucesso.' });
+      productionForm.reset({ ...productionForm.getValues(), formsNumber: '', quantityProduced: 0, machiningTime: 0, observations: '' });
+    } catch (e) { toast({ title: 'Erro', description: 'Falha ao salvar registro.', variant: 'destructive' }); }
+  }
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
+  async function onLossSubmit(values: LossFormValues) {
     if (!firestore) return;
-    const recordRef = doc(firestore, 'productionRecords', id);
     try {
-      await updateDoc(recordRef, { status: newStatus });
-      toast({
-        title: 'Status Atualizado',
-        description: `O status do registro foi alterado para ${newStatus}.`,
-      });
-    } catch (error: any) {
-      console.error('Error updating status: ', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar o status.',
-        variant: 'destructive',
-      });
-    }
+      await addDoc(collection(firestore, 'lossRecords'), { ...values, date: parse(values.date, 'dd/MM/yyyy', new Date()), createdAt: serverTimestamp() });
+      toast({ title: 'Sucesso', description: 'Perda registrada com sucesso.' });
+      lossForm.reset({ ...lossForm.getValues(), timeLost: 0, deadPartsQuantity: 0, observations: '' });
+    } catch (e) { toast({ title: 'Erro', description: 'Falha ao salvar perda.', variant: 'destructive' }); }
+  }
+
+  const handleDelete = async (coll: string, id: string) => {
+    if (!firestore) return;
+    await deleteDoc(doc(firestore, coll, id));
+    toast({ title: 'Excluído', description: 'Registro removido permanentemente.' });
   };
 
-  const handleEdit = (record: any) => {
-    setEditingRecordId(record.id);
-    setEditedRecord({ ...record, date: record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingRecordId(null);
-    setEditedRecord(null);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!firestore || !editedRecord) return;
-    const { id, createdAt, ...dataToSave } = editedRecord;
-    
-    if (typeof dataToSave.date === 'string') {
-        try {
-            dataToSave.date = parse(dataToSave.date, 'dd/MM/yyyy', new Date());
-        } catch (error: any) {
-            console.error("Error parsing date:", error);
-            toast({
-                title: 'Erro de Data',
-                description: 'O formato da data é inválido. Use dd/MM/yyyy.',
-                variant: 'destructive',
-            });
-            return;
-        }
-    }
-    const recordRef = doc(firestore, 'productionRecords', id);
-    try {
-      await updateDoc(recordRef, dataToSave);
-      toast({
-        title: 'Registro Atualizado',
-        description: 'O registro de produção foi atualizado com sucesso.',
-      });
-      handleCancelEdit();
-    } catch (error: any) {
-      console.error('Error updating record: ', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar o registro.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setEditedRecord({ ...editedRecord, [name]: value });
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setEditedRecord({ ...editedRecord, [name]: value });
-  };
-
-  const handleEditLoss = (record: any) => {
-    setEditingLossRecordId(record.id);
-    setEditedLossRecord({ ...record, date: record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date });
-  };
-
-  const handleCancelEditLoss = () => {
-    setEditingLossRecordId(null);
-    setEditedLossRecord(null);
-  };
-  
-  const handleSaveEditLoss = async () => {
-    if (!firestore || !editedLossRecord) return;
-    const { id, createdAt, ...dataToSave } = editedLossRecord;
-
-    if (typeof dataToSave.date === 'string') {
-        try {
-            dataToSave.date = parse(dataToSave.date, 'dd/MM/yyyy', new Date());
-        } catch (error: any) {
-            console.error("Error parsing date:", error);
-            toast({
-                title: 'Erro de Data',
-                description: 'O formato da data é inválido. Use dd/MM/yyyy.',
-                variant: 'destructive',
-            });
-            return;
-        }
-    }
-
-    const recordRef = doc(firestore, 'lossRecords', id);
-    try {
-      await updateDoc(recordRef, dataToSave);
-      toast({
-        title: 'Registro de Perda Atualizado',
-        description: 'O registro de perda foi atualizado com sucesso.',
-      });
-      handleCancelEditLoss();
-    } catch (error: any) {
-      console.error('Error updating loss record: ', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar o registro de perda.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleLossInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setEditedLossRecord({ ...editedLossRecord, [name]: value });
-  };
-
-  const handleLossSelectChange = (name: string, value: string) => {
-    const newRecord = { ...editedLossRecord, [name]: value };
-    if (name === 'lossReason') {
-      const detail = lossReasonDetails.find(item => item.value === value);
-      if (detail) {
-        newRecord.observations = detail.description;
-      } else {
-        newRecord.observations = '';
-      }
-    }
-    setEditedLossRecord(newRecord);
-  };
-
-  const exportToExcel = (data: any[], fileName: string) => {
-    if (!data || data.length === 0) {
-      toast({
-        title: 'Nenhum dado para exportar',
-        description: 'A tabela está vazia.',
-        variant: 'destructive'
-      });
-      return;
-    }
-    const formattedData = data.map(record => ({
-      ...record,
-      date: record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date,
-      createdAt: record.createdAt?.toDate ? format(record.createdAt.toDate(), 'dd/MM/yyyy HH:mm:ss') : record.createdAt,
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(formattedData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Dados');
-    XLSX.writeFile(workbook, `${fileName}.xlsx`);
+  const exportToExcel = (data: any[], name: string) => {
+    const ws = XLSX.utils.json_to_sheet(data.map(r => ({ ...r, date: r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Dados");
+    XLSX.writeFile(wb, `${name}.xlsx`);
   };
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Registro de Produção</h1>
-        <p className="text-muted-foreground">Monitore a produção, registre novas atividades e perdas.</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Registros de Produção</h1>
+          <p className="text-muted-foreground">Controle diário de atividades e perdas de usinagem.</p>
+        </div>
       </div>
 
-      <div>
-          <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <ProductionFormContent />
-            <LossFormContent />
-          </div>
-          <div className="mt-8 space-y-8">
-             <div className="flex flex-col sm:flex-row justify-end gap-3 items-end bg-card p-3 rounded-lg border shadow-sm flex-wrap">
-                <div className="grid w-full sm:max-w-[180px] gap-1.5">
-                    <Label htmlFor="category-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Categorias / Perdas</Label>
-                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                        <SelectTrigger id="category-filter" className="h-8 text-xs font-bold">
-                            <div className='flex items-center gap-2'>
-                                <Filter className="h-3 w-3 text-muted-foreground" />
-                                <SelectValue placeholder="Todas" />
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todas</SelectItem>
-                            <SelectItem value="PRODUCAO">Produção</SelectItem>
-                            {lossReasonOptions.map((reason) => (
-                                <SelectItem key={reason} value={reason}>
-                                    {reason}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader><CardTitle>Nova Produção</CardTitle></CardHeader>
+          <CardContent>
+            <Form {...productionForm}>
+              <form onSubmit={productionForm.handleSubmit(onProductionSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={productionForm.control} name="operatorId" render={({field}) => (
+                    <FormItem><FormLabel>Operador</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>
+                  )} />
+                  <FormField control={productionForm.control} name="date" render={({field}) => (
+                    <FormItem><FormLabel>Data</FormLabel><FormControl><Input placeholder="dd/MM/yyyy" {...field} /></FormControl></FormItem>
+                  )} />
                 </div>
-                <div className="grid w-full sm:max-w-[180px] gap-1.5">
-                    <Label htmlFor="forms-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Nº Forms</Label>
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                            id="forms-filter"
-                            placeholder="Buscar n°..."
-                            className="pl-8 h-8 text-xs"
-                            value={formsFilter}
-                            onChange={(e) => setFormsFilter(e.target.value)}
-                        />
-                    </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={productionForm.control} name="factory" render={({field}) => (
+                    <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
+                  )} />
+                  <FormField control={productionForm.control} name="formsNumber" render={({field}) => (
+                    <FormItem><FormLabel>Nº Forms</FormLabel><FormControl><Input placeholder="Ex: 815" {...field} /></FormControl></FormItem>
+                  )} />
                 </div>
-                <div className="grid w-full sm:max-w-[120px] gap-1.5">
-                    <Label htmlFor="month-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Mês</Label>
-                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                        <SelectTrigger id="month-filter" className="h-8 text-xs font-bold">
-                            <div className='flex items-center gap-2'>
-                                <CalendarDays className="h-3 w-3 text-muted-foreground" />
-                                <SelectValue placeholder="Mês" />
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos</SelectItem>
-                            {months.map((m) => (
-                                <SelectItem key={m.value} value={m.value}>
-                                    {m.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={productionForm.control} name="machine" render={({field}) => (
+                        <FormItem><FormLabel>Máquina</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Máquina" /></SelectTrigger></FormControl><SelectContent><SelectItem value="TORNO CNC CENTUR 30">TORNO CNC</SelectItem><SelectItem value="CENTRO DE USINAGEM D600">CENTRO</SelectItem></SelectContent></Select></FormItem>
+                    )} />
+                    <FormField control={productionForm.control} name="activityType" render={({field}) => (
+                        <FormItem><FormLabel>Tipo</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger></FormControl><SelectContent><SelectItem value="USINAGEM">USINAGEM</SelectItem><SelectItem value="PROGRAMACAO">PROGRAMAÇÃO</SelectItem><SelectItem value="PRIMEIRA PEÇA">PRIMEIRA PEÇA</SelectItem></SelectContent></Select></FormItem>
+                    )} />
                 </div>
-                <div className="grid w-full sm:max-w-[120px] gap-1.5">
-                    <Label htmlFor="date-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Dia</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button
-                            id="date-filter"
-                            variant={"outline"}
-                            size="sm"
-                            className={cn(
-                            "h-8 text-xs font-bold justify-start text-left",
-                            !selectedDate && "text-muted-foreground"
-                            )}
-                        >
-                            <CalendarIcon className="mr-2 h-3 w-3" />
-                            {selectedDate ? format(selectedDate, "dd/MM/yyyy") : <span>Dia</span>}
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                        <Calendar
-                            mode="single"
-                            selected={selectedDate}
-                            onSelect={setSelectedDate}
-                            initialFocus
-                        />
-                        </PopoverContent>
-                    </Popover>
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={productionForm.control} name="quantityProduced" render={({field}) => (
+                        <FormItem><FormLabel>Qtd Produzida</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                    )} />
+                    <FormField control={productionForm.control} name="machiningTime" render={({field}) => (
+                        <FormItem><FormLabel>Tempo (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                    )} />
                 </div>
-                <div className="grid w-full sm:max-w-[180px] gap-1.5">
-                    <Label htmlFor="factory-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Fábrica</Label>
-                    <Select value={selectedFactory} onValueChange={setSelectedFactory}>
-                        <SelectTrigger id="factory-filter" className="h-8 text-xs font-bold">
-                            <div className='flex items-center gap-2'>
-                                <Factory className="h-3 w-3 text-muted-foreground" />
-                                <SelectValue placeholder="Todas" />
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todas as Fábricas</SelectItem>
-                            {factoryList.map((f) => (
-                                <SelectItem key={f} value={f}>
-                                    {f}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="grid w-full sm:max-w-[180px] gap-1.5">
-                    <Label htmlFor="operator-filter" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtrar por Técnico</Label>
-                    <Select value={selectedOperator} onValueChange={setSelectedOperator}>
-                        <SelectTrigger id="operator-filter" className="h-8 text-xs font-bold">
-                            <div className='flex items-center gap-2'>
-                                <User className="h-3 w-3 text-muted-foreground" />
-                                <SelectValue placeholder="Todos" />
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos os Técnicos</SelectItem>
-                            {operatorList.map((op) => (
-                                <SelectItem key={op} value={op}>
-                                    {op}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                {(selectedDate || selectedOperator !== 'all' || selectedFactory !== 'all' || formsFilter || selectedCategory !== 'all' || selectedMonth !== 'all') && (
-                  <Button variant="ghost" size="sm" onClick={() => {
-                    setSelectedDate(undefined);
-                    setSelectedOperator('all');
-                    setSelectedFactory('all');
-                    setFormsFilter('');
-                    setSelectedCategory('all');
-                    setSelectedMonth('all');
-                  }} className="h-8 text-xs text-destructive">Limpar</Button>
-                )}
-            </div>
-            
-            {(selectedCategory === 'all' || selectedCategory === 'PRODUCAO') && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                      <div>
-                          <CardTitle>Registros de Produção Recentes</CardTitle>
-                          <CardDescription>Visualização dos 200 registros mais recentes.</CardDescription>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredProductionRecords, 'Registros_Producao')}>
-                          <FileSpreadsheet className="mr-2 h-4 w-4" />
-                          Exportar
-                      </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Operador</TableHead>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Fábrica</TableHead>
-                        <TableHead>Atividade</TableHead>
-                        <TableHead>Máquina</TableHead>
-                        <TableHead>Nº Forms</TableHead>
-                        <TableHead>Nº Operações</TableHead>
-                        <TableHead>Produzido</TableHead>
-                        <TableHead>Tempo de Usinagem</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Observações</TableHead>
-                        <TableHead>Registrado em</TableHead>
-                        <TableHead>Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loadingProduction ? (
-                        <TableRow>
-                          <TableCell colSpan={13} className="text-center h-24">Carregando...</TableCell>
-                        </TableRow>
-                      ) : filteredProductionRecords && filteredProductionRecords.length > 0 ? (
-                        filteredProductionRecords.map((record: any) => (
-                          <TableRow key={record.id}>
-                            {editingRecordId === record.id ? (
-                              <>
-                                <TableCell>
-                                  <Select value={editedRecord.operatorId} onValueChange={(value) => handleSelectChange('operatorId', value)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                      {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell><Input name="date" value={editedRecord.date} onChange={handleInputChange} /></TableCell>
-                                <TableCell>
-                                  <Select value={editedRecord.factory} onValueChange={(value) => handleSelectChange('factory', value)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                      {factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell>
-                                  <Select value={editedRecord.activityType} onValueChange={(value) => handleSelectChange('activityType', value)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="USINAGEM">USINAGEM</SelectItem>
-                                        <SelectItem value="PROGRAMACAO">PROGRAMAÇÃO</SelectItem>
-                                        <SelectItem value="PRIMEIRA PEÇA">PRIMEIRA PEÇA</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell>
-                                  <Select value={editedRecord.machine} onValueChange={(value) => handleSelectChange('machine', value)}>
-                                      <SelectTrigger><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                          <SelectItem value="TORNO CNC CENTUR 30">TORNO CNC CENTUR 30</SelectItem>
-                                          <SelectItem value="CENTRO DE USINAGEM D600">CENTRO DE USINAGEM D600</SelectItem>
-                                      </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell><Input name="formsNumber" value={editedRecord.formsNumber} onChange={handleInputChange} /></TableCell>
-                                <TableCell><Input name="operationsNumber" value={editedRecord.operationsNumber} onChange={handleInputChange} /></TableCell>
-                                <TableCell><Input type="number" name="quantityProduced" value={editedRecord.quantityProduced} onChange={handleInputChange} /></TableCell>
-                                <TableCell><Input type="number" name="machiningTime" value={editedRecord.machiningTime} onChange={handleInputChange} /></TableCell>
-                                <TableCell>
-                                  <Select value={editedRecord.status} onValueChange={(value) => handleSelectChange('status', value)}>
-                                      <SelectTrigger className={cn("w-[180px] text-white", statusColorMap[editedRecord.status])}><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                          <SelectItem value="Fila de produção">Fila de produção</SelectItem>
-                                          <SelectItem value="Em produção">Em produção</SelectItem>
-                                          <SelectItem value="Encerrado">Encerrado</SelectItem>
-                                          <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
-                                          <SelectItem value="Rejeitado">Rejeitado</SelectItem>
-                                          <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
-                                          <SelectItem value="PROGRAMA CONCLUÍDO">PROGRAMA CONCLUÍDO</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                </TableCell>
-                                <TableCell><Textarea name="observations" value={editedRecord.observations} onChange={handleInputChange} /></TableCell>
-                                <TableCell>{record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}</TableCell>
-                                <TableCell className="flex gap-2">
-                                  <Button variant="ghost" size="icon" onClick={handleSaveEdit}><Save className="h-4 w-4 text-green-500" /></Button>
-                                  <Button variant="ghost" size="icon" onClick={handleCancelEdit}><XCircle className="h-4 w-4 text-red-500" /></Button>
-                                </TableCell>
-                              </>
-                            ) : (
-                              <>
-                                <TableCell>{record.operatorId}</TableCell>
-                                <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
-                                <TableCell>{record.factory}</TableCell>
-                                <TableCell><Badge variant="outline">{record.activityType?.toUpperCase()}</Badge></TableCell>
-                                <TableCell>{record.machine}</TableCell>
-                                <TableCell>{record.formsNumber}</TableCell>
-                                <TableCell>{record.operationsNumber}</TableCell>
-                                <TableCell>{record.quantityProduced}</TableCell>
-                                <TableCell>{record.machiningTime} min</TableCell>
-                                <TableCell>
-                                      <Select value={record.status} onValueChange={(newStatus) => handleStatusChange(record.id, newStatus)}>
-                                        <SelectTrigger className={cn("w-[180px] text-white", statusColorMap[record.status])}><SelectValue placeholder="Selecione um status" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Fila de produção">Fila de produção</SelectItem>
-                                            <SelectItem value="Em produção">Em produção</SelectItem>
-                                            <SelectItem value="Encerrado">Encerrado</SelectItem>
-                                            <SelectItem value="Inspeção/Qualidade">Inspeção/Qualidade</SelectItem>
-                                            <SelectItem value="Rejeitado">Rejeitado</SelectItem>
-                                            <SelectItem value="Serviços Externos">Serviços Externos</SelectItem>
-                                            <SelectItem value="PROGRAMA CONCLUÍDO">PROGRAMA CONCLUÍDO</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                </TableCell>
-                                <TableCell>{record.observations}</TableCell>
-                                <TableCell>{record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}</TableCell>
-                                <TableCell className='flex gap-2'>
-                                  <Button variant="ghost" size="icon" onClick={() => handleEdit(record)}><Edit className="h-4 w-4 text-blue-500" /></Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                        <AlertDialogDescription>Essa ação não pode ser desfeita. Isso excluirá permanentemente o registro de produção.</AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDelete('productionRecords', record.id)}>Excluir</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </TableCell>
-                              </>
-                            )}
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow><TableCell colSpan={13} className="text-center h-24">Nenhum registro recente.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
+                <ProductionTimer title="Contador de Produção" initialTimeInMinutes={useWatch({control: productionForm.control, name: 'machiningTime'}) || 0} onTimeChange={(t) => productionForm.setValue('machiningTime', t)} />
+                <Button type="submit" className="w-full">Registrar Produção</Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
 
-            {(selectedCategory === 'all' || selectedCategory !== 'PRODUCAO') && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                      <div>
-                          <CardTitle>Registros de Perdas Recentes</CardTitle>
-                          <CardDescription>Visualização das 200 perdas mais recentes.</CardDescription>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredLossRecords, 'Registros_Perdas')}>
-                          <FileSpreadsheet className="mr-2 h-4 w-4" />
-                          Exportar
-                      </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Operador</TableHead>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Fábrica</TableHead>
-                        <TableHead>Nº Forms</TableHead>
-                        <TableHead>Máquina</TableHead>
-                        <TableHead>Motivo</TableHead>
-                        <TableHead>Qtd. Peças Mortas</TableHead>
-                        <TableHead>Tempo Perdido</TableHead>
-                        <TableHead>Observações</TableHead>
-                        <TableHead>Registrado em</TableHead>
-                        <TableHead>Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loadingLoss ? (
-                        <TableRow><TableCell colSpan={11} className="text-center h-24">Carregando...</TableCell></TableRow>
-                      ) : filteredLossRecords && filteredLossRecords.length > 0 ? (
-                        filteredLossRecords.map((record: any) => (
-                        <TableRow key={record.id}>
-                          {editingLossRecordId === record.id ? (
-                              <>
-                                  <TableCell>
-                                      <Select value={editedLossRecord.operatorId} onValueChange={(value) => handleLossSelectChange('operatorId', value)}>
-                                          <SelectTrigger><SelectValue /></SelectTrigger>
-                                          <SelectContent>
-                                              {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
-                                          </SelectContent>
-                                      </Select>
-                                  </TableCell>
-                                  <TableCell><Input name="date" value={editedLossRecord.date} onChange={handleLossInputChange} /></TableCell>
-                                  <TableCell>
-                                      <Select value={editedLossRecord.factory} onValueChange={(value) => handleLossSelectChange('factory', value)}>
-                                          <SelectTrigger><SelectValue /></SelectTrigger>
-                                          <SelectContent>
-                                              {factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                                          </SelectContent>
-                                      </Select>
-                                  </TableCell>
-                                  <TableCell><Input name="formsNumber" value={editedLossRecord.formsNumber} onChange={handleLossInputChange} /></TableCell>
-                                  <TableCell>
-                                      <Select value={editedLossRecord.machine} onValueChange={(value) => handleLossSelectChange('machine', value)}>
-                                          <SelectTrigger><SelectValue /></SelectTrigger>
-                                          <SelectContent>
-                                              <SelectItem value="TORNO CNC CENTUR 30">TORNO CNC CENTUR 30</SelectItem>
-                                              <SelectItem value="CENTRO DE USINAGEM D600">CENTRO DE USINAGEM D600</SelectItem>
-                                          </SelectContent>
-                                      </Select>
-                                  </TableCell>
-                                  <TableCell>
-                                      <Select value={editedLossRecord.lossReason} onValueChange={(value) => handleLossSelectChange('lossReason', value)}>
-                                          <SelectTrigger><SelectValue placeholder="Selecione um motivo" /></SelectTrigger>
-                                          <SelectContent>
-                                              {lossReasonOptions.map(reason => <SelectItem key={reason} value={reason}>{reason}</SelectItem>)}
-                                          </SelectContent>
-                                      </Select>
-                                  </TableCell>
-                                  <TableCell><Input type="number" name="deadPartsQuantity" value={editedLossRecord.deadPartsQuantity} onChange={handleLossInputChange} /></TableCell>
-                                  <TableCell><Input type="number" name="timeLost" value={editedLossRecord.timeLost} onChange={handleLossInputChange} /></TableCell>
-                                  <TableCell><Textarea name="observations" value={editedLossRecord.observations} onChange={handleLossInputChange} /></TableCell>
-                                  <TableCell>{record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}</TableCell>
-                                  <TableCell className="flex gap-2">
-                                      <Button variant="ghost" size="icon" onClick={handleSaveEditLoss}><Save className="h-4 w-4 text-green-500" /></Button>
-                                      <Button variant="ghost" size="icon" onClick={handleCancelEditLoss}><XCircle className="h-4 w-4 text-red-500" /></Button>
-                                  </TableCell>
-                              </>
-                          ) : (
-                              <>
-                                  <TableCell>{record.operatorId}</TableCell>
-                                  <TableCell>{record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date}</TableCell>
-                                  <TableCell>{record.factory}</TableCell>
-                                  <TableCell>{record.formsNumber}</TableCell>
-                                  <TableCell>{record.machine}</TableCell>
-                                  <TableCell><Badge className="bg-yellow-400 text-black hover:bg-yellow-500">{record.lossReason}</Badge></TableCell>
-                                  <TableCell className="text-red-500">{record.deadPartsQuantity}</TableCell>
-                                  <TableCell>{record.timeLost} min</TableCell>
-                                  <TableCell>{record.observations}</TableCell>
-                                  <TableCell>{record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy, HH:mm:ss') : ''}</TableCell>
-                                  <TableCell className="flex gap-2">
-                                      <Button variant="ghost" size="icon" onClick={() => handleEditLoss(record)}><Edit className="h-4 w-4 text-blue-500" /></Button>
-                                      <AlertDialog>
-                                          <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500" /></Button></AlertDialogTrigger>
-                                          <AlertDialogContent>
-                                              <AlertDialogHeader>
-                                                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                                  <AlertDialogDescription>Essa ação não pode ser desfeita. Isso excluirá permanentemente o registro de perda.</AlertDialogDescription>
-                                              </AlertDialogHeader>
-                                              <AlertDialogFooter>
-                                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                  <AlertDialogAction onClick={() => handleDelete('lossRecords', record.id)}>Excluir</AlertDialogAction>
-                                              </AlertDialogFooter>
-                                          </AlertDialogContent>
-                                      </AlertDialog>
-                                  </TableCell>
-                              </>
-                          )}
-                        </TableRow>
-                      ))
-                      ) : (
-                        <TableRow><TableCell colSpan={11} className="text-center h-24">Nenhum registro de perda.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+        <Card>
+          <CardHeader><CardTitle>Registrar Perda</CardTitle></CardHeader>
+          <CardContent>
+            <Form {...lossForm}>
+              <form onSubmit={lossForm.handleSubmit(onLossSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={lossForm.control} name="operatorId" render={({field}) => (
+                    <FormItem><FormLabel>Operador</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>
+                  )} />
+                  <FormField control={lossForm.control} name="date" render={({field}) => (
+                    <FormItem><FormLabel>Data</FormLabel><FormControl><Input placeholder="dd/MM/yyyy" {...field} /></FormControl></FormItem>
+                  )} />
+                </div>
+                <FormField control={lossForm.control} name="lossReason" render={({field}) => (
+                    <FormItem><FormLabel>Motivo da Parada</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Motivo" /></SelectTrigger></FormControl><SelectContent>{lossReasonDetails.map(r => <SelectItem key={r.value} value={r.value}>{r.value}</SelectItem>)}</SelectContent></Select></FormItem>
+                )} />
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={lossForm.control} name="timeLost" render={({field}) => (
+                        <FormItem><FormLabel>Tempo Perdido (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                    )} />
+                    <FormField control={lossForm.control} name="factory" render={({field}) => (
+                        <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
+                    )} />
+                </div>
+                <ProductionTimer title="Contador de Perda" initialTimeInMinutes={useWatch({control: lossForm.control, name: 'timeLost'}) || 0} onTimeChange={(t) => lossForm.setValue('timeLost', t)} />
+                <Button type="submit" variant="destructive" className="w-full">Registrar Perda</Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
       </div>
+
+      <div className="mt-8 flex flex-wrap items-end gap-3 bg-card p-4 rounded-lg border shadow-sm">
+        <div className="grid w-full sm:max-w-[180px] gap-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground">Categorias / Perdas</Label>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="h-9 text-xs font-bold"><div className='flex items-center gap-2'><Filter className="h-3.5 w-3.5" /><SelectValue placeholder="Todas" /></div></SelectTrigger>
+                <SelectContent><SelectItem value="all">Todas</SelectItem><SelectItem value="PRODUCAO">Usinagem</SelectItem>{lossReasonDetails.map(r => <SelectItem key={r.value} value={r.value}>{r.value}</SelectItem>)}</SelectContent>
+            </Select>
+        </div>
+        <div className="grid w-full sm:max-w-[150px] gap-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground">Nº Forms</Label>
+            <div className="relative"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9 h-9 text-xs" value={formsFilter} onChange={e => setFormsFilter(e.target.value)} placeholder="815..." /></div>
+        </div>
+        <div className="grid w-full sm:max-w-[120px] gap-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground">Mês</Label>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}><SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem>{months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent></Select>
+        </div>
+        <div className="grid w-full sm:max-w-[160px] gap-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground">Dia</Label>
+            <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("h-9 text-xs font-bold justify-start", !selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3.5 w-3.5" />{selectedDate ? format(selectedDate, "dd/MM/yyyy") : "Dia"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus /></PopoverContent></Popover>
+        </div>
+        <div className="grid w-full sm:max-w-[180px] gap-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground">Fábrica</Label>
+            <Select value={selectedFactory} onValueChange={setSelectedFactory}><SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as Fábricas</SelectItem>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select>
+        </div>
+        <div className="grid w-full sm:max-w-[180px] gap-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground">Técnico</Label>
+            <Select value={selectedOperator} onValueChange={setSelectedOperator}><SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos os Técnicos</SelectItem>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select>
+        </div>
+        <Button variant="ghost" onClick={() => { setSelectedDate(undefined); setSelectedOperator('all'); setSelectedFactory('all'); setFormsFilter(''); setSelectedCategory('all'); setSelectedMonth('all'); }} className="h-9 text-xs text-destructive">Limpar</Button>
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div><CardTitle>Histórico de Produção</CardTitle><CardDescription>Registros filtrados.</CardDescription></div>
+            <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredProductionRecords, 'Producao')}><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar</Button>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader><TableRow><TableHead>Técnico</TableHead><TableHead>Data</TableHead><TableHead>Fábrica</TableHead><TableHead>Nº Forms</TableHead><TableHead>Atividade</TableHead><TableHead>Produzido</TableHead><TableHead>Tempo</TableHead><TableHead>Ações</TableHead></TableRow></TableHeader>
+                <TableBody>
+                    {filteredProductionRecords.map(r => (
+                        <TableRow key={r.id}>
+                            <TableCell>{r.operatorId}</TableCell>
+                            <TableCell>{r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date}</TableCell>
+                            <TableCell>{r.factory}</TableCell>
+                            <TableCell className="font-mono font-bold">#{r.formsNumber}</TableCell>
+                            <TableCell><Badge variant="outline">{r.activityType}</Badge></TableCell>
+                            <TableCell>{r.quantityProduced} pç</TableCell>
+                            <TableCell>{r.machiningTime} min</TableCell>
+                            <TableCell><Button variant="ghost" size="icon" onClick={() => handleDelete('productionRecords', r.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button></TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div><CardTitle>Histórico de Perdas</CardTitle><CardDescription>Paradas e inatividades registradas.</CardDescription></div>
+            <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredLossRecords, 'Perdas')}><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar</Button>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader><TableRow><TableHead>Técnico</TableHead><TableHead>Data</TableHead><TableHead>Fábrica</TableHead><TableHead>Motivo</TableHead><TableHead>Tempo Perdido</TableHead><TableHead>Ações</TableHead></TableRow></TableHeader>
+                <TableBody>
+                    {filteredLossRecords.map(r => (
+                        <TableRow key={r.id}>
+                            <TableCell>{r.operatorId}</TableCell>
+                            <TableCell>{r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date}</TableCell>
+                            <TableCell>{r.factory}</TableCell>
+                            <TableCell><Badge className="bg-yellow-500 text-black">{r.lossReason}</Badge></TableCell>
+                            <TableCell className="text-red-500 font-bold">{r.timeLost} min</TableCell>
+                            <TableCell><Button variant="ghost" size="icon" onClick={() => handleDelete('lossRecords', r.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button></TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
