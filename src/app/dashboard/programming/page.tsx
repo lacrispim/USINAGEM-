@@ -156,8 +156,6 @@ export default function ProgrammingPage() {
     const novosPlanItems: PlanejamentoItem[] = [];
     
     // Ponteiros de tempo global (em minutos) por Raia
-    // Raia 0 = Marcos/Jair/Gustavo (24h)
-    // Raia 1 = Alisson (Apenas 1T - 7h/dia)
     const lanePointers: Record<string, number> = { 
         'TORNO_0': 0, 
         'TORNO_1': 0, 
@@ -166,7 +164,7 @@ export default function ProgrammingPage() {
     }; 
 
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
-        let totalDuration = job[type] || 0;
+        let totalDuration = Number(job[type]) || 0;
         if (totalDuration <= 0 && type !== 'prog') return minStartTime;
         
         // Decisão de Raia: Marcos (0) ou Alisson (1) no Torno. Para o resto, sempre 0.
@@ -188,17 +186,14 @@ export default function ProgrammingPage() {
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const startOffset = startInDay % SHIFT_MIN;
             
-            // Verifica se há técnico para esta raia neste turno
             const techName = MACHINE_LANES[techKey][String(shiftIdx + 1)]?.[chosenLane];
-
-            // Se for a Raia do Alisson (Torno 1) e não for o 1º Turno (0), pula para o 1º turno do próximo dia
             const isAlissonLane = techKey === 'TORNO' && chosenLane === 1;
+
             if ((isAlissonLane && shiftIdx !== 0) || !techName) {
                 actualStart = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue;
             }
 
-            // Calcula tempo livre no turno atual respeitando as pausas
             let winStart = startOffset;
             for (const p of PAUSAS) { 
                 if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) {
@@ -206,7 +201,6 @@ export default function ProgrammingPage() {
                 }
             }
             
-            // Se o tempo de início pulou para fora do turno de 7h, vai para o próximo turno
             if (winStart >= SHIFT_MIN - 1) { 
                 actualStart = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue; 
@@ -249,7 +243,6 @@ export default function ProgrammingPage() {
             
             actualStart += (sInShift + pInShift + (winStart - startOffset));
             
-            // Se preencheu o turno até o fim (7h), garante que o próximo bloco comece no turno seguinte
             if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) {
                 actualStart = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
             }
@@ -258,12 +251,8 @@ export default function ProgrammingPage() {
         return actualStart;
     };
 
-    // Processa a fila respeitando as dependências
     novaFila.forEach(job => {
-        // A Programação é o gatilho inicial
         let tInit = allocateTask(job, 'ADM', 0, 'prog');
-        
-        // Etapa 1 e Etapa 2 podem ser dinâmicas
         let finishEtapa1 = tInit;
         
         if (job.etapa1.includes('TORNO') || (job.torno > 0 && !job.etapa1)) {
@@ -279,16 +268,14 @@ export default function ProgrammingPage() {
         }
     });
 
-    // Sanitização para o Firestore (evita undefined)
-    const sanitizedFila = novaFila.map(f => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v === undefined ? null : v])));
-    const sanitizedPlano = novosPlanItems.map(p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v === undefined ? null : v])));
+    const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
 
-    await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitizedFila, updatedAt: serverTimestamp() });
-    await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitizedPlano, updatedAt: serverTimestamp() });
+    await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
+    await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
     
     toast({ 
       title: "Plano Atualizado", 
-      description: `Capacidade de 7h por turno aplicada com transbordo de carga.` 
+      description: `Capacidade de 7h/turno aplicada com sucesso.` 
     });
   };
 
@@ -437,7 +424,7 @@ export default function ProgrammingPage() {
                   <TableCell className="font-mono font-bold">#{job.requisicao}</TableCell>
                   <TableCell className="uppercase text-[10px] font-medium max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
                   <TableCell className="text-right font-mono font-bold">{job.quantidade} pç</TableCell>
-                  <TableCell className="text-right text-[10px] text-muted-foreground">{job.torno + job.centro + job.setup} min</TableCell>
+                  <TableCell className="text-right text-[10px] text-muted-foreground">{Number(job.torno) + Number(job.centro) + Number(job.setup)} min</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -447,3 +434,4 @@ export default function ProgrammingPage() {
     </div>
   );
 }
+
