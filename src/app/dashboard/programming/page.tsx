@@ -160,22 +160,45 @@ export default function ProgrammingPage() {
     }; 
 
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
-        let totalDuration = Number(job[type]) || 0;
-        if (totalDuration <= 0 && type !== 'prog') return minStartTime;
+        let prodTime = Number(job[type]) || 0;
+        let setupTime = (type === 'torno' || type === 'centro') ? (Number(job.setup) || 20) : 0;
         
+        // Se não tem tempo de produção nem setup, e não é ADM, ignora
+        if (prodTime <= 0 && setupTime <= 0 && type !== 'prog') return minStartTime;
+        if (type === 'prog' && prodTime <= 0) return minStartTime;
+        
+        // Lógica de escolha de Raia para Torno (Marcos vs Alisson)
         let chosenLane = 0;
         if (techKey === 'TORNO') {
-            chosenLane = lanePointers['TORNO_0'] <= lanePointers['TORNO_1'] ? 0 : 1;
+            // Verifica qual raia está disponível mais cedo PARA O INÍCIO da tarefa
+            const p0 = lanePointers['TORNO_0'];
+            const p1 = lanePointers['TORNO_1'];
+            
+            // Regra: se a Raia 1 (Alisson) estiver muito atrás (ociosa), mas o tempo atual for 2T ou 3T,
+            // ela não serve agora. O Marcos (Raia 0) é preferencial por trabalhar em todos os turnos.
+            if (p1 <= p0) {
+                const shiftOfP1 = Math.floor((p1 % (SHIFT_MIN * 3)) / SHIFT_MIN);
+                if (shiftOfP1 === 0) {
+                    chosenLane = 1; // Alisson está no 1T e está livre, usa ele
+                } else {
+                    chosenLane = 0; // Alisson está fora do turno, usa o Marcos
+                }
+            } else {
+                chosenLane = 0;
+            }
         }
         
         const laneId = `${techKey}_${chosenLane}`;
         let actualPointer = Math.max(lanePointers[laneId] || 0, minStartTime);
-        let pendingSetup = type === 'prog' ? 0 : 20;
-        let pendingProd = totalDuration;
+        let pendingSetup = setupTime;
+        let pendingProd = prodTime;
         let doneProdTime = 0;
-        const cycleTime = job.quantidade > 0 ? totalDuration / job.quantidade : totalDuration;
+        const cycleTime = job.quantidade > 0 ? prodTime / job.quantidade : prodTime;
 
-        while (pendingSetup > 0.01 || pendingProd > 0.01) {
+        // Limite de segurança para evitar loops infinitos
+        let iterations = 0;
+        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 500) {
+            iterations++;
             const dayIdx = Math.floor(actualPointer / (SHIFT_MIN * 3));
             const startInDay = actualPointer % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
@@ -184,12 +207,14 @@ export default function ProgrammingPage() {
             const techName = MACHINE_LANES[techKey][String(shiftIdx + 1)]?.[chosenLane];
             const isAlissonLane = techKey === 'TORNO' && chosenLane === 1;
 
+            // Se não tem técnico ou é o Alisson fora do 1T, pula para o próximo turno
             if ((isAlissonLane && shiftIdx !== 0) || !techName) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue;
             }
 
             let winStart = startOffset;
+            // Desconta as pausas (DDS/Café)
             for (const p of PAUSAS) { 
                 if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) {
                     winStart = p.start + p.duration;
@@ -213,9 +238,13 @@ export default function ProgrammingPage() {
                 doneProdTime += pInShift;
                 qInShift = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7)) - before;
                 pendingProd -= pInShift;
+            } else if (pInShift > 0 && pendingProd > 0 && cycleTime <= 0) {
+                // Caso especial: tempo de produção definido mas quantidade 0
+                pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
+                pendingProd -= pInShift;
             }
 
-            if (sInShift > 0 || pInShift > 0) {
+            if (sInShift > 0 || pInShift > 0 || (setupTime > 0 && iterations === 1)) {
                 novosPlanItems.push({ 
                     id: `pl-${Math.random().toString(36).substr(2, 9)}`, 
                     dataExecucao: format(addDays(currentDate, dayIdx), 'dd/MM/yyyy'), 
@@ -247,14 +276,13 @@ export default function ProgrammingPage() {
     };
 
     novaFila.forEach(job => {
-        // Se não tem Etapa 1 nem Etapa 2, ignora a alocação na timeline (fica em espera)
         if (!job.etapa1 && !job.etapa2) return;
 
         let tProg = allocateTask(job, 'ADM', 0, 'prog');
         let tFinishEtapa1 = tProg;
         
         // ETAPA 1
-        const e1 = job.etapa1.toUpperCase();
+        const e1 = String(job.etapa1 || '').toUpperCase();
         if (e1.includes('TORNO')) {
             tFinishEtapa1 = allocateTask(job, 'TORNO', tProg, 'torno');
         } else if (e1.includes('CENTRO')) {
@@ -265,8 +293,8 @@ export default function ProgrammingPage() {
             tFinishEtapa1 = allocateTask(job, 'CENTRO', tProg, 'centro');
         }
 
-        // ETAPA 2 (Sempre começa APÓS o término da Etapa 1)
-        const e2 = job.etapa2.toUpperCase();
+        // ETAPA 2
+        const e2 = String(job.etapa2 || '').toUpperCase();
         if (e2.includes('TORNO')) {
             allocateTask(job, 'TORNO', tFinishEtapa1, 'torno');
         } else if (e2.includes('CENTRO')) {
@@ -279,7 +307,7 @@ export default function ProgrammingPage() {
     await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
     await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
     
-    toast({ title: "Plano Atualizado", description: `Capacidade de 7h/turno aplicada com fluxo de etapas.` });
+    toast({ title: "Plano Atualizado", description: `As tarefas foram sequenciadas respeitando o limite de 7h.` });
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -300,9 +328,9 @@ export default function ProgrammingPage() {
           requisicao: String(findVal(row, ['req', 'requisicao', 'forms', 'Nº forms']) || 'S/N'),
           nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
           quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
-          setup: 20,
-          torno: Number(findVal(row, ['torno minutos', 'torno min', 'Tempo de Planejamento Torno Minutos todas as peças solicitadas']) || 0),
-          centro: Number(findVal(row, ['centro minutos', 'centro min', 'Tempo de Planejamento Centro Minutos todas as peças solicitadas']) || 0),
+          setup: Number(findVal(row, ['setup', 'Setup Minutos']) || 20),
+          torno: Number(findVal(row, ['torno', 'torno minutos', 'torno min', 'Tempo de Planejamento Torno Minutos todas as peças solicitadas']) || 0),
+          centro: Number(findVal(row, ['centro', 'centro minutos', 'centro min', 'Tempo de Planejamento Centro Minutos todas as peças solicitadas']) || 0),
           prog: Number(findVal(row, ['prog', 'programação', 'Programação Minutos']) || 0),
           site: String(findVal(row, ['site', 'fabrica', 'Fábrica']) || 'VALINHOS'),
           etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1']) || ''),
