@@ -22,7 +22,8 @@ import {
   Power,
   PowerOff,
   Plus,
-  Trash2
+  Trash2,
+  MapPin
 } from 'lucide-react';
 import { format, addDays, isSameDay, parse, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -82,6 +83,7 @@ interface PlanejamentoItem {
   jobId: string;
   laneIndex: number;
   isConcluded?: boolean;
+  site: string;
 }
 
 const TURNOS = [
@@ -89,6 +91,8 @@ const TURNOS = [
   { id: '2', label: '2T', range: '13:00-20:00' },
   { id: '3', label: '3T', range: '20:00-03:00' },
 ];
+
+const FACTORIES = ["VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
 
 const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
@@ -139,7 +143,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
         item.isConcluded && "opacity-40 grayscale-[0.5] border-green-500 border-2"
       )} 
       style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
-      title={`#${item.requisicao} - ${item.nomeDaPeca} ${item.isConcluded ? '(Concluído)' : ''}`}
+      title={`#${item.requisicao} - ${item.nomeDaPeca} [${item.site}] ${item.isConcluded ? '(Concluído)' : ''}`}
     >
       {item.setupMinutos > 0 && (
         <div 
@@ -185,7 +189,7 @@ export default function ProgrammingPage() {
     torno: 0,
     centro: 0,
     prog: 0,
-    site: 'VALINHOS',
+    site: 'VALINHOS DOVE',
     etapa1: '',
     etapa2: ''
   });
@@ -330,7 +334,8 @@ export default function ProgrammingPage() {
                     techKey, 
                     jobId: job.id, 
                     laneIndex: chosenLane,
-                    isConcluded: false
+                    isConcluded: false,
+                    site: job.site || 'VALINHOS'
                 });
             }
             
@@ -344,9 +349,13 @@ export default function ProgrammingPage() {
         return actualPointer;
     };
 
+    // Prioridade 1: Programação (ADM)
     novaFila.forEach(job => {
         allocateTask(job, 'ADM', 0, 'prog');
-        
+    });
+
+    // Prioridade 2: Etapa 1
+    novaFila.forEach(job => {
         const e1 = String(job.etapa1 || '').toUpperCase();
         if (e1.includes('TORNO')) {
             jobCompletionTimes[job.id] = allocateTask(job, 'TORNO', 0, 'torno');
@@ -357,6 +366,7 @@ export default function ProgrammingPage() {
         }
     });
 
+    // Prioridade 3: Etapa 2
     novaFila.forEach(job => {
         const e2 = String(job.etapa2 || '').toUpperCase();
         const minStart = jobCompletionTimes[job.id] || 0;
@@ -392,14 +402,14 @@ export default function ProgrammingPage() {
 
       const novaFila: JobBase[] = json.map((row, i) => ({
           id: `job-${i}-${Date.now()}`,
-          requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms']) || 'S/N'),
+          requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
           nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
           quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
           setup: Number(findVal(row, ['Tempo setup TORNO', 'Tempo setup CENTRO', 'setup', 'Setup Minutos']) || 20),
           torno: Number(findVal(row, ['Tempo de Planejamento Torno Minutos todas as peças solicitadas', 'torno', 'torno minutos', 'torno min']) || 0),
           centro: Number(findVal(row, ['Tempo de Planejamento Centro Minutos todas as peças solicitadas', 'centro', 'centro minutos', 'centro min']) || 0),
-          prog: Number(findVal(row, ['Tempo de Planejamento Programação Minutos todas as peças solicitadas', 'Tempo Programação Minutos', 'prog', 'programação', 'Programação Minutos']) || 0),
-          site: String(findVal(row, ['site', 'fabrica', 'Fábrica']) || 'VALINHOS'),
+          prog: Number(findVal(row, ['Tempo Programação Minutos', 'Tempo de Planejamento Programação Minutos todas as peças solicitadas', 'prog', 'programação', 'Programação Minutos']) || 0),
+          site: String(findVal(row, ['site', 'fabrica', 'Fábrica', 'unidade', 'unidade de negócio']) || 'VALINHOS DOVE').toUpperCase(),
           etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || ''),
           etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
       }));
@@ -425,7 +435,7 @@ export default function ProgrammingPage() {
       torno: Number(newItem.torno) || 0,
       centro: Number(newItem.centro) || 0,
       prog: Number(newItem.prog) || 0,
-      site: newItem.site || 'VALINHOS',
+      site: newItem.site || 'VALINHOS DOVE',
       etapa1: newItem.etapa1 || '',
       etapa2: newItem.etapa2 || ''
     };
@@ -442,7 +452,7 @@ export default function ProgrammingPage() {
       torno: 0,
       centro: 0,
       prog: 0,
-      site: 'VALINHOS',
+      site: 'VALINHOS DOVE',
       etapa1: '',
       etapa2: ''
     });
@@ -487,6 +497,15 @@ export default function ProgrammingPage() {
                     <Label>Nome da Peça</Label>
                     <Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} placeholder="Ex: Eixo Motor" />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Fábrica (Site)</Label>
+                  <Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a Fábrica" /></SelectTrigger>
+                    <SelectContent>
+                      {FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -635,6 +654,7 @@ export default function ProgrammingPage() {
             <TableHeader>
                 <TableRow>
                     <TableHead className="w-20 text-center">AÇÕES</TableHead>
+                    <TableHead>FÁBRICA / SITE</TableHead>
                     <TableHead>FLUXO / STATUS</TableHead>
                     <TableHead>REQ.</TableHead>
                     <TableHead>PEÇA</TableHead>
@@ -646,7 +666,7 @@ export default function ProgrammingPage() {
             <TableBody>
               {fila.length === 0 ? (
                 <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição</TableCell>
+                    <TableCell colSpan={8} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição</TableCell>
                 </TableRow>
               ) : fila.map((job, idx) => (
                 <TableRow key={job.id} className="hover:bg-muted/5">
@@ -654,6 +674,12 @@ export default function ProgrammingPage() {
                     <div className="flex flex-col items-center gap-1">
                         <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => { const nf = [...fila]; [nf[idx], nf[idx-1]] = [nf[idx-1], nf[idx]]; recalculatePlan(nf); }} disabled={idx === 0}><ArrowUp className="h-3 w-3" /></Button>
                         <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => { const nf = [...fila]; [nf[idx], nf[idx+1]] = [nf[idx+1], nf[idx]]; recalculatePlan(nf); }} disabled={idx === fila.length - 1}><ArrowDown className="h-3 w-3" /></Button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-[10px] font-black uppercase">{job.site || 'VALINHOS DOVE'}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -695,3 +721,4 @@ export default function ProgrammingPage() {
     </div>
   );
 }
+
