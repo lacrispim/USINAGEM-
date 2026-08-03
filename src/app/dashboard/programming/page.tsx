@@ -155,9 +155,13 @@ export default function ProgrammingPage() {
     if (!firestore) return;
     const novosPlanItems: PlanejamentoItem[] = [];
     
+    // Pointers independentes por raia para maximizar ocupação
     const lanePointers: Record<string, number> = { 
         'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 
     }; 
+
+    // Mapeamento de quando cada JOB termina sua primeira etapa para liberar a segunda
+    const jobCompletionTimes: Record<string, number> = {};
 
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
         let prodTime = Number(job[type]) || 0;
@@ -168,7 +172,10 @@ export default function ProgrammingPage() {
         
         const chosenLane = 0;
         const laneId = `${techKey}_${chosenLane}`;
+        
+        // O trabalho começa no máximo entre a disponibilidade da máquina e o término da etapa anterior
         let actualPointer = Math.max(lanePointers[laneId] || 0, minStartTime);
+        
         let pendingSetup = setupTime;
         let pendingProd = prodTime;
         let doneProdTime = 0;
@@ -184,11 +191,13 @@ export default function ProgrammingPage() {
             
             const techName = MACHINE_LANES[techKey][String(shiftIdx + 1)]?.[chosenLane];
 
+            // Se o turno atual não tem técnico (ex: Alisson no 2T/3T), pula para o próximo turno
             if (!techName) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue;
             }
 
+            // Respeita as Pausas (DDS e Café)
             let winStart = startOffset;
             for (const p of PAUSAS) { 
                 if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) {
@@ -196,6 +205,7 @@ export default function ProgrammingPage() {
                 }
             }
             
+            // Se as pausas ou o horário já consumiram o turno, pula para o próximo
             if (winStart >= SHIFT_MIN - 1) { 
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue; 
@@ -218,7 +228,7 @@ export default function ProgrammingPage() {
                 pendingProd -= pInShift;
             }
 
-            if (sInShift > 0 || pInShift > 0 || (setupTime > 0 && iterations === 1)) {
+            if (sInShift > 0 || pInShift > 0) {
                 novosPlanItems.push({ 
                     id: `pl-${Math.random().toString(36).substr(2, 9)}`, 
                     dataExecucao: format(addDays(currentDate, dayIdx), 'dd/MM/yyyy'), 
@@ -241,6 +251,7 @@ export default function ProgrammingPage() {
             
             actualPointer = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
             
+            // Se preencheu o turno exatamente, garante que o próximo inicie no turno seguinte
             if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
             }
@@ -249,27 +260,29 @@ export default function ProgrammingPage() {
         return actualPointer;
     };
 
+    // Primeiro aloca todas as etapas 1 para maximizar a ocupação das máquinas logo no início
     novaFila.forEach(job => {
-        if (!job.etapa1 && !job.etapa2) return;
-
-        // William faz a programação, mas a máquina não espera William terminar para começar a Etapa 1
-        // (A programação é tratada como um recurso em paralelo para William)
         allocateTask(job, 'ADM', 0, 'prog');
-        
-        let tFinishEtapa1 = 0;
         
         const e1 = String(job.etapa1 || '').toUpperCase();
         if (e1.includes('TORNO')) {
-            tFinishEtapa1 = allocateTask(job, 'TORNO', 0, 'torno');
+            jobCompletionTimes[job.id] = allocateTask(job, 'TORNO', 0, 'torno');
         } else if (e1.includes('CENTRO')) {
-            tFinishEtapa1 = allocateTask(job, 'CENTRO', 0, 'centro');
+            jobCompletionTimes[job.id] = allocateTask(job, 'CENTRO', 0, 'centro');
+        } else {
+            jobCompletionTimes[job.id] = 0;
         }
+    });
 
+    // Depois aloca as etapas 2, respeitando o término das respectivas etapas 1
+    novaFila.forEach(job => {
         const e2 = String(job.etapa2 || '').toUpperCase();
+        const minStart = jobCompletionTimes[job.id] || 0;
+        
         if (e2.includes('TORNO')) {
-            allocateTask(job, 'TORNO', tFinishEtapa1, 'torno');
+            allocateTask(job, 'TORNO', minStart, 'torno');
         } else if (e2.includes('CENTRO')) {
-            allocateTask(job, 'CENTRO', tFinishEtapa1, 'centro');
+            allocateTask(job, 'CENTRO', minStart, 'centro');
         }
     });
 
@@ -278,7 +291,7 @@ export default function ProgrammingPage() {
     await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
     await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
     
-    toast({ title: "Plano Atualizado", description: `As tarefas foram sequenciadas com base nas Etapas 1 e 2 sem ociosidade por programação.` });
+    toast({ title: "Plano Otimizado", description: `A carga horária foi distribuída para preencher lacunas nos turnos 2T e 3T.` });
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
