@@ -289,9 +289,11 @@ export default function RecordsPage() {
         {/* Gráfico Planejado vs Realizado em destaque (largura total) */}
         <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gráfico OEE em destaque (largura total) */}
+        <OeeLossWaterfallChart productionData={operatorFilteredProductionRecords} lossData={operatorFilteredLossRecords} loading={isLoading} />
+
+        <div className="grid grid-cols-1 gap-6">
             <AvailableVsActualChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
-            <OeeLossWaterfallChart productionData={operatorFilteredProductionRecords} lossData={operatorFilteredLossRecords} loading={isLoading} />
         </div>
       </div>
     </div>

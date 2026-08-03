@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -106,12 +107,12 @@ export function OeeLossWaterfallChart({
       const value = payload.find((p: any) => p.dataKey === 'value')?.value || 0;
       
       return (
-        <div className="rounded-lg border bg-background p-2.5 shadow-sm">
+        <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[14rem]">
           <div className="grid gap-1.5">
-            <p className="font-semibold">{label}</p>
+            <p className="font-semibold text-lg">{label}</p>
             <div className="flex items-center gap-2">
                 <div className="flex justify-between flex-1">
-                    <span className="text-muted-foreground">Horas</span>
+                    <span className="text-sm text-muted-foreground">Perda Acumulada</span>
                     <span className="font-bold">{value.toFixed(1)}h</span>
                 </div>
             </div>
@@ -130,23 +131,23 @@ export function OeeLossWaterfallChart({
         <div className="flex justify-between items-start">
             <div>
                 <CardTitle>Análise de Eficiência e Perdas (OEE)</CardTitle>
-                <CardDescription>Análise em cascata das horas de perda.</CardDescription>
+                <CardDescription>Análise em cascata (Waterfall) detalhando as causas de perda de eficiência.</CardDescription>
             </div>
             <div className="text-right">
-                <p className="text-sm font-bold text-green-500">{totalMachiningHours.toFixed(1)}h</p>
-                <p className="text-xs text-muted-foreground">Usinagem Efetiva</p>
-                <p className="text-sm font-bold text-blue-500 mt-1">{totalLostHours.toFixed(1)}h</p>
-                <p className="text-xs text-muted-foreground">Perda Total</p>
+                <p className="text-2xl font-bold text-green-500">{totalMachiningHours.toFixed(1)}h</p>
+                <p className="text-xs text-muted-foreground uppercase font-bold">Usinagem Efetiva</p>
+                <p className="text-2xl font-bold text-blue-500 mt-2">{totalLostHours.toFixed(1)}h</p>
+                <p className="text-xs text-muted-foreground uppercase font-bold">Perda Total</p>
             </div>
         </div>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="flex h-[350px] w-full items-center justify-center">
+          <div className="flex h-[450px] w-full items-center justify-center">
             <Loader className="h-8 w-8 animate-spin" />
           </div>
         ) : chartData.length > 1 ? (
-          <div className="h-[350px] w-full">
+          <div className="h-[650px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig}>
                 <BarChart
@@ -155,35 +156,37 @@ export function OeeLossWaterfallChart({
                     top: 20,
                     right: 30,
                     left: 0,
-                    bottom: 60,
+                    bottom: 80,
                   }}
                 >
-                  <CartesianGrid vertical={false} />
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.1} />
                   <XAxis 
                     dataKey="name"
                     angle={-45}
                     textAnchor="end"
                     interval={0}
-                    height={100}
-                    tick={{fontSize: 12}}
+                    height={120}
+                    className="text-[11px] font-bold uppercase"
                   />
                   <YAxis 
                     unit="h" 
                     domain={[0, maxHours]}
                     allowDecimals={false}
+                    className="text-[10px]"
                   />
                   <ChartTooltip 
-                    cursor={{fill: 'hsl(var(--accent))', radius: 4}}
+                    cursor={{fill: 'hsl(var(--accent))', radius: 4, opacity: 0.1}}
                     content={<CustomTooltip />}
                   />
                   
                   <Bar dataKey="start" stackId="a" fill="transparent" />
-                  <Bar dataKey="value" stackId="a">
+                  <Bar dataKey="value" stackId="a" radius={[4, 4, 0, 0]}>
                     <LabelList 
                         dataKey="value" 
                         position="top"
+                        offset={10}
                         formatter={(value: number) => value > 0.05 ? `${value.toFixed(1)}h` : ''}
-                        className="text-xs fill-muted-foreground"
+                        className="text-xs fill-foreground font-bold"
                     />
                      {chartData.map((entry, index) => {
                         const isTotal = entry.name === 'Total';
@@ -198,7 +201,7 @@ export function OeeLossWaterfallChart({
         ) : (
           <div className="flex h-[350px] w-full flex-col items-center justify-center">
             <p className="text-sm text-muted-foreground">
-              Nenhum dado de perda para exibir.
+              Nenhum dado de perda para exibir no período selecionado.
             </p>
           </div>
         )}
