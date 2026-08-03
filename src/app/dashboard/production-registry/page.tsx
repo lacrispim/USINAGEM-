@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter, CalendarDays, Factory, History, Pencil, Clock } from 'lucide-react';
+import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter, CalendarDays, Factory, History, Pencil, Clock, MessageSquare } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -144,7 +144,7 @@ export default function ProductionRegistryPage() {
 
   const productionForm = useForm<ProductionFormValues>({
     resolver: zodResolver(productionFormSchema),
-    defaultValues: { date: format(new Date(), 'dd/MM/yyyy'), status: 'Em produção' }
+    defaultValues: { date: format(new Date(), 'dd/MM/yyyy'), status: 'Em produção', observations: '' }
   });
 
   const editProductionForm = useForm<ProductionFormValues>({
@@ -153,14 +153,13 @@ export default function ProductionRegistryPage() {
 
   const lossForm = useForm<LossFormValues>({
     resolver: zodResolver(lossFormSchema),
-    defaultValues: { date: format(new Date(), 'dd/MM/yyyy') }
+    defaultValues: { date: format(new Date(), 'dd/MM/yyyy'), observations: '' }
   });
 
   const editLossForm = useForm<LossFormValues>({
     resolver: zodResolver(lossFormSchema),
   });
 
-  // Aumentado o limite para 2000 para garantir sincronia com a tela de records do supervisor
   const productionRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
   const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
   
@@ -343,6 +342,9 @@ export default function ProductionRegistryPage() {
                         <FormItem><FormLabel>Tempo (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
                     )} />
                 </div>
+                <FormField control={productionForm.control} name="observations" render={({field}) => (
+                    <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Detalhes adicionais..." className="min-h-[80px]" {...field} /></FormControl></FormItem>
+                )} />
                 <ProductionTimer title="Contador de Produção" initialTimeInMinutes={useWatch({control: productionForm.control, name: 'machiningTime'}) || 0} onTimeChange={(t) => productionForm.setValue('machiningTime', t)} />
                 <Button type="submit" className="w-full">Registrar Produção</Button>
               </form>
@@ -374,6 +376,9 @@ export default function ProductionRegistryPage() {
                         <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
                     )} />
                 </div>
+                <FormField control={lossForm.control} name="observations" render={({field}) => (
+                    <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Descreva o motivo da parada..." className="min-h-[80px]" {...field} /></FormControl></FormItem>
+                )} />
                 <ProductionTimer title="Contador de Perda" initialTimeInMinutes={useWatch({control: lossForm.control, name: 'timeLost'}) || 0} onTimeChange={(t) => lossForm.setValue('timeLost', t)} />
                 <Button type="submit" variant="destructive" className="w-full">Registrar Perda</Button>
               </form>
@@ -382,7 +387,6 @@ export default function ProductionRegistryPage() {
         </Card>
       </div>
 
-      {/* DIALOG DE EDIÇÃO */}
       <Dialog open={editingRecord !== null} onOpenChange={(open) => !open && setEditingRecord(null)}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -416,6 +420,9 @@ export default function ProductionRegistryPage() {
                         <FormItem><FormLabel>Tempo (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
                     )} />
                 </div>
+                <FormField control={editProductionForm.control} name="observations" render={({field}) => (
+                    <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea className="min-h-[80px]" {...field} /></FormControl></FormItem>
+                )} />
                 <DialogFooter>
                   <Button type="submit">Salvar Alterações</Button>
                 </DialogFooter>
@@ -444,6 +451,9 @@ export default function ProductionRegistryPage() {
                         <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
                     )} />
                 </div>
+                <FormField control={editLossForm.control} name="observations" render={({field}) => (
+                    <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea className="min-h-[80px]" {...field} /></FormControl></FormItem>
+                )} />
                 <DialogFooter>
                   <Button type="submit">Salvar Alterações</Button>
                 </DialogFooter>
@@ -501,6 +511,7 @@ export default function ProductionRegistryPage() {
                         <TableHead>Atividade</TableHead>
                         <TableHead>Produzido</TableHead>
                         <TableHead>Tempo</TableHead>
+                        <TableHead>Observações</TableHead>
                         <TableHead>Ações</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -517,6 +528,9 @@ export default function ProductionRegistryPage() {
                             <TableCell><Badge variant="outline">{r.activityType}</Badge></TableCell>
                             <TableCell>{r.quantityProduced} pç</TableCell>
                             <TableCell>{r.machiningTime} min</TableCell>
+                            <TableCell className="max-w-[150px] truncate text-[10px] text-muted-foreground italic">
+                                {r.observations || '-'}
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1">
                                 <Button variant="ghost" size="icon" onClick={() => handleEdit('production', r)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
@@ -545,6 +559,7 @@ export default function ProductionRegistryPage() {
                         <TableHead>Fábrica</TableHead>
                         <TableHead>Motivo</TableHead>
                         <TableHead>Tempo Perdido</TableHead>
+                        <TableHead>Observações</TableHead>
                         <TableHead>Ações</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -559,6 +574,9 @@ export default function ProductionRegistryPage() {
                             <TableCell>{r.factory}</TableCell>
                             <TableCell><Badge className="bg-yellow-500 text-black">{r.lossReason}</Badge></TableCell>
                             <TableCell className="text-red-500 font-bold">{r.timeLost} min</TableCell>
+                            <TableCell className="max-w-[150px] truncate text-[10px] text-muted-foreground italic">
+                                {r.observations || '-'}
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1">
                                 <Button variant="ghost" size="icon" onClick={() => handleEdit('loss', r)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
