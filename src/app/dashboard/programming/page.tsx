@@ -163,26 +163,17 @@ export default function ProgrammingPage() {
         let prodTime = Number(job[type]) || 0;
         let setupTime = (type === 'torno' || type === 'centro') ? (Number(job.setup) || 20) : 0;
         
-        // Se não tem tempo de produção nem setup, e não é ADM, ignora
         if (prodTime <= 0 && setupTime <= 0 && type !== 'prog') return minStartTime;
         if (type === 'prog' && prodTime <= 0) return minStartTime;
         
-        // Lógica de escolha de Raia para Torno (Marcos vs Alisson)
         let chosenLane = 0;
         if (techKey === 'TORNO') {
-            // Verifica qual raia está disponível mais cedo PARA O INÍCIO da tarefa
             const p0 = lanePointers['TORNO_0'];
             const p1 = lanePointers['TORNO_1'];
-            
-            // Regra: se a Raia 1 (Alisson) estiver muito atrás (ociosa), mas o tempo atual for 2T ou 3T,
-            // ela não serve agora. O Marcos (Raia 0) é preferencial por trabalhar em todos os turnos.
             if (p1 <= p0) {
                 const shiftOfP1 = Math.floor((p1 % (SHIFT_MIN * 3)) / SHIFT_MIN);
-                if (shiftOfP1 === 0) {
-                    chosenLane = 1; // Alisson está no 1T e está livre, usa ele
-                } else {
-                    chosenLane = 0; // Alisson está fora do turno, usa o Marcos
-                }
+                if (shiftOfP1 === 0) chosenLane = 1;
+                else chosenLane = 0;
             } else {
                 chosenLane = 0;
             }
@@ -195,7 +186,6 @@ export default function ProgrammingPage() {
         let doneProdTime = 0;
         const cycleTime = job.quantidade > 0 ? prodTime / job.quantidade : prodTime;
 
-        // Limite de segurança para evitar loops infinitos
         let iterations = 0;
         while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 500) {
             iterations++;
@@ -207,14 +197,12 @@ export default function ProgrammingPage() {
             const techName = MACHINE_LANES[techKey][String(shiftIdx + 1)]?.[chosenLane];
             const isAlissonLane = techKey === 'TORNO' && chosenLane === 1;
 
-            // Se não tem técnico ou é o Alisson fora do 1T, pula para o próximo turno
             if ((isAlissonLane && shiftIdx !== 0) || !techName) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue;
             }
 
             let winStart = startOffset;
-            // Desconta as pausas (DDS/Café)
             for (const p of PAUSAS) { 
                 if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) {
                     winStart = p.start + p.duration;
@@ -239,7 +227,6 @@ export default function ProgrammingPage() {
                 qInShift = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7)) - before;
                 pendingProd -= pInShift;
             } else if (pInShift > 0 && pendingProd > 0 && cycleTime <= 0) {
-                // Caso especial: tempo de produção definido mas quantidade 0
                 pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
                 pendingProd -= pInShift;
             }
@@ -281,7 +268,6 @@ export default function ProgrammingPage() {
         let tProg = allocateTask(job, 'ADM', 0, 'prog');
         let tFinishEtapa1 = tProg;
         
-        // ETAPA 1
         const e1 = String(job.etapa1 || '').toUpperCase();
         if (e1.includes('TORNO')) {
             tFinishEtapa1 = allocateTask(job, 'TORNO', tProg, 'torno');
@@ -293,7 +279,6 @@ export default function ProgrammingPage() {
             tFinishEtapa1 = allocateTask(job, 'CENTRO', tProg, 'centro');
         }
 
-        // ETAPA 2
         const e2 = String(job.etapa2 || '').toUpperCase();
         if (e2.includes('TORNO')) {
             allocateTask(job, 'TORNO', tFinishEtapa1, 'torno');
@@ -319,21 +304,23 @@ export default function ProgrammingPage() {
       const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
       
       const findVal = (row: any, keys: string[]) => {
-          const k = Object.keys(row).find(k => keys.some(s => k.toLowerCase().trim() === s.toLowerCase().trim() || k.toLowerCase().includes(s.toLowerCase())));
-          return k ? row[k] : undefined;
+          const k = Object.keys(row).find(k => keys.some(s => k.toLowerCase().trim() === s.toLowerCase().trim()));
+          if (k) return row[k];
+          const kPartial = Object.keys(row).find(k => keys.some(s => k.toLowerCase().trim().includes(s.toLowerCase().trim())));
+          return kPartial ? row[kPartial] : undefined;
       };
 
       const novaFila: JobBase[] = json.map((row, i) => ({
           id: `job-${i}-${Date.now()}`,
-          requisicao: String(findVal(row, ['req', 'requisicao', 'forms', 'Nº forms']) || 'S/N'),
+          requisicao: String(findVal(row, ['Requisição2', 'req', 'requisicao', 'forms', 'Nº forms']) || 'S/N'),
           nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
           quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
-          setup: Number(findVal(row, ['setup', 'Setup Minutos']) || 20),
-          torno: Number(findVal(row, ['torno', 'torno minutos', 'torno min', 'Tempo de Planejamento Torno Minutos todas as peças solicitadas']) || 0),
-          centro: Number(findVal(row, ['centro', 'centro minutos', 'centro min', 'Tempo de Planejamento Centro Minutos todas as peças solicitadas']) || 0),
-          prog: Number(findVal(row, ['prog', 'programação', 'Programação Minutos']) || 0),
+          setup: Number(findVal(row, ['Tempo setup TORNO', 'Tempo setup CENTRO', 'setup', 'Setup Minutos']) || 20),
+          torno: Number(findVal(row, ['Tempo de Planejamento Torno Minutos todas as peças solicitadas', 'torno', 'torno minutos', 'torno min']) || 0),
+          centro: Number(findVal(row, ['Tempo de Planejamento Centro Minutos todas as peças solicitadas', 'centro', 'centro minutos', 'centro min']) || 0),
+          prog: Number(findVal(row, ['Tempo Programação Minutos', 'prog', 'programação', 'Programação Minutos']) || 0),
           site: String(findVal(row, ['site', 'fabrica', 'Fábrica']) || 'VALINHOS'),
-          etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1']) || ''),
+          etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || ''),
           etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
       }));
       
