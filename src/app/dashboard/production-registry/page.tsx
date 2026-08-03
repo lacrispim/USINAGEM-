@@ -289,7 +289,7 @@ export default function ProductionRegistryPage() {
     const ws = XLSX.utils.json_to_sheet(data.map(r => ({ 
         ...r, 
         date: r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date,
-        apontamento: r.createdAt?.toDate ? format(r.createdAt.toDate(), 'HH:mm:ss') : '-'
+        apontamento: r.createdAt?.toDate ? format(r.createdAt.toDate(), 'dd/MM/yyyy HH:mm:ss') : '-'
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Dados");
@@ -510,7 +510,7 @@ export default function ProductionRegistryPage() {
                             <TableCell>{r.operatorId}</TableCell>
                             <TableCell>{r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date}</TableCell>
                             <TableCell className="text-primary font-mono text-[11px] font-bold">
-                                {r.createdAt?.toDate ? format(r.createdAt.toDate(), 'HH:mm') : '-'}
+                                {r.createdAt?.toDate ? format(r.createdAt.toDate(), 'dd/MM HH:mm') : '-'}
                             </TableCell>
                             <TableCell>{r.factory}</TableCell>
                             <TableCell className="font-mono font-bold">#{r.formsNumber}</TableCell>
@@ -554,7 +554,7 @@ export default function ProductionRegistryPage() {
                             <TableCell>{r.operatorId}</TableCell>
                             <TableCell>{r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date}</TableCell>
                             <TableCell className="text-primary font-mono text-[11px] font-bold">
-                                {r.createdAt?.toDate ? format(r.createdAt.toDate(), 'HH:mm') : '-'}
+                                {r.createdAt?.toDate ? format(r.createdAt.toDate(), 'dd/MM HH:mm') : '-'}
                             </TableCell>
                             <TableCell>{r.factory}</TableCell>
                             <TableCell><Badge className="bg-yellow-500 text-black">{r.lossReason}</Badge></TableCell>
