@@ -167,7 +167,7 @@ export function AvailableVsActualChart({
                   <Legend verticalAlign="bottom" height={48} />
                   
                   <Bar name="Disponível" dataKey="totalDisponivel" fill={AVAILABLE_COLOR} radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="totalDisponivel" position="top" className="fill-blue-400 text-[10px] font-bold" formatter={(v: number) => v > 0 ? `${v}h` : ''} />
+                    <LabelList dataKey="totalDisponivel" position="top" className="fill-blue-400 text-[10px] font-bold" formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''} />
                   </Bar>
 
                   {dynamicCategories.map((cat, idx) => (
@@ -178,7 +178,16 @@ export function AvailableVsActualChart({
                       stackId="realizado" 
                       fill={cat.color}
                       radius={idx === dynamicCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                    />
+                    >
+                      {idx === dynamicCategories.length - 1 && (
+                        <LabelList 
+                          dataKey="totalRealizado" 
+                          position="top" 
+                          className="fill-foreground text-[10px] font-bold" 
+                          formatter={(v: number) => v > 0 ? `${v.toFixed(1)}h` : ''} 
+                        />
+                      )}
+                    </Bar>
                   ))}
                 </BarChart>
               </ChartContainer>
