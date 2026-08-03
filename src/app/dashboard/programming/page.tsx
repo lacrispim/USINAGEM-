@@ -60,9 +60,9 @@ interface PlanejamentoItem {
 }
 
 const TURNOS = [
-  { id: '1', label: '1T', range: '06:00-14:00' },
-  { id: '2', label: '2T', range: '14:00-22:00' },
-  { id: '3', label: '3T', range: '22:00-06:00' },
+  { id: '1', label: '1T', range: '06:00-13:00' },
+  { id: '2', label: '2T', range: '13:00-20:00' },
+  { id: '3', label: '3T', range: '20:00-03:00' },
 ];
 
 const MACHINE_LANES: Record<string, Record<string, string[]>> = {
@@ -81,7 +81,8 @@ const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   }
 };
 
-const SHIFT_MIN = 480;
+// Jornada ajustada para 7 horas úteis
+const SHIFT_MIN = 420; 
 const PAUSAS = [
   { start: 0, duration: 10, label: 'DDS', icon: Mic },
   { start: 180, duration: 15, label: 'CAFÉ', icon: Coffee }
@@ -91,7 +92,7 @@ const Ruler = () => {
   const marks = [];
   for (let m = 0; m <= SHIFT_MIN; m += 60) {
     const pc = (m / SHIFT_MIN) * 100;
-    marks.push(<div key={m} className="absolute top-0 h-full flex flex-col items-center" style={{ left: `${pc}%` }}><div className={cn("w-px bg-border", m % 120 === 0 ? "h-[9px] bg-muted-foreground" : "h-[5px]")} />{m % 120 === 0 && <span className="text-[9px] font-mono text-muted-foreground leading-none mt-1">{m / 60}h</span>}</div>);
+    marks.push(<div key={m} className="absolute top-0 h-full flex flex-col items-center" style={{ left: `${pc}%` }}><div className={cn("w-px bg-border", m % 120 === 0 ? "h-[9px] bg-muted-foreground" : "h-[5px]")} />{m % 60 === 0 && <span className="text-[9px] font-mono text-muted-foreground leading-none mt-1">{m / 60}h</span>}</div>);
   }
   return <div className="relative h-[18px] ml-[155px] border-b border-border/50 mb-1">{marks}</div>;
 };
@@ -102,9 +103,26 @@ const TimelineBar = React.memo(({ item }: { item: PlanejamentoItem }) => {
   const leftPc = (item.startOffsetMin / SHIFT_MIN) * 100;
   const setupPc = totalMin > 0 ? (item.setupMinutos / totalMin) * 100 : 0;
 
+  const isTorno = item.techKey === 'TORNO';
+  const isProg = item.techKey === 'ADM';
+
   return (
-    <div className={cn("absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm hover:scale-[1.01] transition-all z-10", item.techKey === 'ADM' ? "bg-slate-700" : (item.techKey === 'TORNO' ? "bg-[#00707F]" : "bg-[#5B36A8]"))} style={{ left: `${leftPc}%`, width: `${widthPc}%` }} title={`#${item.requisicao} - ${item.nomeDaPeca}`}>
-      {item.setupMinutos > 0 && <div className="h-full shrink-0 border-r border-black/20" style={{ width: `${setupPc}%`, background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #101820 5px 10px)' }} />}
+    <div 
+      className={cn(
+        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm hover:scale-[1.01] transition-all z-10", 
+        isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")
+      )} 
+      style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
+      title={`#${item.requisicao} - ${item.nomeDaPeca}`}
+    >
+      {item.setupMinutos > 0 && (
+        <div 
+          className="h-full shrink-0 border-r border-black/20 flex items-center justify-center" 
+          style={{ width: `${setupPc}%`, background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #101820 5px 10px)' }}
+        >
+           <span className="text-[7px] font-black text-white bg-black/50 px-0.5 rounded-sm">S</span>
+        </div>
+      )}
       <div className="flex-1 flex items-center gap-1.5 px-1.5 min-w-0 text-white overflow-hidden">
         <span className="font-mono text-[9px] font-black shrink-0">#{item.requisicao}</span>
         {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[8px] font-bold shrink-0">{item.quantidadeNoBloco}pç</span>}
@@ -136,11 +154,17 @@ export default function ProgrammingPage() {
   const recalculatePlan = async (novaFila: JobBase[]) => {
     if (!firestore) return;
     const novosPlanItems: PlanejamentoItem[] = [];
-    const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'TORNO_1': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
+    const lanePointers: Record<string, number> = { 
+        'TORNO_0': 0, 
+        'TORNO_1': 0, 
+        'CENTRO_0': 0, 
+        'ADM_0': 0 
+    }; 
 
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
         let totalDuration = job[type] || 0;
         if (totalDuration <= 0 && type !== 'prog') return minStartTime;
+        
         let chosenLane = techKey === 'TORNO' ? (lanePointers['TORNO_0'] <= lanePointers['TORNO_1'] ? 0 : 1) : 0;
         const laneId = `${techKey}_${chosenLane}`;
         let actualStart = Math.max(lanePointers[laneId] || 0, minStartTime);
@@ -157,17 +181,29 @@ export default function ProgrammingPage() {
             const startOffset = startInDay % SHIFT_MIN;
             const techName = MACHINE_LANES[techKey][shiftId]?.[chosenLane];
 
-            if (!techName) { actualStart = (dayIdx + 1) * 3 * SHIFT_MIN; continue; }
+            if (!techName) { 
+                actualStart = (dayIdx + 1) * 3 * SHIFT_MIN; 
+                continue; 
+            }
 
             let winStart = startOffset;
-            for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart >= p.start) winStart = p.start + p.duration; }
-            if (winStart >= SHIFT_MIN) { actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN; continue; }
+            for (const p of PAUSAS) { 
+                if (winStart < p.start + p.duration && winStart >= p.start) {
+                    winStart = p.start + p.duration;
+                }
+            }
+            
+            if (winStart >= SHIFT_MIN) { 
+                actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN; 
+                continue; 
+            }
 
             const effectiveAvail = SHIFT_MIN - winStart;
             let sInShift = pendingSetup > 0.1 ? Math.min(pendingSetup, effectiveAvail) : 0;
             pendingSetup -= sInShift;
             let pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
             let qInShift = 0;
+            
             if (pInShift > 0 && cycleTime > 0) {
                 const before = Math.floor(doneProdTime / cycleTime + 1e-7);
                 doneProdTime += pInShift;
@@ -176,10 +212,30 @@ export default function ProgrammingPage() {
             }
 
             if (sInShift > 0 || pInShift > 0) {
-                novosPlanItems.push({ id: `pl-${Math.random().toString(36).substr(2, 9)}`, dataExecucao: format(addDays(currentDate, dayIdx), 'dd/MM/yyyy'), tecnico: techName, equipamento: type.toUpperCase(), requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca, quantidadeTotal: job.quantidade, quantidadeNoBloco: qInShift, tempoMinutos: pInShift, setupMinutos: sInShift, turno: shiftId, startOffsetMin: winStart, tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', techKey, jobId: job.id, laneIndex: chosenLane });
+                novosPlanItems.push({ 
+                    id: `pl-${Math.random().toString(36).substr(2, 9)}`, 
+                    dataExecucao: format(addDays(currentDate, dayIdx), 'dd/MM/yyyy'), 
+                    tecnico: techName, 
+                    equipamento: type.toUpperCase(), 
+                    requisicao: job.requisicao, 
+                    nomeDaPeca: job.nomeDaPeca, 
+                    quantidadeTotal: job.quantidade, 
+                    quantidadeNoBloco: qInShift, 
+                    tempoMinutos: pInShift, 
+                    setupMinutos: sInShift, 
+                    turno: shiftId, 
+                    startOffsetMin: winStart, 
+                    tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', 
+                    techKey, 
+                    jobId: job.id, 
+                    laneIndex: chosenLane 
+                });
             }
+            
             actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
-            if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN;
+            if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) {
+                actualStart = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx + 1) * SHIFT_MIN;
+            }
         }
         lanePointers[laneId] = actualStart;
         return actualStart;
@@ -189,15 +245,25 @@ export default function ProgrammingPage() {
         let t1 = 0;
         if (job.prog > 0) t1 = allocateTask(job, 'ADM', 0, 'prog');
         let jobTerminus = t1;
-        if (job.etapa1.includes('TORNO') || (job.torno > 0 && !job.etapa1)) jobTerminus = allocateTask(job, 'TORNO', t1, 'torno');
-        else if (job.etapa1.includes('CENTRO') || (job.centro > 0 && !job.etapa1)) jobTerminus = allocateTask(job, 'CENTRO', t1, 'centro');
-        if (job.etapa2.includes('TORNO')) allocateTask(job, 'TORNO', jobTerminus, 'torno');
-        else if (job.etapa2.includes('CENTRO')) allocateTask(job, 'CENTRO', jobTerminus, 'centro');
+        
+        // Etapa 1
+        if (job.etapa1.includes('TORNO') || (job.torno > 0 && !job.etapa1)) {
+            jobTerminus = allocateTask(job, 'TORNO', t1, 'torno');
+        } else if (job.etapa1.includes('CENTRO') || (job.centro > 0 && !job.etapa1)) {
+            jobTerminus = allocateTask(job, 'CENTRO', t1, 'centro');
+        }
+        
+        // Etapa 2 (Sempre inicia após o término total da Etapa 1)
+        if (job.etapa2.includes('TORNO')) {
+            allocateTask(job, 'TORNO', jobTerminus, 'torno');
+        } else if (job.etapa2.includes('CENTRO')) {
+            allocateTask(job, 'CENTRO', jobTerminus, 'centro');
+        }
     });
 
     await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: novaFila, updatedAt: serverTimestamp() });
     await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: novosPlanItems, updatedAt: serverTimestamp() });
-    toast({ title: "Sucesso", description: "Plano atualizado." });
+    toast({ title: "Sucesso", description: "Plano atualizado com base em 7h/turno." });
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -207,23 +273,26 @@ export default function ProgrammingPage() {
     reader.onload = async (event) => {
       const workbook = XLSX.read(new Uint8Array(event.target?.result as ArrayBuffer), { type: 'array' });
       const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+      
       const findVal = (row: any, keys: string[]) => {
-          const k = Object.keys(row).find(k => keys.some(s => k.toLowerCase().includes(s.toLowerCase())));
+          const k = Object.keys(row).find(k => keys.some(s => k.toLowerCase().trim() === s.toLowerCase().trim() || k.toLowerCase().includes(s.toLowerCase())));
           return k ? row[k] : undefined;
       };
+
       const novaFila: JobBase[] = json.map((row, i) => ({
           id: `job-${i}-${Date.now()}`,
-          requisicao: String(findVal(row, ['req', 'requisicao', 'forms']) || 'S/N'),
-          nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome']) || 'SEM NOME'),
-          quantidade: Number(findVal(row, ['qtd', 'quantidade']) || 1),
+          requisicao: String(findVal(row, ['req', 'requisicao', 'forms', 'Nº forms']) || 'S/N'),
+          nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
+          quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
           setup: 20,
-          torno: Number(findVal(row, ['torno minutos', 'torno min']) || 0),
-          centro: Number(findVal(row, ['centro minutos', 'centro min']) || 0),
-          prog: Number(findVal(row, ['prog', 'programação']) || 0),
-          site: String(findVal(row, ['site', 'fabrica']) || 'VALINHOS'),
-          etapa1: String(findVal(row, ['etapa 1', 'etapa1']) || ''),
-          etapa2: String(findVal(row, ['etapa 2', 'etapa2']) || ''),
+          torno: Number(findVal(row, ['torno minutos', 'torno min', 'Tempo de Planejamento Torno Minutos todas as peças solicitadas']) || 0),
+          centro: Number(findVal(row, ['centro minutos', 'centro min', 'Tempo de Planejamento Centro Minutos todas as peças solicitadas']) || 0),
+          prog: Number(findVal(row, ['prog', 'programação', 'Programação Minutos']) || 0),
+          site: String(findVal(row, ['site', 'fabrica', 'Fábrica']) || 'VALINHOS'),
+          etapa1: String(findVal(row, ['etapa 1', 'etapa1', 'Etapa 1']) || ''),
+          etapa2: String(findVal(row, ['etapa 2', 'etapa2', 'Etapa 2']) || ''),
       }));
+      
       await recalculatePlan(novaFila);
       setIsImporting(false);
     };
@@ -233,7 +302,10 @@ export default function ProgrammingPage() {
   return (
     <div className="flex flex-col gap-6 bg-background dark p-4">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div><h1 className="text-3xl font-bold uppercase font-['Barlow_Condensed']">Plano de Carga CNC</h1><p className="text-[11px] tracking-widest text-muted-foreground uppercase font-bold">Time Técnico · Sequenciamento Etapas</p></div>
+        <div>
+            <h1 className="text-3xl font-bold uppercase font-['Barlow_Condensed']">Plano de Carga CNC</h1>
+            <p className="text-[11px] tracking-widest text-muted-foreground uppercase font-bold">Time Técnico · Jornada 7h Úteis</p>
+        </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" className="h-10" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
           <div className="flex items-center gap-2 font-bold min-w-[120px] justify-center"><CalendarDays className="h-4 w-4 text-primary" />{format(currentDate, 'dd/MM/yyyy')}</div>
@@ -251,20 +323,44 @@ export default function ProgrammingPage() {
             return (
                 <div key={d} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
                     <div className="bg-muted/40 p-4 border-b-2 border-primary flex justify-between items-center">
-                        <div className="flex items-center gap-4"><span className="text-xl font-bold font-['Barlow_Condensed'] uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span><span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span></div>
-                        <div className="flex gap-4 font-mono text-[11px] text-muted-foreground"><span>PEÇAS: <b className="text-foreground text-sm">{dayItems.reduce((a, b) => a + b.quantidadeNoBloco, 0)}</b></span><span>OCUPAÇÃO: <b className="text-foreground text-sm">{(dayItems.reduce((a, b) => a + b.tempoMinutos + b.setupMinutos, 0) / 60).toFixed(1)}h</b></span></div>
+                        <div className="flex items-center gap-4">
+                            <span className="text-xl font-bold font-['Barlow_Condensed'] uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
+                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
+                        </div>
+                        <div className="flex gap-4 font-mono text-[11px] text-muted-foreground">
+                            <span>PEÇAS: <b className="text-foreground text-sm">{dayItems.reduce((a, b) => a + b.quantidadeNoBloco, 0)}</b></span>
+                            <span>OCUPAÇÃO: <b className="text-foreground text-sm">{(dayItems.reduce((a, b) => a + b.tempoMinutos + b.setupMinutos, 0) / 60).toFixed(1)}h / 21h</b></span>
+                        </div>
                     </div>
                     {TURNOS.map(t => (
                         <div key={t.id} className="grid grid-cols-[100px_1fr] border-b border-border/20 last:border-0">
-                            <div className="bg-muted/10 border-r border-border/20 p-4 flex flex-col justify-center items-center"><span className="text-2xl font-bold font-['Barlow_Condensed'] text-foreground">{t.label}</span><span className="text-[9px] font-mono text-muted-foreground font-bold">{t.range}</span></div>
+                            <div className="bg-muted/10 border-r border-border/20 p-4 flex flex-col justify-center items-center">
+                                <span className="text-2xl font-bold font-['Barlow_Condensed'] text-foreground">{t.label}</span>
+                                <span className="text-[9px] font-mono text-muted-foreground font-bold">{t.range}</span>
+                            </div>
                             <div className="p-4 bg-card/40">
                                 <Ruler />
                                 {['TORNO', 'CENTRO', 'ADM'].map(cat => (MACHINE_LANES[cat][t.id] || []).map((tech, lIdx) => tech && (
                                     <div key={`${tech}-${lIdx}`} className="grid grid-cols-[155px_1fr] items-center mb-3">
-                                        <div className="pr-3 truncate"><div className={cn("text-[9px] font-mono font-black uppercase", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>{cat === 'TORNO' ? `Torno R${lIdx+1}` : cat}</div><div className="text-[11px] font-bold truncate">{tech}</div></div>
+                                        <div className="pr-3 truncate">
+                                            <div className={cn("text-[9px] font-mono font-black uppercase", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>
+                                                {cat === 'TORNO' ? `Torno R${lIdx+1}` : cat}
+                                            </div>
+                                            <div className="text-[11px] font-bold truncate">{tech}</div>
+                                        </div>
                                         <div className="relative h-[38px] border border-border/50 rounded bg-black/20 overflow-hidden">
-                                            {PAUSAS.map(p => <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-2 w-2 text-yellow-500/30" /></div>)}
-                                            {dayItems.filter(i => i.techKey === cat && i.laneIndex === lIdx && i.turno === t.id).map(item => <TimelineBar key={item.id} item={item} />)}
+                                            {PAUSAS.map(p => (
+                                                <div 
+                                                    key={p.label} 
+                                                    className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" 
+                                                    style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}
+                                                >
+                                                    <p.icon className="h-2 w-2 text-yellow-500/30" />
+                                                </div>
+                                            ))}
+                                            {dayItems.filter(i => i.techKey === cat && i.laneIndex === lIdx && i.turno === t.id).map(item => (
+                                                <TimelineBar key={item.id} item={item} />
+                                            ))}
                                         </div>
                                     </div>
                                 )))}
@@ -277,15 +373,41 @@ export default function ProgrammingPage() {
       </div>
       
       <Card className="shadow-lg border-border">
-        <CardHeader className="bg-muted/5 border-b"><CardTitle className="font-['Barlow_Condensed'] text-xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle></CardHeader>
+        <CardHeader className="bg-muted/5 border-b">
+            <CardTitle className="font-['Barlow_Condensed'] text-xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader><TableRow><TableHead className="w-20 text-center">AÇÕES</TableHead><TableHead>FLUXO</TableHead><TableHead>REQ.</TableHead><TableHead>PEÇA</TableHead><TableHead className="text-right">QTD</TableHead><TableHead className="text-right">TOTAL</TableHead></TableRow></TableHeader>
+            <TableHeader>
+                <TableRow>
+                    <TableHead className="w-20 text-center">AÇÕES</TableHead>
+                    <TableHead>FLUXO</TableHead>
+                    <TableHead>REQ.</TableHead>
+                    <TableHead>PEÇA</TableHead>
+                    <TableHead className="text-right">QTD</TableHead>
+                    <TableHead className="text-right">TOTAL</TableHead>
+                </TableRow>
+            </TableHeader>
             <TableBody>
-              {fila.length === 0 ? <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição</TableCell></TableRow> : fila.map((job, idx) => (
+              {fila.length === 0 ? (
+                <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição</TableCell>
+                </TableRow>
+              ) : fila.map((job, idx) => (
                 <TableRow key={job.id} className="hover:bg-muted/5">
-                  <TableCell className="text-center"><div className="flex flex-col items-center gap-1"><Button variant="outline" size="icon" className="h-6 w-6" onClick={() => { const nf = [...fila]; [nf[idx], nf[idx-1]] = [nf[idx-1], nf[idx]]; recalculatePlan(nf); }} disabled={idx === 0}><ArrowUp className="h-3 w-3" /></Button><Button variant="outline" size="icon" className="h-6 w-6" onClick={() => { const nf = [...fila]; [nf[idx], nf[idx+1]] = [nf[idx+1], nf[idx]]; recalculatePlan(nf); }} disabled={idx === fila.length - 1}><ArrowDown className="h-3 w-3" /></Button></div></TableCell>
-                  <TableCell><div className="flex items-center gap-2">{job.etapa1 && <Badge variant="outline" className="text-[9px]">{job.etapa1}</Badge>}{job.etapa2 && <span className="text-muted-foreground text-xs">→</span>}{job.etapa2 && <Badge variant="outline" className="text-[9px]">{job.etapa2}</Badge>}</div></TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex flex-col items-center gap-1">
+                        <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => { const nf = [...fila]; [nf[idx], nf[idx-1]] = [nf[idx-1], nf[idx]]; recalculatePlan(nf); }} disabled={idx === 0}><ArrowUp className="h-3 w-3" /></Button>
+                        <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => { const nf = [...fila]; [nf[idx], nf[idx+1]] = [nf[idx+1], nf[idx]]; recalculatePlan(nf); }} disabled={idx === fila.length - 1}><ArrowDown className="h-3 w-3" /></Button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                        {job.etapa1 && <Badge variant="outline" className="text-[9px]">{job.etapa1}</Badge>}
+                        {job.etapa2 && <span className="text-muted-foreground text-xs">→</span>}
+                        {job.etapa2 && <Badge variant="outline" className="text-[9px]">{job.etapa2}</Badge>}
+                    </div>
+                  </TableCell>
                   <TableCell className="font-mono font-bold">#{job.requisicao}</TableCell>
                   <TableCell className="uppercase text-[10px] font-medium max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
                   <TableCell className="text-right font-mono font-bold">{job.quantidade} pç</TableCell>
