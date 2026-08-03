@@ -286,12 +286,13 @@ export default function RecordsPage() {
             </CardContent>
         </Card>
 
+        {/* Gráfico Planejado vs Realizado em destaque (largura total) */}
+        <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
             <AvailableVsActualChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
+            <OeeLossWaterfallChart productionData={operatorFilteredProductionRecords} lossData={operatorFilteredLossRecords} loading={isLoading} />
         </div>
-        
-        <OeeLossWaterfallChart productionData={operatorFilteredProductionRecords} lossData={operatorFilteredLossRecords} loading={isLoading} />
       </div>
     </div>
   );

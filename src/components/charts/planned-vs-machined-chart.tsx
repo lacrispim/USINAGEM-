@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -175,16 +176,12 @@ export function PlannedVsMachinedChart({
   const CustomLegend = () => {
     return (
       <div className="flex items-center justify-center gap-x-4 gap-y-2 mt-4 flex-wrap max-w-5xl mx-auto border-t pt-4">
-        {dynamicCategories.length <= 16 ? (
-            dynamicCategories.map(cat => (
-                <div key={cat.key} className="flex items-center gap-1.5">
-                 <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: cat.color}} />
-                 <span className="text-[10px] font-bold uppercase text-muted-foreground">{cat.label}</span>
-               </div>
-             ))
-        ) : (
-            <span className="text-[10px] font-bold uppercase text-muted-foreground">Diversos motivos de parada detalhados no Tooltip</span>
-        )}
+        {dynamicCategories.map(cat => (
+            <div key={cat.key} className="flex items-center gap-1.5">
+             <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor: cat.color}} />
+             <span className="text-[10px] font-bold uppercase text-muted-foreground">{cat.label}</span>
+           </div>
+         ))}
         <div className="flex items-center gap-4 border-l pl-4 ml-2">
             <span className="text-[9px] font-black uppercase text-foreground">Barra Esq: Plan | Barra Dir: Real</span>
         </div>
@@ -224,11 +221,11 @@ export function PlannedVsMachinedChart({
             <Loader className="h-8 w-8 animate-spin" />
           </div>
         ) : data && data.length > 0 ? (
-          <div className="h-[600px] w-full">
+          <div className="h-[750px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ChartContainer config={chartConfig}>
-                <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 120 }} barGap={4}>
-                  <CartesianGrid vertical={false} />
+                <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 120 }} barGap={6}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.1} />
                   <XAxis
                     dataKey="name"
                     tickLine={false}
@@ -238,15 +235,16 @@ export function PlannedVsMachinedChart({
                     textAnchor="end"
                     interval={0}
                     height={120}
-                    className="text-[10px] font-bold uppercase"
+                    className="text-[11px] font-bold uppercase"
                   />
                   <YAxis
                     unit="h"
                     tickLine={false}
                     axisLine={false}
+                    className="text-[10px]"
                   />
                   <ChartTooltip
-                    cursor={{ fill: 'hsl(var(--accent))', radius: 4 }}
+                    cursor={{ fill: 'hsl(var(--accent))', radius: 4, opacity: 0.1 }}
                     content={<CustomTooltip />}
                   />
                   <Legend content={<CustomLegend />} />
@@ -259,6 +257,7 @@ export function PlannedVsMachinedChart({
                         stackId="planejado" 
                         fill={cat.color}
                         radius={idx === dynamicCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        barSize={40}
                     >
                         {idx === 0 && (
                             <LabelList 
@@ -289,6 +288,7 @@ export function PlannedVsMachinedChart({
                         fill={cat.color}
                         opacity={0.8}
                         radius={idx === dynamicCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        barSize={40}
                     >
                         {idx === 0 && (
                             <LabelList 
