@@ -13,7 +13,6 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
-  Legend,
 } from 'recharts';
 import {
   ChartContainer,
@@ -314,7 +313,6 @@ export function OperatorPerformanceChart({
                     )}
                 </Bar>
               ))}
-              <Legend verticalAlign="bottom" height={36} />
             </BarChart>
           </ChartContainer>
         </ResponsiveContainer>
