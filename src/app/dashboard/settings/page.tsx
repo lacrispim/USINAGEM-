@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useUser } from '@/firebase';
@@ -19,6 +18,7 @@ import { useState, useEffect } from 'react';
 import { Wifi, Lock, Unlock, ShieldCheck, Globe } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { user, isUserLoading } = useUser();
