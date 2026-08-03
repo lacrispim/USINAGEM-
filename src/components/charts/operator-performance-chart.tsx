@@ -38,7 +38,7 @@ const OPERATOR_COLORS: { [key: string]: string } = {
   'Nathan Xavier': 'hsl(var(--chart-5))',
   'Jair Melo': 'hsl(var(--chart-7))',
   'Marcos Barbosa': 'hsl(var(--chart-8))',
-  'Alisson Franca': 'hsl(215 80% 60%)',
+  'Alisson França': 'hsl(215 80% 60%)',
   'Outro': 'hsl(var(--chart-6))',
 };
 
@@ -67,10 +67,11 @@ const CATEGORY_STYLES: Record<string, { label: string; color: string }> = {
 
 const DEFAULT_COLOR = '#6b7280';
 
+// Normalização unificada para evitar desincronia entre dispositivos (especialmente com nomes acentuados)
 const normalizeOperatorName = (name: any) => {
   if (!name) return '';
   const n = String(name).toLowerCase().trim();
-  if (n.includes('alisson')) return 'Alisson Franca';
+  if (n.includes('alisson')) return 'Alisson França';
   if (n.includes('gustavo')) return 'Gustavo Gozzi';
   if (n.includes('daniel')) return 'Daniel Solivo';
   if (n.includes('rodrigo')) return 'Rodrigo Cantano';
@@ -114,14 +115,13 @@ export function OperatorPerformanceChart({
         return operatorStats[name];
     };
 
-    // Processar Realizado de Produção (Diferenciando por activityType)
+    // Processar Realizado de Produção
     productionData.forEach(record => {
-      const name = normalizeOperatorName(record.operatorId || record.tecnico || record['Técnicos'] || record['Técnico']);
+      const name = normalizeOperatorName(record.operatorId || record.tecnico);
       if (name) {
         const stats = getOrCreate(name);
         const hours = Number(record.machiningTime || 0) / 60;
         
-        // Identifica se é Programação, Usinagem, etc.
         const rawActivity = String(record.activityType || 'PRODUCAO').toUpperCase().trim();
         const catKey = getCategoryKey(rawActivity);
         
@@ -133,7 +133,7 @@ export function OperatorPerformanceChart({
 
     // Processar Realizado de Perdas
     lossData.forEach(record => {
-      const name = normalizeOperatorName(record.operatorId || record.tecnico || record['Técnicos'] || record['Técnico']);
+      const name = normalizeOperatorName(record.operatorId || record.tecnico);
       if (name) {
         const stats = getOrCreate(name);
         const hours = Number(record.timeLost || 0) / 60;
@@ -144,33 +144,24 @@ export function OperatorPerformanceChart({
       }
     });
 
-    // Processar Planejado
+    // Processar Planejado (usando os dados da Fila transformados em Plano)
     plannedData.forEach(record => {
-      const name = normalizeOperatorName(record.tecnico || record['Técnicos'] || record['Técnico'] || record.operatorId);
+      const name = normalizeOperatorName(record.tecnico || record.operatorId);
       if (name) {
         const stats = getOrCreate(name);
         
-        if (record.atividades && Array.isArray(record.atividades)) {
-          record.atividades.forEach((ativ: any) => {
-             const catKey = getCategoryKey(ativ.tipo);
-             const time = Number(ativ.tempo) || 0;
-             const field = `plan_${catKey}`;
-             stats[field] = (stats[field] || 0) + time;
-             stats.planTotal += time;
-             categoriesFound.add(catKey);
-          });
-        } else {
-          const rawHours = record.horasPlanejadas || record['Horas Máquina'];
-          const machineHours = typeof rawHours === 'string' 
-              ? parseFloat(rawHours.replace(',', '.')) 
-              : (Number(rawHours) || 0);
-          const rawReason = String(record['Perdas planejadas'] || record.perdaPlanejada || '').toUpperCase().trim();
-          const catKey = getCategoryKey(rawReason);
-          const field = `plan_${catKey}`;
-          stats[field] = (stats[field] || 0) + machineHours;
-          stats.planTotal += machineHours;
-          categoriesFound.add(catKey);
-        }
+        // No novo motor, cada registro já é uma tecnologia (Torno, Centro, etc.)
+        const techTime = (Number(record.torno || 0) + Number(record.centro || 0) + Number(record.setup || 0) + Number(record.prog || 0)) / 60;
+        
+        // Categorizar o tempo planejado baseado na tecnologia predominante
+        let catKey = 'PRODUCAO';
+        if (Number(record.prog) > 0) catKey = 'PROGRAMACAO';
+        if (Number(record.setup) > 0 && Number(record.torno) === 0 && Number(record.centro) === 0) catKey = 'SETUP';
+
+        const field = `plan_${catKey}`;
+        stats[field] = (stats[field] || 0) + techTime;
+        stats.planTotal += techTime;
+        categoriesFound.add(catKey);
       }
     });
 
@@ -181,7 +172,6 @@ export function OperatorPerformanceChart({
       }))
       .sort((a, b) => (b.realTotal + b.planTotal) - (a.realTotal + a.planTotal));
 
-    // Filtrar apenas o operador selecionado, se houver um
     const filteredData = selectedOperator && selectedOperator !== 'all'
         ? sortedData.filter(item => item.name === selectedOperator)
         : sortedData;
@@ -274,7 +264,7 @@ export function OperatorPerformanceChart({
     <div className="flex items-center justify-center gap-x-4 gap-y-2 mt-4 flex-wrap border-t pt-4">
         <div className="flex items-center gap-1.5 mr-4">
             <div className="w-2.5 h-2.5 rounded-full border-2 border-muted-foreground" />
-            <span className="text-[9px] font-black uppercase text-foreground">Barra Sup: Plan | Barra Inf: Real (Ambas Segmentadas)</span>
+            <span className="text-[9px] font-black uppercase text-foreground">Barra Sup: Plan | Barra Inf: Real</span>
         </div>
         {activeCategories.map(cat => (
             <div key={cat} className="flex items-center gap-1.5">

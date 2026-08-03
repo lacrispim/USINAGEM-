@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -161,8 +160,9 @@ export default function ProductionRegistryPage() {
     resolver: zodResolver(lossFormSchema),
   });
 
-  const productionRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(300)) : null, [firestore]);
-  const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(300)) : null, [firestore]);
+  // Aumentado o limite para 2000 para garantir sincronia com a tela de records do supervisor
+  const productionRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
+  const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
   
   const { data: productionRecords, isLoading: loadingProduction } = useCollection(productionRecordsQuery);
   const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossRecordsQuery);
@@ -289,7 +289,7 @@ export default function ProductionRegistryPage() {
     const ws = XLSX.utils.json_to_sheet(data.map(r => ({ 
         ...r, 
         date: r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date,
-        apontamento: r.createdAt?.toDate ? format(r.createdAt.toDate(), 'dd/MM/yyyy HH:mm:ss') : '-'
+        apontamento: r.createdAt?.toDate ? format(r.createdAt.toDate(), 'dd/MM HH:mm:ss') : '-'
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Dados");

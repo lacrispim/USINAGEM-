@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -57,6 +56,7 @@ const availableHoursJune: Record<string, number> = {
   'SUAPE': 113, 'VINHEDO': 112, 'VALINHOS (DOVE/SABONETE)': 166, 'POUSO ALEGRE': 124,
 };
 
+// Normalização de nomes unificada para evitar duplicidade "França" vs "Franca"
 const normalizeOperatorName = (name: any) => {
   if (!name) return '';
   const n = String(name).toLowerCase().trim();
@@ -96,7 +96,7 @@ export default function RecordsPage() {
     setSelectedYear(String(new Date().getFullYear()));
   }, []);
 
-  const planoRef = useMemo(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]);
+  const planoRef = useMemo(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]);
   const { data: planoDoc } = useDoc(planoRef);
 
   useEffect(() => {
@@ -122,15 +122,16 @@ export default function RecordsPage() {
     return { startDate: start, endDate: end };
   }, [selectedDate, selectedYear, selectedMonth, isClient]);
 
-  const prodQuery = useMemoFirebase(() => firestore && startDate && endDate ? query(collection(firestore, 'productionRecords'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000)) : null, [firestore, startDate, endDate]);
-  const lossQuery = useMemoFirebase(() => firestore && startDate && endDate ? query(collection(firestore, 'lossRecords'), where('date', '>=', startDate), where('date', '<=', endDate), limit(1000)) : null, [firestore, startDate, endDate]);
+  // Limite aumentado para 2000 registros para garantir que dispositivos mobile vejam o mesmo histórico que desktops
+  const prodQuery = useMemoFirebase(() => firestore && startDate && endDate ? query(collection(firestore, 'productionRecords'), where('date', '>=', startDate), where('date', '<=', endDate), limit(2000)) : null, [firestore, startDate, endDate]);
+  const lossQuery = useMemoFirebase(() => firestore && startDate && endDate ? query(collection(firestore, 'lossRecords'), where('date', '>=', startDate), where('date', '<=', endDate), limit(2000)) : null, [firestore, startDate, endDate]);
 
   const { data: productionRecords, isLoading: loadingProduction } = useCollection(prodQuery);
   const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossQuery);
 
   const filteredPlanejamentoData = useMemo(() => {
     return planejamentoData.filter(record => {
-      const name = normalizeOperatorName(record.tecnico);
+      const name = normalizeOperatorName(record.tecnico || record.operatorId);
       return (!selectedOperator || selectedOperator === 'all' || name === selectedOperator);
     });
   }, [planejamentoData, selectedOperator]);
@@ -155,12 +156,9 @@ export default function RecordsPage() {
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record.site || 'VALINHOS');
       const d = getOrCreate(factory);
-      const time = (record.tempoMinutos || 0) / 60;
+      // Garantindo precisão numérica com Number()
+      const time = (Number(record.torno) + Number(record.centro) + Number(record.setup) + Number(record.prog)) / 60;
       d.totalPlanejado += time;
-      
-      const type = record.tipoAtividade === 'PROGRAMACAO' ? 'PROGRAMACAO' : 'PRODUCAO';
-      const key = `plan_${type}`;
-      d[key] = (d[key] || 0) + time;
     });
     
     operatorFilteredProductionRecords.forEach(record => {
