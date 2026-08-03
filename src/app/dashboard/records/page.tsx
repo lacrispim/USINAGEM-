@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -21,7 +22,7 @@ import {
 import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { collection, query, where, limit } from 'firebase/firestore';
-import { format, startOfDay, endOfDay, endOfMonth, parse } from 'date-fns';
+import { format, startOfDay, endOfDay, endOfMonth, parse, isWithinInterval } from 'date-fns';
 import {
   Select,
   SelectContent,
@@ -51,12 +52,12 @@ const operatorList = [
     "William Martinucci", "Nathan Xavier", "Jair Melo", "Marcos Barbosa"
 ];
 
-const availableHoursJune: Record<string, number> = {
+// Orçamento de horas para comparação de capacidade
+const availableHoursBudget: Record<string, number> = {
   'AGUAÍ': 285, 'INDAIATUBA': 68, 'IGARASSU': 107, 'GARANHUNS': 94,
   'SUAPE': 113, 'VINHEDO': 112, 'VALINHOS (DOVE/SABONETE)': 166, 'POUSO ALEGRE': 124,
 };
 
-// Normalização de nomes unificada para evitar duplicidade "França" vs "Franca"
 const normalizeOperatorName = (name: any) => {
   if (!name) return '';
   const n = String(name).toLowerCase().trim();
@@ -96,7 +97,8 @@ export default function RecordsPage() {
     setSelectedYear(String(new Date().getFullYear()));
   }, []);
 
-  const planoRef = useMemo(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]);
+  // Buscamos o 'plano' (cronograma distribuído) em vez da 'fila' bruta
+  const planoRef = useMemo(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]);
   const { data: planoDoc } = useDoc(planoRef);
 
   useEffect(() => {
@@ -122,7 +124,6 @@ export default function RecordsPage() {
     return { startDate: start, endDate: end };
   }, [selectedDate, selectedYear, selectedMonth, isClient]);
 
-  // Limite aumentado para 2000 registros para garantir que dispositivos mobile vejam o mesmo histórico que desktops
   const prodQuery = useMemoFirebase(() => firestore && startDate && endDate ? query(collection(firestore, 'productionRecords'), where('date', '>=', startDate), where('date', '<=', endDate), limit(2000)) : null, [firestore, startDate, endDate]);
   const lossQuery = useMemoFirebase(() => firestore && startDate && endDate ? query(collection(firestore, 'lossRecords'), where('date', '>=', startDate), where('date', '<=', endDate), limit(2000)) : null, [firestore, startDate, endDate]);
 
@@ -131,10 +132,18 @@ export default function RecordsPage() {
 
   const filteredPlanejamentoData = useMemo(() => {
     return planejamentoData.filter(record => {
+      // Filtragem por data baseada no campo dataExecucao do plano
+      if (record.dataExecucao && startDate && endDate) {
+        try {
+          const planDate = parse(record.dataExecucao, 'dd/MM/yyyy', new Date());
+          if (!isWithinInterval(planDate, { start: startDate, end: endDate })) return false;
+        } catch (e) { return false; }
+      }
+      
       const name = normalizeOperatorName(record.tecnico || record.operatorId);
       return (!selectedOperator || selectedOperator === 'all' || name === selectedOperator);
     });
-  }, [planejamentoData, selectedOperator]);
+  }, [planejamentoData, selectedOperator, startDate, endDate]);
 
   const operatorFilteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
@@ -156,8 +165,13 @@ export default function RecordsPage() {
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record.site || 'VALINHOS');
       const d = getOrCreate(factory);
-      // Garantindo precisão numérica com Number()
-      const time = (Number(record.torno) + Number(record.centro) + Number(record.setup) + Number(record.prog)) / 60;
+      // No 'plano', o tempo já está dividido por turnos
+      const time = (Number(record.tempoMinutos || 0) + Number(record.setupMinutos || 0)) / 60;
+      
+      const type = String(record.tipoAtividade || 'USINAGEM').toUpperCase();
+      const planKey = `plan_${type === 'PROGRAMACAO' ? 'PROGRAMACAO' : 'PRODUCAO'}`;
+      
+      d[planKey] = (d[planKey] || 0) + time;
       d.totalPlanejado += time;
     });
     
@@ -185,7 +199,7 @@ export default function RecordsPage() {
     return Object.keys(dataMap).map(factory => ({
         name: factory,
         ...dataMap[factory],
-        totalDisponivel: availableHoursJune[factory] || 0
+        totalDisponivel: availableHoursBudget[factory] || 0
     })).sort((a, b) => b.totalPlanejado - a.totalPlanejado);
   }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords]);
 
@@ -198,7 +212,7 @@ export default function RecordsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Visão Supervisor</h1>
-          <p className="text-muted-foreground">Análise consolidada de produtividade e eficiência industrial.</p>
+          <p className="text-muted-foreground">Análise consolidada de produtividade e eficiência baseada no cronograma.</p>
         </div>
         <div className="flex items-center gap-3">
             <Button variant="outline" asChild><Link href="/dashboard/programming">Ver Cronograma</Link></Button>
@@ -270,7 +284,7 @@ export default function RecordsPage() {
         <Card>
             <CardHeader>
             <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /> Performance: Planejado vs Realizado</CardTitle>
-            <CardDescription>Comparativo de horas baseado nos registros de produção e perdas do Firestore.</CardDescription>
+            <CardDescription>Comparativo de carga horária baseado no cronograma (Plano de Carga) e apontamentos reais.</CardDescription>
             </CardHeader>
             <CardContent>
             <OperatorPerformanceChart 
@@ -284,16 +298,11 @@ export default function RecordsPage() {
             </CardContent>
         </Card>
 
-        {/* Gráfico Planejado vs Realizado em destaque (largura total) */}
         <PlannedVsMachinedChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
-
-        {/* Gráfico OEE em destaque (largura total) */}
         <OeeLossWaterfallChart productionData={operatorFilteredProductionRecords} lossData={operatorFilteredLossRecords} loading={isLoading} />
-
-        <div className="grid grid-cols-1 gap-6">
-            <AvailableVsActualChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
-        </div>
+        <AvailableVsActualChart data={plannedVsMachinedData} loading={isLoading || loadingPlanejamento} />
       </div>
     </div>
   );
 }
+

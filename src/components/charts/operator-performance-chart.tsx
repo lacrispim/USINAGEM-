@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -52,22 +53,10 @@ const CATEGORY_STYLES: Record<string, { label: string; color: string }> = {
     'INSPEÇÃO & VALIDAÇÃO DAS PEÇAS': { label: 'Qualidade', color: '#3b82f6' },
     'MANUTENÇÃO PLANEJADA': { label: 'Manutenção', color: '#7c3aed' },
     'QUEBRA': { label: 'Quebra', color: '#b91c1c' },
-    'FALHA DE PROCESSO': { label: 'Falha Proc.', color: '#451a03' },
-    'ABSENTEÍSMO': { label: 'Absenteísmo', color: '#4b5563' },
-    'FALTA DE MATERIAL & FERRAMENTA': { label: 'Falta Mat/Ferr', color: '#1e3a8a' },
-    'MOVIMENTAÇÃO DE PEÇAS E EQUIPAMENTOS': { label: 'Movimentação', color: '#064e3b' },
-    'PEQUENAS PARADAS': { label: 'Peq. Paradas', color: '#78350f' },
-    'AJUSTES CORRETIVOS DE PROCESSOS': { label: 'Ajustes', color: '#be185d' },
-    'VELOCIDADE REDUZIDA (PROBLEMA DE MÁQUINA)': { label: 'Vel. Reduzida', color: '#4c1d95' },
-    'RETRABALHO': { label: 'Retrabalho', color: '#111827' },
-    'SERVIÇOS DE BANCADA/SERRA': { label: 'Bancada/Serra', color: '#fbbf24' },
-    'AUXÍLIO EM MAQUINA': { label: 'Auxílio Máquina', color: '#2dd4bf' },
-    'AUXÍLIO AS FÁBRICAS': { label: 'Aux. Fábricas', color: '#0ea5e9' },
 };
 
 const DEFAULT_COLOR = '#6b7280';
 
-// Normalização unificada para evitar desincronia entre dispositivos (especialmente com nomes acentuados)
 const normalizeOperatorName = (name: any) => {
   if (!name) return '';
   const n = String(name).toLowerCase().trim();
@@ -115,25 +104,21 @@ export function OperatorPerformanceChart({
         return operatorStats[name];
     };
 
-    // Processar Realizado de Produção
+    // Processar Realizado
     productionData.forEach(record => {
-      const name = normalizeOperatorName(record.operatorId || record.tecnico);
+      const name = normalizeOperatorName(record.operatorId);
       if (name) {
         const stats = getOrCreate(name);
         const hours = Number(record.machiningTime || 0) / 60;
-        
-        const rawActivity = String(record.activityType || 'PRODUCAO').toUpperCase().trim();
-        const catKey = getCategoryKey(rawActivity);
-        
+        const catKey = getCategoryKey(record.activityType || 'PRODUCAO');
         stats[`real_${catKey}`] = (stats[`real_${catKey}`] || 0) + hours;
         stats.realTotal += hours;
         categoriesFound.add(catKey);
       }
     });
 
-    // Processar Realizado de Perdas
     lossData.forEach(record => {
-      const name = normalizeOperatorName(record.operatorId || record.tecnico);
+      const name = normalizeOperatorName(record.operatorId);
       if (name) {
         const stats = getOrCreate(name);
         const hours = Number(record.timeLost || 0) / 60;
@@ -144,23 +129,26 @@ export function OperatorPerformanceChart({
       }
     });
 
-    // Processar Planejado (usando os dados da Fila transformados em Plano)
+    // Processar Planejado baseado no 'plano' (cronograma distribuído)
     plannedData.forEach(record => {
-      const name = normalizeOperatorName(record.tecnico || record.operatorId);
+      const name = normalizeOperatorName(record.tecnico);
       if (name) {
         const stats = getOrCreate(name);
+        const hours = (Number(record.tempoMinutos || 0) + Number(record.setupMinutos || 0)) / 60;
         
-        // No novo motor, cada registro já é uma tecnologia (Torno, Centro, etc.)
-        const techTime = (Number(record.torno || 0) + Number(record.centro || 0) + Number(record.setup || 0) + Number(record.prog || 0)) / 60;
-        
-        // Categorizar o tempo planejado baseado na tecnologia predominante
+        // Categorizar o planejado baseado no tipo de atividade do plano
+        const rawType = String(record.tipoAtividade || 'USINAGEM').toUpperCase();
         let catKey = 'PRODUCAO';
-        if (Number(record.prog) > 0) catKey = 'PROGRAMACAO';
-        if (Number(record.setup) > 0 && Number(record.torno) === 0 && Number(record.centro) === 0) catKey = 'SETUP';
+        if (rawType.includes('PROGRAMACAO')) catKey = 'PROGRAMACAO';
+        
+        // Se tem tempo de setup mas não de produção, conta como Setup
+        if (Number(record.setupMinutos) > 0 && Number(record.tempoMinutos) === 0) {
+            catKey = 'SETUP';
+        }
 
         const field = `plan_${catKey}`;
-        stats[field] = (stats[field] || 0) + techTime;
-        stats.planTotal += techTime;
+        stats[field] = (stats[field] || 0) + hours;
+        stats.planTotal += hours;
         categoriesFound.add(catKey);
       }
     });
@@ -172,23 +160,17 @@ export function OperatorPerformanceChart({
       }))
       .sort((a, b) => (b.realTotal + b.planTotal) - (a.realTotal + a.planTotal));
 
-    const filteredData = selectedOperator && selectedOperator !== 'all'
-        ? sortedData.filter(item => item.name === selectedOperator)
-        : sortedData;
-
     const sortedCategories = Array.from(categoriesFound).sort((a, b) => {
         if (a === 'PRODUCAO') return -1;
         if (b === 'PRODUCAO') return 1;
-        if (a === 'PROGRAMACAO') return -1;
-        if (b === 'PROGRAMACAO') return 1;
         return a.localeCompare(b);
     });
 
     return { 
-        chartData: filteredData, 
+        chartData: sortedData, 
         activeCategories: sortedCategories
     };
-  }, [productionData, lossData, plannedData, selectedOperator]);
+  }, [productionData, lossData, plannedData]);
 
   const chartConfig = useMemo(() => {
     const config: any = {};
@@ -200,80 +182,7 @@ export function OperatorPerformanceChart({
   }, [activeCategories]);
   
   const maxVal = Math.max(...chartData.map(d => Math.max(d.planTotal, d.realTotal)), 0);
-  const xAxisDomainMax = Math.max(10, Math.ceil(maxVal) + 1);
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const p = payload[0].payload;
-      return (
-        <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[14rem]">
-          <div className="grid gap-1.5">
-            <p className="font-semibold text-lg">{label}</p>
-            
-            <div className="flex flex-col gap-1 border-b pb-2 mb-1">
-                <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold">Planejado (Total)</span>
-                    <span className="font-bold">{p.planTotal.toFixed(1)}h</span>
-                </div>
-                <div className="pl-3 flex flex-col gap-0.5">
-                    {activeCategories.map(cat => {
-                        const val = p[`plan_${cat}`] || 0;
-                        if (val <= 0) return null;
-                        return (
-                            <div key={`plan-tip-${cat}`} className="flex items-center gap-2">
-                                <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR }} />
-                                <div className="flex justify-between flex-1">
-                                    <span className="text-muted-foreground text-[10px]">{CATEGORY_STYLES[cat]?.label || cat}</span>
-                                    <span className="font-bold text-[10px]">{val.toFixed(1)}h</span>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-                <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold">Realizado (Total)</span>
-                    <span className="font-bold" style={{ color: p.fillColor }}>{p.realTotal.toFixed(1)}h</span>
-                </div>
-                <div className="pl-3 flex flex-col gap-0.5">
-                    {activeCategories.map(cat => {
-                        const val = p[`real_${cat}`] || 0;
-                        if (val <= 0) return null;
-                        return (
-                            <div key={`real-tip-${cat}`} className="flex items-center gap-2">
-                                <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR }} />
-                                <div className="flex justify-between flex-1">
-                                    <span className="text-muted-foreground text-[10px]">{CATEGORY_STYLES[cat]?.label || cat}</span>
-                                    <span className="font-bold text-[10px]">{val.toFixed(1)}h</span>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const CustomLegend = () => (
-    <div className="flex items-center justify-center gap-x-4 gap-y-2 mt-4 flex-wrap border-t pt-4">
-        <div className="flex items-center gap-1.5 mr-4">
-            <div className="w-2.5 h-2.5 rounded-full border-2 border-muted-foreground" />
-            <span className="text-[9px] font-black uppercase text-foreground">Barra Sup: Plan | Barra Inf: Real</span>
-        </div>
-        {activeCategories.map(cat => (
-            <div key={cat} className="flex items-center gap-1.5">
-                <div className={cn("w-2 h-2 rounded-sm")} style={{ backgroundColor: CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR }} />
-                <span className={cn("text-[9px] font-bold uppercase text-muted-foreground")}>{CATEGORY_STYLES[cat]?.label || cat}</span>
-            </div>
-        ))}
-    </div>
-  );
+  const xAxisDomainMax = Math.max(10, Math.ceil(maxVal) + 2);
 
   return (
     loading ? (
@@ -287,11 +196,6 @@ export function OperatorPerformanceChart({
                 layout="vertical" 
                 barGap={4} 
                 margin={{ top: 30, right: 60, left: 40, bottom: 20 }}
-                onClick={(e) => {
-                    if (e && e.activeLabel) {
-                        onOperatorSelect(e.activeLabel);
-                    }
-                }}
             >
               <CartesianGrid horizontal={false} strokeOpacity={0.1} />
                <YAxis 
@@ -301,20 +205,16 @@ export function OperatorPerformanceChart({
                     axisLine={false} 
                     tickMargin={10} 
                     width={120} 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12, cursor: 'pointer' }} 
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
                 />
               <XAxis type="number" domain={[0, xAxisDomainMax]} unit="h" tickLine={false} axisLine={false} className="text-[10px]" />
-              <ChartTooltip cursor={{ fill: 'hsl(var(--accent))', opacity: 0.05 }} content={<CustomTooltip />} />
+              <ChartTooltip cursor={{ fill: 'hsl(var(--accent))', opacity: 0.05 }} />
               
               <ReferenceLine x={7} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2}>
                   <Label value="Meta 7h" position="top" fill="#ef4444" fontSize={10} fontWeight="bold" />
               </ReferenceLine>
 
-              <ReferenceLine x={8} stroke="#f97316" strokeDasharray="3 3" strokeWidth={2}>
-                  <Label value="Meta 8h" position="top" fill="#f97316" fontSize={10} fontWeight="bold" />
-              </ReferenceLine>
-              
-              {/* STACK PLANEJADO (SUPERIOR) */}
+              {/* STACK PLANEJADO */}
               {activeCategories.map((cat, idx) => (
                 <Bar 
                     key={`plan-${cat}`} 
@@ -323,7 +223,6 @@ export function OperatorPerformanceChart({
                     fill={CATEGORY_STYLES[cat]?.color || DEFAULT_COLOR}
                     barSize={15}
                     radius={idx === activeCategories.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
-                    className="cursor-pointer"
                 >
                     {idx === activeCategories.length - 1 && (
                         <LabelList 
@@ -337,7 +236,7 @@ export function OperatorPerformanceChart({
                 </Bar>
               ))}
 
-              {/* STACK REALIZADO (INFERIOR) */}
+              {/* STACK REALIZADO */}
               {activeCategories.map((cat, idx) => (
                 <Bar 
                     key={`real-${cat}`} 
@@ -347,7 +246,6 @@ export function OperatorPerformanceChart({
                     opacity={0.8}
                     barSize={15}
                     radius={idx === activeCategories.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
-                    className="cursor-pointer"
                 >
                     {idx === activeCategories.length - 1 && (
                         <LabelList 
@@ -360,14 +258,13 @@ export function OperatorPerformanceChart({
                     )}
                 </Bar>
               ))}
-
-              <Legend content={<CustomLegend />} />
+              <Legend verticalAlign="top" height={36} />
             </BarChart>
           </ChartContainer>
         </ResponsiveContainer>
       </div>
     ) : (
-      <div className="flex h-[350px] w-full flex-col items-center justify-center"><p className="text-sm text-muted-foreground">Sem dados disponíveis.</p></div>
+      <div className="flex h-[350px] w-full flex-col items-center justify-center"><p className="text-sm text-muted-foreground">Sem dados disponíveis para o período.</p></div>
     )
   );
 }
