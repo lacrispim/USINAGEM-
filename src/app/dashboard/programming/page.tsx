@@ -252,14 +252,17 @@ export default function ProgrammingPage() {
     novaFila.forEach(job => {
         if (!job.etapa1 && !job.etapa2) return;
 
-        let tProg = allocateTask(job, 'ADM', 0, 'prog');
-        let tFinishEtapa1 = tProg;
+        // William faz a programação, mas a máquina não espera William terminar para começar a Etapa 1
+        // (A programação é tratada como um recurso em paralelo para William)
+        allocateTask(job, 'ADM', 0, 'prog');
+        
+        let tFinishEtapa1 = 0;
         
         const e1 = String(job.etapa1 || '').toUpperCase();
         if (e1.includes('TORNO')) {
-            tFinishEtapa1 = allocateTask(job, 'TORNO', tProg, 'torno');
+            tFinishEtapa1 = allocateTask(job, 'TORNO', 0, 'torno');
         } else if (e1.includes('CENTRO')) {
-            tFinishEtapa1 = allocateTask(job, 'CENTRO', tProg, 'centro');
+            tFinishEtapa1 = allocateTask(job, 'CENTRO', 0, 'centro');
         }
 
         const e2 = String(job.etapa2 || '').toUpperCase();
@@ -275,7 +278,7 @@ export default function ProgrammingPage() {
     await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
     await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
     
-    toast({ title: "Plano Atualizado", description: `As tarefas foram sequenciadas com base nas Etapas 1 e 2.` });
+    toast({ title: "Plano Atualizado", description: `As tarefas foram sequenciadas com base nas Etapas 1 e 2 sem ociosidade por programação.` });
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -286,17 +289,11 @@ export default function ProgrammingPage() {
       const workbook = XLSX.read(new Uint8Array(event.target?.result as ArrayBuffer), { type: 'array' });
       const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
       
-      /**
-       * Função robusta para encontrar valores nas colunas do Excel.
-       * A ordem no array 'keys' dita a prioridade da busca.
-       */
       const findVal = (row: any, keys: string[]) => {
-          // Primeiro passamos procurando por correspondência EXATA (ignorando case/espaços)
           for (const key of keys) {
               const rowKey = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
               if (rowKey !== undefined) return row[rowKey];
           }
-          // Segundo passamos procurando por correspondência PARCIAL (.includes)
           for (const key of keys) {
               const rowKey = Object.keys(row).find(k => k.toLowerCase().trim().includes(key.toLowerCase().trim()));
               if (rowKey !== undefined) return row[rowKey];
@@ -306,8 +303,7 @@ export default function ProgrammingPage() {
 
       const novaFila: JobBase[] = json.map((row, i) => ({
           id: `job-${i}-${Date.now()}`,
-          // PRIORIDADE: 'requisição' antes de 'Requisição2'
-          requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
+          requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms']) || 'S/N'),
           nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
           quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
           setup: Number(findVal(row, ['Tempo setup TORNO', 'Tempo setup CENTRO', 'setup', 'Setup Minutos']) || 20),
