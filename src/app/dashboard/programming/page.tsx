@@ -20,7 +20,9 @@ import {
   AlertCircle,
   Check,
   Power,
-  PowerOff
+  PowerOff,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { format, addDays, isSameDay, parse, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -29,6 +31,24 @@ import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface JobBase {
   id: string;
@@ -73,7 +93,7 @@ const TURNOS = [
 const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Marcos Barbosa'],
-    '2': ['Jair Melo'], 
+    '2': ['Alisson França'], 
     '3': ['Gustavo Gozzi']
   },
   'CENTRO': {
@@ -155,6 +175,21 @@ export default function ProgrammingPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
 
+  // Estado para novo item manual
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newItem, setNewItem] = useState<Partial<JobBase>>({
+    requisicao: '',
+    nomeDaPeca: '',
+    quantidade: 1,
+    setup: 20,
+    torno: 0,
+    centro: 0,
+    prog: 0,
+    site: 'VALINHOS',
+    etapa1: '',
+    etapa2: ''
+  });
+
   const { data: filaDoc } = useDoc(useMemo(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]));
   const { data: planoDoc } = useDoc(useMemo(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]));
   const { data: configDoc } = useDoc(useMemo(() => firestore ? doc(firestore, 'programacaoState', 'config') : null, [firestore]));
@@ -196,7 +231,6 @@ export default function ProgrammingPage() {
     try {
       await setDoc(doc(firestore, 'programacaoState', 'config'), { disabledShifts: newDisabled, updatedAt: serverTimestamp() });
       toast({ title: "Turno Atualizado", description: `Turno ${shiftId} ${newDisabled[key] ? 'desativado' : 'ativado'}.` });
-      // Recalcula o plano para refletir a nova disponibilidade
       recalculatePlan(fila, newDisabled);
     } catch (e) {
       toast({ title: "Erro", description: "Falha ao salvar configuração.", variant: "destructive" });
@@ -244,7 +278,6 @@ export default function ProgrammingPage() {
 
             const techName = MACHINE_LANES[techKey][String(shiftIdx + 1)]?.[chosenLane];
 
-            // Pula se o turno estiver desativado ou se não houver técnico mapeado
             if (isShiftDisabled || !techName) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue;
@@ -377,6 +410,52 @@ export default function ProgrammingPage() {
     reader.readAsArrayBuffer(file);
   };
 
+  const handleAddManual = async () => {
+    if (!newItem.requisicao || !newItem.nomeDaPeca) {
+      toast({ title: "Erro", description: "Preencha ao menos Requisição e Nome da Peça.", variant: "destructive" });
+      return;
+    }
+
+    const job: JobBase = {
+      id: `job-manual-${Date.now()}`,
+      requisicao: newItem.requisicao || 'S/N',
+      nomeDaPeca: newItem.nomeDaPeca || 'SEM NOME',
+      quantidade: Number(newItem.quantidade) || 1,
+      setup: Number(newItem.setup) || 20,
+      torno: Number(newItem.torno) || 0,
+      centro: Number(newItem.centro) || 0,
+      prog: Number(newItem.prog) || 0,
+      site: newItem.site || 'VALINHOS',
+      etapa1: newItem.etapa1 || '',
+      etapa2: newItem.etapa2 || ''
+    };
+
+    const novaFila = [...fila, job];
+    setFila(novaFila);
+    await recalculatePlan(novaFila);
+    setIsAddDialogOpen(false);
+    setNewItem({
+      requisicao: '',
+      nomeDaPeca: '',
+      quantidade: 1,
+      setup: 20,
+      torno: 0,
+      centro: 0,
+      prog: 0,
+      site: 'VALINHOS',
+      etapa1: '',
+      etapa2: ''
+    });
+    toast({ title: "Sucesso", description: "Requisição adicionada manualmente." });
+  };
+
+  const handleDeleteManual = async (id: string) => {
+    const novaFila = fila.filter(j => j.id !== id);
+    setFila(novaFila);
+    await recalculatePlan(novaFila);
+    toast({ title: "Excluído", description: "Requisição removida da fila." });
+  };
+
   return (
     <div className="flex flex-col gap-6 bg-background dark p-4">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -388,6 +467,82 @@ export default function ProgrammingPage() {
           <Button variant="outline" className="h-10" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
           <div className="flex items-center gap-2 font-bold min-w-[120px] justify-center"><CalendarDays className="h-4 w-4 text-primary" />{format(currentDate, 'dd/MM/yyyy')}</div>
           <Button variant="outline" className="h-10" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
+          
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="secondary" className="h-10 text-[10px] font-black uppercase"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Adicionar Requisição Manual</DialogTitle>
+                <DialogDescription>Preencha os dados da peça para inserir na fila de produção.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Requisição</Label>
+                    <Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} placeholder="Ex: M0008" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nome da Peça</Label>
+                    <Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} placeholder="Ex: Eixo Motor" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Quantidade</Label>
+                    <Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Setup (min)</Label>
+                    <Input type="number" value={newItem.setup} onChange={e => setNewItem({...newItem, setup: Number(e.target.value)})} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Torno (min)</Label>
+                    <Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Centro (min)</Label>
+                    <Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Prog (min)</Label>
+                    <Input type="number" value={newItem.prog} onChange={e => setNewItem({...newItem, prog: Number(e.target.value)})} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Etapa 1</Label>
+                    <Select value={newItem.etapa1} onValueChange={v => setNewItem({...newItem, etapa1: v})}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="null">Nenhuma</SelectItem>
+                        <SelectItem value="TORNO">TORNO</SelectItem>
+                        <SelectItem value="CENTRO">CENTRO</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Etapa 2</Label>
+                    <Select value={newItem.etapa2} onValueChange={v => setNewItem({...newItem, etapa2: v})}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="null">Nenhuma</SelectItem>
+                        <SelectItem value="TORNO">TORNO</SelectItem>
+                        <SelectItem value="CENTRO">CENTRO</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleAddManual} className="w-full">Adicionar na Fila</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           <Button variant="outline" className="h-10 text-[10px] font-black uppercase" onClick={() => recalculatePlan([], disabledShifts)}><Eraser className="h-4 w-4 mr-2" /> Limpar</Button>
           <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
           <Button className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase shadow-lg" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha</Button>
@@ -485,12 +640,13 @@ export default function ProgrammingPage() {
                     <TableHead>PEÇA</TableHead>
                     <TableHead className="text-right">QTD</TableHead>
                     <TableHead className="text-right">TOTAL</TableHead>
+                    <TableHead className="w-10"></TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
               {fila.length === 0 ? (
                 <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição</TableCell>
+                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição</TableCell>
                 </TableRow>
               ) : fila.map((job, idx) => (
                 <TableRow key={job.id} className="hover:bg-muted/5">
@@ -519,6 +675,11 @@ export default function ProgrammingPage() {
                   <TableCell className="uppercase text-[10px] font-medium max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
                   <TableCell className="text-right font-mono font-bold">{job.quantidade} pç</TableCell>
                   <TableCell className="text-right text-[10px] text-muted-foreground">{Number(job.torno) + Number(job.centro) + Number(job.setup)} min</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteManual(job.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
