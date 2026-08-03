@@ -17,6 +17,7 @@ import {
   FileUp,
   Coffee,
   Mic,
+  AlertCircle,
 } from 'lucide-react';
 import { format, addDays, isSameDay, parse, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -81,8 +82,7 @@ const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   }
 };
 
-// Jornada de 7 horas úteis (420 minutos)
-const SHIFT_MIN = 420; 
+const SHIFT_MIN = 420; // 7 horas úteis
 const PAUSAS = [
   { start: 0, duration: 10, label: 'DDS', icon: Mic },
   { start: 180, duration: 15, label: 'CAFÉ', icon: Coffee }
@@ -155,34 +155,29 @@ export default function ProgrammingPage() {
     if (!firestore) return;
     const novosPlanItems: PlanejamentoItem[] = [];
     
-    // Ponteiros de tempo global (em minutos) por Raia
     const lanePointers: Record<string, number> = { 
-        'TORNO_0': 0, 
-        'TORNO_1': 0, 
-        'CENTRO_0': 0, 
-        'ADM_0': 0 
+        'TORNO_0': 0, 'TORNO_1': 0, 'CENTRO_0': 0, 'ADM_0': 0 
     }; 
 
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
         let totalDuration = Number(job[type]) || 0;
         if (totalDuration <= 0 && type !== 'prog') return minStartTime;
         
-        // Decisão de Raia: Marcos (0) ou Alisson (1) no Torno. Para o resto, sempre 0.
         let chosenLane = 0;
         if (techKey === 'TORNO') {
             chosenLane = lanePointers['TORNO_0'] <= lanePointers['TORNO_1'] ? 0 : 1;
         }
         
         const laneId = `${techKey}_${chosenLane}`;
-        let actualStart = Math.max(lanePointers[laneId] || 0, minStartTime);
+        let actualPointer = Math.max(lanePointers[laneId] || 0, minStartTime);
         let pendingSetup = type === 'prog' ? 0 : 20;
         let pendingProd = totalDuration;
         let doneProdTime = 0;
         const cycleTime = job.quantidade > 0 ? totalDuration / job.quantidade : totalDuration;
 
         while (pendingSetup > 0.01 || pendingProd > 0.01) {
-            const dayIdx = Math.floor(actualStart / (SHIFT_MIN * 3));
-            const startInDay = actualStart % (SHIFT_MIN * 3);
+            const dayIdx = Math.floor(actualPointer / (SHIFT_MIN * 3));
+            const startInDay = actualPointer % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const startOffset = startInDay % SHIFT_MIN;
             
@@ -190,7 +185,7 @@ export default function ProgrammingPage() {
             const isAlissonLane = techKey === 'TORNO' && chosenLane === 1;
 
             if ((isAlissonLane && shiftIdx !== 0) || !techName) {
-                actualStart = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
+                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue;
             }
 
@@ -202,7 +197,7 @@ export default function ProgrammingPage() {
             }
             
             if (winStart >= SHIFT_MIN - 1) { 
-                actualStart = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
+                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue; 
             }
 
@@ -241,30 +236,41 @@ export default function ProgrammingPage() {
                 });
             }
             
-            actualStart += (sInShift + pInShift + (winStart - startOffset));
+            actualPointer = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
             
             if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) {
-                actualStart = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
+                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
             }
         }
-        lanePointers[laneId] = actualStart;
-        return actualStart;
+        lanePointers[laneId] = actualPointer;
+        return actualPointer;
     };
 
     novaFila.forEach(job => {
-        let tInit = allocateTask(job, 'ADM', 0, 'prog');
-        let finishEtapa1 = tInit;
+        // Se não tem Etapa 1 nem Etapa 2, ignora a alocação na timeline (fica em espera)
+        if (!job.etapa1 && !job.etapa2) return;
+
+        let tProg = allocateTask(job, 'ADM', 0, 'prog');
+        let tFinishEtapa1 = tProg;
         
-        if (job.etapa1.includes('TORNO') || (job.torno > 0 && !job.etapa1)) {
-            finishEtapa1 = allocateTask(job, 'TORNO', tInit, 'torno');
-        } else if (job.etapa1.includes('CENTRO') || (job.centro > 0 && !job.etapa1)) {
-            finishEtapa1 = allocateTask(job, 'CENTRO', tInit, 'centro');
+        // ETAPA 1
+        const e1 = job.etapa1.toUpperCase();
+        if (e1.includes('TORNO')) {
+            tFinishEtapa1 = allocateTask(job, 'TORNO', tProg, 'torno');
+        } else if (e1.includes('CENTRO')) {
+            tFinishEtapa1 = allocateTask(job, 'CENTRO', tProg, 'centro');
+        } else if (job.torno > 0) {
+            tFinishEtapa1 = allocateTask(job, 'TORNO', tProg, 'torno');
+        } else if (job.centro > 0) {
+            tFinishEtapa1 = allocateTask(job, 'CENTRO', tProg, 'centro');
         }
-        
-        if (job.etapa2.includes('TORNO')) {
-            allocateTask(job, 'TORNO', finishEtapa1, 'torno');
-        } else if (job.etapa2.includes('CENTRO')) {
-            allocateTask(job, 'CENTRO', finishEtapa1, 'centro');
+
+        // ETAPA 2 (Sempre começa APÓS o término da Etapa 1)
+        const e2 = job.etapa2.toUpperCase();
+        if (e2.includes('TORNO')) {
+            allocateTask(job, 'TORNO', tFinishEtapa1, 'torno');
+        } else if (e2.includes('CENTRO')) {
+            allocateTask(job, 'CENTRO', tFinishEtapa1, 'centro');
         }
     });
 
@@ -273,10 +279,7 @@ export default function ProgrammingPage() {
     await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
     await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
     
-    toast({ 
-      title: "Plano Atualizado", 
-      description: `Capacidade de 7h/turno aplicada com sucesso.` 
-    });
+    toast({ title: "Plano Atualizado", description: `Capacidade de 7h/turno aplicada com fluxo de etapas.` });
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -302,8 +305,8 @@ export default function ProgrammingPage() {
           centro: Number(findVal(row, ['centro minutos', 'centro min', 'Tempo de Planejamento Centro Minutos todas as peças solicitadas']) || 0),
           prog: Number(findVal(row, ['prog', 'programação', 'Programação Minutos']) || 0),
           site: String(findVal(row, ['site', 'fabrica', 'Fábrica']) || 'VALINHOS'),
-          etapa1: String(findVal(row, ['etapa 1', 'etapa1', 'Etapa 1']) || ''),
-          etapa2: String(findVal(row, ['etapa 2', 'etapa2', 'Etapa 2']) || ''),
+          etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1']) || ''),
+          etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
       }));
       
       await recalculatePlan(novaFila);
@@ -394,7 +397,7 @@ export default function ProgrammingPage() {
             <TableHeader>
                 <TableRow>
                     <TableHead className="w-20 text-center">AÇÕES</TableHead>
-                    <TableHead>FLUXO</TableHead>
+                    <TableHead>FLUXO / STATUS</TableHead>
                     <TableHead>REQ.</TableHead>
                     <TableHead>PEÇA</TableHead>
                     <TableHead className="text-right">QTD</TableHead>
@@ -416,9 +419,17 @@ export default function ProgrammingPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                        {job.etapa1 && <Badge variant="outline" className="text-[9px]">{job.etapa1}</Badge>}
-                        {job.etapa2 && <span className="text-muted-foreground text-xs">→</span>}
-                        {job.etapa2 && <Badge variant="outline" className="text-[9px]">{job.etapa2}</Badge>}
+                        {(!job.etapa1 && !job.etapa2) ? (
+                            <Badge variant="destructive" className="text-[8px] animate-pulse flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" /> AGUARDANDO DEFINIÇÃO
+                            </Badge>
+                        ) : (
+                            <>
+                                {job.etapa1 && <Badge variant="outline" className="text-[9px] bg-primary/10">{job.etapa1}</Badge>}
+                                {job.etapa2 && <span className="text-muted-foreground text-xs">→</span>}
+                                {job.etapa2 && <Badge variant="outline" className="text-[9px] bg-primary/20">{job.etapa2}</Badge>}
+                            </>
+                        )}
                     </div>
                   </TableCell>
                   <TableCell className="font-mono font-bold">#{job.requisicao}</TableCell>
@@ -434,4 +445,3 @@ export default function ProgrammingPage() {
     </div>
   );
 }
-
