@@ -692,7 +692,7 @@ export default function ProgrammingPage() {
           <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="w-16 text-center">POS</TableHead>
+                    <TableHead className="w-20 text-center">POS</TableHead>
                     <TableHead className="w-20 text-center">AÇÕES</TableHead>
                     <TableHead>FÁBRICA / SITE</TableHead>
                     <TableHead>FLUXO</TableHead>
@@ -710,28 +710,33 @@ export default function ProgrammingPage() {
                 const globalIdx = fila.findIndex(f => f.id === job.id);
                 return (
                   <TableRow key={job.id} className="hover:bg-muted/5">
-                    <TableCell className="text-center">
-                        <Input 
-                            type="number" 
-                            key={`pos-input-${job.id}-${globalIdx}`}
-                            defaultValue={globalIdx + 1}
-                            className="h-8 w-12 text-center text-xs font-black bg-primary/10 border-primary/20 focus:ring-primary"
-                            onBlur={(e) => {
-                                const newPos = parseInt(e.target.value);
-                                if (!isNaN(newPos) && newPos !== globalIdx + 1) {
-                                    moveJobToPosition(globalIdx, newPos);
-                                }
-                            }}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    const val = parseInt((e.target as HTMLInputElement).value);
-                                    if (!isNaN(val) && val !== globalIdx + 1) {
-                                        moveJobToPosition(globalIdx, val);
-                                    }
-                                    (e.target as HTMLInputElement).blur();
-                                }
-                            }}
-                        />
+                    <TableCell className="text-center px-4">
+                        <div className="relative group/pos">
+                          <Input 
+                              type="number" 
+                              key={`pos-input-${job.id}-${globalIdx}`}
+                              defaultValue={globalIdx + 1}
+                              className="h-10 w-12 text-center text-sm font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all"
+                              onFocus={(e) => e.target.select()}
+                              onBlur={(e) => {
+                                  const newPos = parseInt(e.target.value);
+                                  if (!isNaN(newPos) && newPos !== globalIdx + 1 && newPos > 0) {
+                                      moveJobToPosition(globalIdx, newPos);
+                                  } else {
+                                      e.target.value = String(globalIdx + 1);
+                                  }
+                              }}
+                              onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                      const val = parseInt((e.target as HTMLInputElement).value);
+                                      if (!isNaN(val) && val !== globalIdx + 1 && val > 0) {
+                                          moveJobToPosition(globalIdx, val);
+                                      }
+                                      (e.target as HTMLInputElement).blur();
+                                  }
+                              }}
+                          />
+                        </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex flex-col items-center gap-1">
