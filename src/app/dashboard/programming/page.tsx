@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -105,7 +104,6 @@ const ALL_TECHNICIANS = [
   "Marcos Barbosa"
 ];
 
-// ESCALA TÉCNICA PADRÃO
 const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Marcos Barbosa'],
@@ -452,7 +450,7 @@ export default function ProgrammingPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 bg-background dark p-4">
+    <div className="flex flex-col gap-6 p-4">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
             <h1 className="text-3xl font-bold uppercase font-['Barlow_Condensed']">Plano de Carga CNC</h1>
@@ -526,7 +524,7 @@ export default function ProgrammingPage() {
             
             return (
                 <div key={d} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
-                    <div className="bg-muted/40 p-4 border-b-2 border-primary flex justify-between items-center">
+                    <div className="bg-muted/10 p-4 border-b border-border flex justify-between items-center">
                         <div className="flex items-center gap-4">
                             <span className="text-xl font-bold font-['Barlow_Condensed'] uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
@@ -537,11 +535,11 @@ export default function ProgrammingPage() {
                         const isDisabled = disabledShifts[shiftKey];
                         return (
                             <div key={t.id} className={cn("grid grid-cols-[100px_1fr] border-b border-border/20 last:border-0 relative", isDisabled && "bg-stripes")}>
-                                <div className="bg-muted/10 border-r border-border/20 p-4 flex flex-col justify-center items-center gap-2">
+                                <div className="bg-muted/5 border-r border-border/20 p-4 flex flex-col justify-center items-center gap-2">
                                     <span className={cn("text-2xl font-bold font-['Barlow_Condensed']", isDisabled ? "text-muted-foreground" : "text-foreground")}>{t.label}</span>
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => toggleShift(day, t.id)}>{isDisabled ? <PowerOff className="h-3.5 w-3.5 text-destructive" /> : <Power className="h-3.5 w-3.5 text-green-500" />}</Button>
                                 </div>
-                                <div className="p-4 bg-card/40">
+                                <div className="p-4 bg-background/20">
                                     {!isDisabled && (
                                         <>
                                             <Ruler />
@@ -579,6 +577,11 @@ export default function ProgrammingPage() {
                                                 );
                                             })}
                                         </>
+                                    )}
+                                    {isDisabled && (
+                                      <div className="h-full flex items-center justify-center opacity-20">
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Turno Desativado</span>
+                                      </div>
                                     )}
                                 </div>
                             </div>
@@ -649,7 +652,7 @@ export default function ProgrammingPage() {
       
       <style jsx global>{`
         .bg-stripes {
-          background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.05) 0px, rgba(255, 255, 255, 0.05) 10px, transparent 10px, transparent 20px);
+          background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 10px, transparent 10px, transparent 20px);
         }
       `}</style>
     </div>
