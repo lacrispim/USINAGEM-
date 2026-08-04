@@ -5,7 +5,6 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -94,10 +93,15 @@ const TURNOS = [
 
 const FACTORIES = ["VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
 
+// ESCALA TÉCNICA ATUALIZADA:
+// Torno: Marcos Barbosa (1T), Jair Melo (2T), Gustavo Gozzi (3T)
+// Centro: Daniel Solivo (1T), Nathan Xavier (2T), Rodrigo Cantano (3T)
+// ADM: William Martinucci (1T)
+// Alisson França: Folgista (Cobre ausências, sem raia fixa)
 const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Marcos Barbosa'],
-    '2': ['Alisson França'], 
+    '2': ['Jair Melo'], 
     '3': ['Gustavo Gozzi']
   },
   'CENTRO': {
@@ -316,13 +320,19 @@ export default function ProgrammingPage() {
         return actualPointer;
     };
 
+    // ALOCAÇÃO OTIMIZADA: Prioriza preencher Etapa 1 em paralelo para ocupar todas as máquinas
+    // 1. Programação corre em paralelo
     novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
+    
+    // 2. Preenche primeiro todas as Etapas 1 (Torno ou Centro) de todos os jobs para ocupar técnicos ociosos
     novaFila.forEach(job => {
         const e1 = String(job.etapa1 || '').toUpperCase();
         if (e1.includes('TORNO')) jobCompletionTimes[job.id] = allocateTask(job, 'TORNO', 0, 'torno');
         else if (e1.includes('CENTRO')) jobCompletionTimes[job.id] = allocateTask(job, 'CENTRO', 0, 'centro');
         else jobCompletionTimes[job.id] = 0;
     });
+    
+    // 3. Preenche as Etapas 2 respeitando a finalização da Etapa 1
     novaFila.forEach(job => {
         const e2 = String(job.etapa2 || '').toUpperCase();
         const minStart = jobCompletionTimes[job.id] || 0;
@@ -552,4 +562,3 @@ export default function ProgrammingPage() {
     </div>
   );
 }
-
