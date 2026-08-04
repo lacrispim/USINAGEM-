@@ -22,7 +22,8 @@ import {
   Trash2,
   MapPin,
   UserRoundPen,
-  Filter
+  Filter,
+  Hash
 } from 'lucide-react';
 import { format, addDays, isSameDay, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -204,7 +205,6 @@ export default function ProgrammingPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   
-  // Estado para filtro de site
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -241,7 +241,6 @@ export default function ProgrammingPage() {
     else if (planoDoc === null) setLoading(false);
   }, [filaDoc, planoDoc, configDoc]);
 
-  // Dados filtrados para exibição
   const filteredFila = useMemo(() => {
     if (selectedSiteFilter === 'all') return fila;
     return fila.filter(item => item.site === selectedSiteFilter);
@@ -301,6 +300,19 @@ export default function ProgrammingPage() {
     } catch (e) {
       toast({ title: "Erro", description: "Falha ao salvar troca.", variant: "destructive" });
     }
+  };
+
+  const moveJobToPosition = async (currentIdx: number, newPos: number) => {
+    const targetIdx = Math.max(0, Math.min(fila.length - 1, newPos - 1));
+    if (currentIdx === targetIdx) return;
+    
+    const newFila = [...fila];
+    const [movedItem] = newFila.splice(currentIdx, 1);
+    newFila.splice(targetIdx, 0, movedItem);
+    
+    setFila(newFila);
+    await recalculatePlan(newFila);
+    toast({ title: "Sequência Alterada", description: `Requisição movida para a posição ${targetIdx + 1}.` });
   };
 
   const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides) => {
@@ -680,6 +692,7 @@ export default function ProgrammingPage() {
           <Table>
             <TableHeader>
                 <TableRow>
+                    <TableHead className="w-16 text-center">POS</TableHead>
                     <TableHead className="w-20 text-center">AÇÕES</TableHead>
                     <TableHead>FÁBRICA / SITE</TableHead>
                     <TableHead>FLUXO</TableHead>
@@ -692,41 +705,62 @@ export default function ProgrammingPage() {
             </TableHeader>
             <TableBody>
               {filteredFila.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição{selectedSiteFilter !== 'all' ? ` para ${selectedSiteFilter}` : ''}</TableCell></TableRow>
-              ) : filteredFila.map((job, idx) => (
-                <TableRow key={job.id} className="hover:bg-muted/5">
-                  <TableCell className="text-center">
-                    <div className="flex flex-col items-center gap-1">
-                        <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => { const nf = [...fila]; [nf[idx], nf[idx-1]] = [nf[idx-1], nf[idx]]; recalculatePlan(nf); }} disabled={idx === 0}><ArrowUp className="h-3 w-3" /></Button>
-                        <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => { const nf = [...fila]; [nf[idx], nf[idx+1]] = [nf[idx+1], nf[idx]]; recalculatePlan(nf); }} disabled={idx === fila.length - 1}><ArrowDown className="h-3 w-3" /></Button>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3 text-primary" />
-                        <span className="text-[10px] font-black uppercase text-foreground">{job.site || 'VALINHOS DOVE'}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                        {(!job.etapa1 && !job.etapa2) ? (
-                            <Badge variant="destructive" className="text-[8px] animate-pulse">AGUARDANDO</Badge>
-                        ) : (
-                            <div className="flex items-center gap-1 text-[9px] font-bold">
-                                {job.etapa1 && <span className="bg-primary/10 px-1 rounded">{job.etapa1}</span>}
-                                {job.etapa2 && <span>→</span>}
-                                {job.etapa2 && <span className="bg-primary/20 px-1 rounded">{job.etapa2}</span>}
-                            </div>
-                        )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono font-bold">#{job.requisicao}</TableCell>
-                  <TableCell className="uppercase text-[10px] font-medium max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
-                  <TableCell className="text-right font-mono font-bold">{job.quantidade} pç</TableCell>
-                  <TableCell className="text-right text-[10px] text-muted-foreground">{Number(job.torno) + Number(job.centro) + Number(job.setup)} min</TableCell>
-                  <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteManual(job.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
-                </TableRow>
-              ))}
+                <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição{selectedSiteFilter !== 'all' ? ` para ${selectedSiteFilter}` : ''}</TableCell></TableRow>
+              ) : filteredFila.map((job, idx) => {
+                const globalIdx = fila.findIndex(f => f.id === job.id);
+                return (
+                  <TableRow key={job.id} className="hover:bg-muted/5">
+                    <TableCell className="text-center">
+                        <Input 
+                            type="number" 
+                            defaultValue={globalIdx + 1}
+                            className="h-8 w-12 text-center text-xs font-black bg-primary/10 border-primary/20 focus:ring-primary"
+                            onBlur={(e) => {
+                                const newPos = parseInt(e.target.value);
+                                if (!isNaN(newPos)) moveJobToPosition(globalIdx, newPos);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    const newPos = parseInt((e.target as HTMLInputElement).value);
+                                    if (!isNaN(newPos)) moveJobToPosition(globalIdx, newPos);
+                                    (e.target as HTMLInputElement).blur();
+                                }
+                            }}
+                        />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex flex-col items-center gap-1">
+                          <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, globalIdx)} disabled={globalIdx === 0}><ArrowUp className="h-3 w-3" /></Button>
+                          <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, globalIdx + 2)} disabled={globalIdx === fila.length - 1}><ArrowDown className="h-3 w-3" /></Button>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                          <MapPin className="h-3 w-3 text-primary" />
+                          <span className="text-[10px] font-black uppercase text-foreground">{job.site || 'VALINHOS DOVE'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                          {(!job.etapa1 && !job.etapa2) ? (
+                              <Badge variant="destructive" className="text-[8px] animate-pulse">AGUARDANDO</Badge>
+                          ) : (
+                              <div className="flex items-center gap-1 text-[9px] font-bold">
+                                  {job.etapa1 && <span className="bg-primary/10 px-1 rounded">{job.etapa1}</span>}
+                                  {job.etapa2 && <span>→</span>}
+                                  {job.etapa2 && <span className="bg-primary/20 px-1 rounded">{job.etapa2}</span>}
+                              </div>
+                          )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono font-bold">#{job.requisicao}</TableCell>
+                    <TableCell className="uppercase text-[10px] font-medium max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
+                    <TableCell className="text-right font-mono font-bold">{job.quantidade} pç</TableCell>
+                    <TableCell className="text-right text-[10px] text-muted-foreground">{Number(job.torno) + Number(job.centro) + Number(job.setup)} min</TableCell>
+                    <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteManual(job.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
