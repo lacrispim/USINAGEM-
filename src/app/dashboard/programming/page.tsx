@@ -140,7 +140,6 @@ const PAUSAS = [
   { start: 180, duration: 15, label: 'CAFÉ', icon: Coffee }
 ];
 
-// Helper to normalize site names (handles Valinhos consolidation and casing)
 const normalizeSiteName = (site: string | undefined): string => {
   if (!site) return 'VALINHOS';
   const s = String(site).toUpperCase().trim();
@@ -524,12 +523,10 @@ export default function ProgrammingPage() {
 
   return (
     <div className="flex flex-col gap-6 p-4">
-      {/* Cabeçalho Organizado em Duas Camadas para Evitar Sobreposição */}
       <div className="flex flex-col gap-6 border-b border-border/50 pb-6 mb-2">
-        {/* Camada Superior: Título e Botões de Ação Principais */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl md:text-5xl font-black uppercase font-['Barlow_Condensed'] tracking-tighter leading-none">Plano de Carga CNC</h1>
+            <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none">Plano de Carga CNC</h1>
             <p className="text-[10px] tracking-[0.2em] text-muted-foreground uppercase font-black mt-1 opacity-70">Time Técnico · Jornada 7h Disponíveis</p>
           </div>
           
@@ -599,7 +596,6 @@ export default function ProgrammingPage() {
           </div>
         </div>
 
-        {/* Camada Inferior: Filtros e Navegação de Data */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1 shadow-inner w-full md:w-auto">
             <div className="flex items-center px-2 flex-1 md:flex-none">
@@ -677,7 +673,7 @@ export default function ProgrammingPage() {
                 <div key={d} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
                     <div className="bg-muted/10 p-4 border-b border-border flex justify-between items-center">
                         <div className="flex items-center gap-4">
-                            <span className="text-xl font-bold font-['Barlow_Condensed'] uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
+                            <span className="text-xl font-bold uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
                         </div>
                         <div className="flex gap-2">
@@ -699,7 +695,7 @@ export default function ProgrammingPage() {
                         return (
                             <div key={t.id} className={cn("grid grid-cols-[100px_1fr] border-b border-border/20 last:border-0 relative", isDisabled && "bg-stripes")}>
                                 <div className="bg-muted/5 border-r border-border/20 p-4 flex flex-col justify-center items-center gap-2">
-                                    <span className={cn("text-2xl font-bold font-['Barlow_Condensed']", isDisabled ? "text-muted-foreground" : "text-foreground")}>{t.label}</span>
+                                    <span className={cn("text-2xl font-bold", isDisabled ? "text-muted-foreground" : "text-foreground")}>{t.label}</span>
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => toggleShift(day, t.id)}>{isDisabled ? <PowerOff className="h-3.5 w-3.5 text-destructive" /> : <Power className="h-3.5 w-3.5 text-green-500" />}</Button>
                                 </div>
                                 <div className="p-4 bg-background/20">
@@ -759,7 +755,7 @@ export default function ProgrammingPage() {
       
       <Card className="shadow-lg border-border">
         <CardHeader className="bg-muted/5 border-b flex flex-row items-center justify-between">
-            <CardTitle className="font-['Barlow_Condensed'] text-xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle>
+            <CardTitle className="text-xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle>
             {selectedSiteFilter !== 'all' && (
                 <div className="flex items-center gap-2">
                     <span className="text-[9px] font-black text-muted-foreground uppercase">Exibindo:</span>
