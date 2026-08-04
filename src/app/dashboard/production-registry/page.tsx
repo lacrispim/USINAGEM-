@@ -134,7 +134,15 @@ export default function ProductionRegistryPage() {
 
   const productionForm = useForm<ProductionFormValues>({
     resolver: zodResolver(productionFormSchema),
-    defaultValues: { date: format(new Date(), 'dd/MM/yyyy'), status: 'Em produção', observations: '' }
+    defaultValues: { 
+      date: format(new Date(), 'dd/MM/yyyy'), 
+      status: 'Em produção', 
+      observations: '',
+      quantityProduced: 0,
+      machiningTime: 0,
+      activityType: 'USINAGEM',
+      machine: 'TORNO CNC CENTUR 30'
+    }
   });
 
   const editProductionForm = useForm<ProductionFormValues>({
@@ -143,7 +151,12 @@ export default function ProductionRegistryPage() {
 
   const lossForm = useForm<LossFormValues>({
     resolver: zodResolver(lossFormSchema),
-    defaultValues: { date: format(new Date(), 'dd/MM/yyyy'), observations: '' }
+    defaultValues: { 
+      date: format(new Date(), 'dd/MM/yyyy'), 
+      observations: '',
+      timeLost: 0,
+      deadPartsQuantity: 0
+    }
   });
 
   const editLossForm = useForm<LossFormValues>({
@@ -221,8 +234,16 @@ export default function ProductionRegistryPage() {
     });
 
     toast({ title: 'Sucesso', description: 'Produção enviada com sucesso.' });
+    
+    // Resetar campos preservando contexto do técnico
+    const currentValues = productionForm.getValues();
     productionForm.reset({ 
-        ...productionForm.getValues(), 
+        operatorId: currentValues.operatorId,
+        date: currentValues.date,
+        factory: currentValues.factory,
+        machine: currentValues.machine,
+        status: currentValues.status,
+        activityType: currentValues.activityType,
         formsNumber: '', 
         quantityProduced: 0, 
         machiningTime: 0, 
@@ -255,8 +276,15 @@ export default function ProductionRegistryPage() {
     });
 
     toast({ title: 'Sucesso', description: 'Perda enviada com sucesso.' });
+    
+    // Resetar campos preservando contexto
+    const currentValues = lossForm.getValues();
     lossForm.reset({ 
-        ...lossForm.getValues(), 
+        operatorId: currentValues.operatorId,
+        date: currentValues.date,
+        factory: currentValues.factory,
+        machine: currentValues.machine,
+        lossReason: currentValues.lossReason,
         timeLost: 0, 
         deadPartsQuantity: 0, 
         observations: '' 
