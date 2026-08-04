@@ -93,11 +93,11 @@ const TURNOS = [
 
 const FACTORIES = ["VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
 
-// ESCALA TÉCNICA ATUALIZADA:
+// ESCALA TÉCNICA ATUALIZADA (7 Técnicos Fixos + 1 Folgista):
 // Torno: Marcos Barbosa (1T), Jair Melo (2T), Gustavo Gozzi (3T)
 // Centro: Daniel Solivo (1T), Nathan Xavier (2T), Rodrigo Cantano (3T)
 // ADM: William Martinucci (1T)
-// Alisson França: Folgista (Cobre ausências, sem raia fixa)
+// Alisson França: Folgista (Cobre ausências, sem raia fixa no planejamento padrão)
 const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Marcos Barbosa'],
@@ -321,10 +321,8 @@ export default function ProgrammingPage() {
     };
 
     // ALOCAÇÃO OTIMIZADA: Prioriza preencher Etapa 1 em paralelo para ocupar todas as máquinas
-    // 1. Programação corre em paralelo
     novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
     
-    // 2. Preenche primeiro todas as Etapas 1 (Torno ou Centro) de todos os jobs para ocupar técnicos ociosos
     novaFila.forEach(job => {
         const e1 = String(job.etapa1 || '').toUpperCase();
         if (e1.includes('TORNO')) jobCompletionTimes[job.id] = allocateTask(job, 'TORNO', 0, 'torno');
@@ -332,7 +330,6 @@ export default function ProgrammingPage() {
         else jobCompletionTimes[job.id] = 0;
     });
     
-    // 3. Preenche as Etapas 2 respeitando a finalização da Etapa 1
     novaFila.forEach(job => {
         const e2 = String(job.etapa2 || '').toUpperCase();
         const minStart = jobCompletionTimes[job.id] || 0;
