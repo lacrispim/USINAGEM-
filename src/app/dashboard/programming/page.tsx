@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -23,7 +24,8 @@ import {
   MapPin,
   UserRoundPen,
   Filter,
-  Hash
+  Hash,
+  Cpu
 } from 'lucide-react';
 import { format, addDays, isSameDay, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -206,6 +208,7 @@ export default function ProgrammingPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
+  const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<string>('all');
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
@@ -247,8 +250,11 @@ export default function ProgrammingPage() {
   }, [fila, selectedSiteFilter]);
 
   const filteredPlanejamento = useMemo(() => {
-    if (selectedSiteFilter === 'all') return planejamentoData;
-    return planejamentoData.filter(item => item.site === selectedSiteFilter);
+    let data = planejamentoData;
+    if (selectedSiteFilter !== 'all') {
+      data = data.filter(item => item.site === selectedSiteFilter);
+    }
+    return data;
   }, [planejamentoData, selectedSiteFilter]);
 
   const toggleConcluded = async (itemId: string) => {
@@ -490,12 +496,14 @@ export default function ProgrammingPage() {
   return (
     <div className="flex flex-col gap-6 p-4">
       <div className="flex flex-col xl:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
             <div>
                 <h1 className="text-3xl font-bold uppercase font-['Barlow_Condensed']">Plano de Carga CNC</h1>
                 <p className="text-[11px] tracking-widest text-muted-foreground uppercase font-bold">Time Técnico · Jornada 7h Disponíveis</p>
             </div>
             <div className="h-10 w-px bg-border mx-2 hidden xl:block" />
+            
+            {/* Filtro de Site */}
             <div className="flex items-center gap-2 bg-card border rounded-md px-3 h-11">
                 <Filter className="h-3.5 w-3.5 text-muted-foreground" />
                 <Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}>
@@ -505,6 +513,22 @@ export default function ProgrammingPage() {
                     <SelectContent>
                         <SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>
                         {FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            {/* Filtro de Equipamento */}
+            <div className="flex items-center gap-2 bg-card border rounded-md px-3 h-11">
+                <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+                <Select value={selectedEquipmentFilter} onValueChange={setSelectedEquipmentFilter}>
+                    <SelectTrigger className="border-0 bg-transparent shadow-none focus:ring-0 p-0 h-auto text-[10px] font-black uppercase w-[120px]">
+                        <SelectValue placeholder="Equipamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">TODOS</SelectItem>
+                        <SelectItem value="TORNO">TORNO CNC</SelectItem>
+                        <SelectItem value="CENTRO">CENTRO CNC</SelectItem>
+                        <SelectItem value="ADM">PROGRAMAÇÃO</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -609,11 +633,18 @@ export default function ProgrammingPage() {
                             <span className="text-xl font-bold font-['Barlow_Condensed'] uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
                         </div>
-                        {selectedSiteFilter !== 'all' && (
-                            <Badge variant="outline" className="border-primary/50 text-primary text-[10px] font-black">
-                                VISUALIZANDO APENAS: {selectedSiteFilter}
-                            </Badge>
-                        )}
+                        <div className="flex gap-2">
+                          {selectedSiteFilter !== 'all' && (
+                              <Badge variant="outline" className="border-primary/50 text-primary text-[10px] font-black">
+                                  SITE: {selectedSiteFilter}
+                              </Badge>
+                          )}
+                          {selectedEquipmentFilter !== 'all' && (
+                              <Badge variant="outline" className="border-purple-500/50 text-purple-400 text-[10px] font-black">
+                                  EQUIPAMENTO: {selectedEquipmentFilter}
+                              </Badge>
+                          )}
+                        </div>
                     </div>
                     {TURNOS.map(t => {
                         const shiftKey = `${dateStr}_${t.id}`;
@@ -628,7 +659,9 @@ export default function ProgrammingPage() {
                                     {!isDisabled && (
                                         <>
                                             <Ruler />
-                                            {['TORNO', 'CENTRO', 'ADM'].map(cat => {
+                                            {['TORNO', 'CENTRO', 'ADM']
+                                              .filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat)
+                                              .map(cat => {
                                                 const overrideKey = `${dateStr}_${cat}_${t.id}`;
                                                 const tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
                                                 
