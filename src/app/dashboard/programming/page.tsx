@@ -120,9 +120,9 @@ const ALL_TECHNICIANS = [
 
 const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
-    '1': ['Marcos Barbosa'],
+    '1': ['Gustavo Gozzi'],
     '2': ['Jair Melo'], 
-    '3': ['Gustavo Gozzi']
+    '3': ['Alisson França']
   },
   'CENTRO': {
     '1': ['Daniel Solivo'],
@@ -376,7 +376,7 @@ export default function ProgrammingPage() {
             const shiftId = String(shiftIdx + 1);
             
             const shiftKey = `${dateStr}_${shiftId}`;
-            const overrideKey = `${dateStr}_techKey_${shiftId}`;
+            const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
             
             const isShiftDisabled = currentDisabled[shiftKey];
             const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
@@ -651,12 +651,12 @@ export default function ProgrammingPage() {
               <Button 
                 key={tech} 
                 variant={activeSwap?.currentTech === tech ? "default" : "outline"}
-                className={cn("justify-start h-11", tech === "Alisson França" && "border-blue-500/50 text-blue-400")}
+                className={cn("justify-start h-11", tech === "Marcos Barbosa" && "border-blue-500/50 text-blue-400")}
                 onClick={() => handleTechSwap(tech)}
               >
                 <UserRoundPen className="h-4 w-4 mr-3 opacity-50" />
                 {tech}
-                {tech === "Alisson França" && <span className="ml-auto text-[8px] font-black uppercase bg-blue-500/20 px-1.5 rounded">Folgista</span>}
+                {tech === "Marcos Barbosa" && <span className="ml-auto text-[8px] font-black uppercase bg-blue-500/20 px-1.5 rounded">Folgista</span>}
               </Button>
             ))}
           </div>
@@ -725,7 +725,7 @@ export default function ProgrammingPage() {
                                                         </div>
                                                         <div className="text-[11px] font-bold truncate flex items-center gap-1.5">
                                                           {tech}
-                                                          {tech === "Alisson França" && <Badge variant="outline" className="h-3.5 text-[7px] border-blue-500 text-blue-400 px-1 font-black">FOLGISTA</Badge>}
+                                                          {tech === "Marcos Barbosa" && <Badge variant="outline" className="h-3.5 text-[7px] border-blue-500 text-blue-400 px-1 font-black">FOLGISTA</Badge>}
                                                         </div>
                                                       </div>
                                                       <div className="relative h-[38px] border border-border/50 rounded bg-black/20 overflow-hidden">
