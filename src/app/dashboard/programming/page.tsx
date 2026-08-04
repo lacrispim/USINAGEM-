@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -525,64 +524,15 @@ export default function ProgrammingPage() {
 
   return (
     <div className="flex flex-col gap-6 p-4">
-      {/* Cabeçalho Organizado */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 border-b border-border/50 pb-6 mb-2">
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8">
+      {/* Cabeçalho Organizado em Duas Camadas para Evitar Sobreposição */}
+      <div className="flex flex-col gap-6 border-b border-border/50 pb-6 mb-2">
+        {/* Camada Superior: Título e Botões de Ação Principais */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-black uppercase font-['Barlow_Condensed'] tracking-tighter leading-none">Plano de Carga CNC</h1>
+            <h1 className="text-4xl md:text-5xl font-black uppercase font-['Barlow_Condensed'] tracking-tighter leading-none">Plano de Carga CNC</h1>
             <p className="text-[10px] tracking-[0.2em] text-muted-foreground uppercase font-black mt-1 opacity-70">Time Técnico · Jornada 7h Disponíveis</p>
           </div>
           
-          <div className="h-10 w-px bg-border hidden md:block" />
-
-          {/* Filtros Consolidados */}
-          <div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1 shadow-inner">
-            <div className="flex items-center px-2">
-                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                <Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}>
-                    <SelectTrigger className="h-9 w-[160px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0">
-                        <SelectValue placeholder="Fábrica" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>
-                        {FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
-            
-            <div className="h-4 w-px bg-border/50" />
-
-            <div className="flex items-center px-2">
-                <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
-                <Select value={selectedEquipmentFilter} onValueChange={setSelectedEquipmentFilter}>
-                    <SelectTrigger className="h-9 w-[140px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0">
-                        <SelectValue placeholder="Equipamento" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">TODOS</SelectItem>
-                        <SelectItem value="TORNO">TORNO CNC</SelectItem>
-                        <SelectItem value="CENTRO">CENTRO CNC</SelectItem>
-                        <SelectItem value="ADM">PROGRAMAÇÃO</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-          {/* Navegação de Data */}
-          <div className="flex items-center bg-card/50 border rounded-lg p-1 shadow-inner">
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-            <div className="flex items-center gap-2 font-black px-4 text-[11px] min-w-[120px] justify-center text-primary">
-              <CalendarDays className="h-3.5 w-3.5 opacity-60" />
-              {format(currentDate, 'dd/MM/yyyy')}
-            </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
-          </div>
-
-          <div className="h-6 w-px bg-border hidden lg:block" />
-
-          {/* Ações Agrupadas */}
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
@@ -646,6 +596,50 @@ export default function ProgrammingPage() {
                 {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} 
                 Importar Planilha
             </Button>
+          </div>
+        </div>
+
+        {/* Camada Inferior: Filtros e Navegação de Data */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1 shadow-inner w-full md:w-auto">
+            <div className="flex items-center px-2 flex-1 md:flex-none">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}>
+                    <SelectTrigger className="h-9 w-full md:w-[160px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0">
+                        <SelectValue placeholder="Fábrica" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>
+                        {FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            
+            <div className="h-4 w-px bg-border/50 hidden md:block" />
+
+            <div className="flex items-center px-2 flex-1 md:flex-none border-l md:border-l-0 border-border/20 md:border-transparent">
+                <Cpu className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <Select value={selectedEquipmentFilter} onValueChange={setSelectedEquipmentFilter}>
+                    <SelectTrigger className="h-9 w-full md:w-[140px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0">
+                        <SelectValue placeholder="Equipamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">TODOS</SelectItem>
+                        <SelectItem value="TORNO">TORNO CNC</SelectItem>
+                        <SelectItem value="CENTRO">CENTRO CNC</SelectItem>
+                        <SelectItem value="ADM">PROGRAMAÇÃO</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+          </div>
+
+          <div className="flex items-center bg-card/50 border rounded-lg p-1 shadow-inner w-full md:w-auto justify-center">
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-2 font-black px-4 text-[11px] min-w-[120px] justify-center text-primary">
+              <CalendarDays className="h-3.5 w-3.5 opacity-60" />
+              {format(currentDate, 'dd/MM/yyyy')}
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
           </div>
         </div>
       </div>
