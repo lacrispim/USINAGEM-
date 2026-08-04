@@ -140,8 +140,10 @@ export default function ProductionRegistryPage() {
       observations: '',
       quantityProduced: 0,
       machiningTime: 0,
-      activityType: 'USINAGEM',
-      machine: 'TORNO CNC CENTUR 30'
+      activityType: '',
+      machine: '',
+      operatorId: '',
+      factory: ''
     }
   });
 
@@ -155,7 +157,11 @@ export default function ProductionRegistryPage() {
       date: format(new Date(), 'dd/MM/yyyy'), 
       observations: '',
       timeLost: 0,
-      deadPartsQuantity: 0
+      deadPartsQuantity: 0,
+      machine: '',
+      operatorId: '',
+      factory: '',
+      lossReason: ''
     }
   });
 
@@ -245,8 +251,8 @@ export default function ProductionRegistryPage() {
         quantityProduced: 0, 
         machiningTime: 0, 
         observations: '',
-        machine: 'TORNO CNC CENTUR 30',
-        activityType: 'USINAGEM',
+        machine: '',
+        activityType: '',
         status: 'Em produção'
     });
   }
@@ -283,7 +289,7 @@ export default function ProductionRegistryPage() {
         date: savedDate,
         operatorId: '',
         factory: '',
-        machine: 'TORNO CNC CENTUR 30',
+        machine: '',
         lossReason: '',
         timeLost: 0, 
         deadPartsQuantity: 0, 
@@ -432,10 +438,10 @@ export default function ProductionRegistryPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <FormField control={productionForm.control} name="machine" render={({field}) => (
-                        <FormItem><FormLabel>Máquina</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Máquina" /></SelectTrigger></FormControl><SelectContent><SelectItem value="TORNO CNC CENTUR 30">TORNO CNC</SelectItem><SelectItem value="CENTRO DE USINAGEM D600">CENTRO</SelectItem></SelectContent></Select></FormItem>
+                        <FormItem><FormLabel>Máquina</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Escolha a Máquina" /></SelectTrigger></FormControl><SelectContent><SelectItem value="TORNO CNC CENTUR 30">TORNO CNC</SelectItem><SelectItem value="CENTRO DE USINAGEM D600">CENTRO</SelectItem></SelectContent></Select></FormItem>
                     )} />
                     <FormField control={productionForm.control} name="activityType" render={({field}) => (
-                        <FormItem><FormLabel>Tipo</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger></FormControl><SelectContent><SelectItem value="USINAGEM">USINAGEM</SelectItem><SelectItem value="PROGRAMACAO">PROGRAMAÇÃO</SelectItem><SelectItem value="PRIMEIRA PEÇA">PRIMEIRA PEÇA</SelectItem></SelectContent></Select></FormItem>
+                        <FormItem><FormLabel>Tipo</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Escolha o Tipo" /></SelectTrigger></FormControl><SelectContent><SelectItem value="USINAGEM">USINAGEM</SelectItem><SelectItem value="PROGRAMACAO">PROGRAMAÇÃO</SelectItem><SelectItem value="PRIMEIRA PEÇA">PRIMEIRA PEÇA</SelectItem></SelectContent></Select></FormItem>
                     )} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -470,7 +476,7 @@ export default function ProductionRegistryPage() {
                   )} />
                 </div>
                 <FormField control={lossForm.control} name="lossReason" render={({field}) => (
-                    <FormItem><FormLabel>Motivo da Parada</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Motivo" /></SelectTrigger></FormControl><SelectContent>{lossReasonDetails.map(r => <SelectItem key={r.value} value={r.value}>{r.value}</SelectItem>)}</SelectContent></Select></FormItem>
+                    <FormItem><FormLabel>Motivo da Parada</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Selecione o Motivo" /></SelectTrigger></FormControl><SelectContent>{lossReasonDetails.map(r => <SelectItem key={r.value} value={r.value}>{r.value}</SelectItem>)}</SelectContent></Select></FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                     <FormField control={lossForm.control} name="timeLost" render={({field}) => (
@@ -480,6 +486,9 @@ export default function ProductionRegistryPage() {
                         <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
                     )} />
                 </div>
+                <FormField control={lossForm.control} name="machine" render={({field}) => (
+                    <FormItem><FormLabel>Máquina</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Escolha a Máquina" /></SelectTrigger></FormControl><SelectContent><SelectItem value="TORNO CNC CENTUR 30">TORNO CNC</SelectItem><SelectItem value="CENTRO DE USINAGEM D600">CENTRO</SelectItem></SelectContent></Select></FormItem>
+                )} />
                 <FormField control={lossForm.control} name="observations" render={({field}) => (
                     <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Descreva o motivo da parada..." className="min-h-[80px]" {...field} /></FormControl></FormItem>
                 )} />
