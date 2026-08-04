@@ -312,7 +312,7 @@ export default function ProgrammingPage() {
     
     setFila(newFila);
     await recalculatePlan(newFila);
-    toast({ title: "Sequência Alterada", description: `Requisição movida para a posição ${targetIdx + 1}.` });
+    toast({ title: "Sequência Alterada", description: `Item movido para a posição ${targetIdx + 1}. Cronograma recalculado.` });
   };
 
   const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides) => {
@@ -713,16 +713,21 @@ export default function ProgrammingPage() {
                     <TableCell className="text-center">
                         <Input 
                             type="number" 
+                            key={`pos-input-${job.id}-${globalIdx}`}
                             defaultValue={globalIdx + 1}
                             className="h-8 w-12 text-center text-xs font-black bg-primary/10 border-primary/20 focus:ring-primary"
                             onBlur={(e) => {
                                 const newPos = parseInt(e.target.value);
-                                if (!isNaN(newPos)) moveJobToPosition(globalIdx, newPos);
+                                if (!isNaN(newPos) && newPos !== globalIdx + 1) {
+                                    moveJobToPosition(globalIdx, newPos);
+                                }
                             }}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
-                                    const newPos = parseInt((e.target as HTMLInputElement).value);
-                                    if (!isNaN(newPos)) moveJobToPosition(globalIdx, newPos);
+                                    const val = parseInt((e.target as HTMLInputElement).value);
+                                    if (!isNaN(val) && val !== globalIdx + 1) {
+                                        moveJobToPosition(globalIdx, val);
+                                    }
                                     (e.target as HTMLInputElement).blur();
                                 }
                             }}
