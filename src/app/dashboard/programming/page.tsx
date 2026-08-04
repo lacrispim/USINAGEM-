@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -15,19 +16,19 @@ import {
   FileUp,
   Coffee,
   Mic,
-  AlertCircle,
   Check,
   Power,
   PowerOff,
   Plus,
   Trash2,
-  MapPin
+  MapPin,
+  UserRoundPen
 } from 'lucide-react';
-import { format, addDays, isSameDay, parse, startOfDay } from 'date-fns';
+import { format, addDays, isSameDay, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -93,12 +94,19 @@ const TURNOS = [
 
 const FACTORIES = ["VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
 
-// ESCALA TÉCNICA ATUALIZADA (7 Técnicos Fixos + 1 Folgista):
-// Torno: Marcos Barbosa (1T), Jair Melo (2T), Gustavo Gozzi (3T)
-// Centro: Daniel Solivo (1T), Nathan Xavier (2T), Rodrigo Cantano (3T)
-// ADM: William Martinucci (1T)
-// Alisson França: Folgista (Cobre ausências, sem raia fixa no planejamento padrão)
-const MACHINE_LANES: Record<string, Record<string, string[]>> = {
+const ALL_TECHNICIANS = [
+  "Alisson França", 
+  "Daniel Solivo", 
+  "Rodrigo Cantano", 
+  "Gustavo Gozzi", 
+  "William Martinucci", 
+  "Nathan Xavier", 
+  "Jair Melo", 
+  "Marcos Barbosa"
+];
+
+// ESCALA TÉCNICA PADRÃO
+const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Marcos Barbosa'],
     '2': ['Jair Melo'], 
@@ -114,7 +122,7 @@ const MACHINE_LANES: Record<string, Record<string, string[]>> = {
   }
 };
 
-const SHIFT_MIN = 420; // 7 horas úteis
+const SHIFT_MIN = 420; 
 const PAUSAS = [
   { start: 0, duration: 10, label: 'DDS', icon: Mic },
   { start: 180, duration: 15, label: 'CAFÉ', icon: Coffee }
@@ -177,14 +185,19 @@ export default function ProgrammingPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [fila, setFila] = useState<JobBase[]>([]);
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [disabledShifts, setDisabledShifts] = useState<Record<string, boolean>>({});
+  const [techOverrides, setTechOverrides] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
+  const [activeSwap, setActiveSwap] = useState<{ day: string, shiftId: string, category: string, currentTech: string } | null>(null);
+
   const [newItem, setNewItem] = useState<Partial<JobBase>>({
     requisicao: '',
     nomeDaPeca: '',
@@ -204,8 +217,14 @@ export default function ProgrammingPage() {
 
   useEffect(() => {
     if (filaDoc) setFila(filaDoc.data || []);
-    if (configDoc) setDisabledShifts(configDoc.disabledShifts || {});
-    if (planoDoc) { setPlanejamentoData(planoDoc.data || []); setLoading(false); }
+    if (configDoc) {
+      setDisabledShifts(configDoc.disabledShifts || {});
+      setTechOverrides(configDoc.techOverrides || {});
+    }
+    if (planoDoc) { 
+      setPlanejamentoData(planoDoc.data || []); 
+      setLoading(false); 
+    }
     else if (planoDoc === null) setLoading(false);
   }, [filaDoc, planoDoc, configDoc]);
 
@@ -227,14 +246,40 @@ export default function ProgrammingPage() {
     const newDisabled = { ...disabledShifts, [key]: !disabledShifts[key] };
     setDisabledShifts(newDisabled);
     try {
-      await setDoc(doc(firestore, 'programacaoState', 'config'), { disabledShifts: newDisabled, updatedAt: serverTimestamp() });
-      recalculatePlan(fila, newDisabled);
+      await setDoc(doc(firestore, 'programacaoState', 'config'), { 
+        disabledShifts: newDisabled, 
+        techOverrides,
+        updatedAt: serverTimestamp() 
+      }, { merge: true });
+      recalculatePlan(fila, newDisabled, techOverrides);
     } catch (e) {
       toast({ title: "Erro", description: "Falha ao salvar configuração.", variant: "destructive" });
     }
   };
 
-  const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts) => {
+  const handleTechSwap = async (newTech: string) => {
+    if (!firestore || !activeSwap) return;
+    const { day, shiftId, category } = activeSwap;
+    const key = `${day}_${category}_${shiftId}`;
+    const newOverrides = { ...techOverrides, [key]: newTech };
+    
+    setTechOverrides(newOverrides);
+    setIsSwapDialogOpen(false);
+    
+    try {
+      await setDoc(doc(firestore, 'programacaoState', 'config'), { 
+        techOverrides: newOverrides,
+        disabledShifts,
+        updatedAt: serverTimestamp() 
+      }, { merge: true });
+      recalculatePlan(fila, disabledShifts, newOverrides);
+      toast({ title: "Técnico Alterado", description: `Turno assumido por ${newTech}.` });
+    } catch (e) {
+      toast({ title: "Erro", description: "Falha ao salvar troca.", variant: "destructive" });
+    }
+  };
+
+  const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides) => {
     if (!firestore) return;
     const novosPlanItems: PlanejamentoItem[] = [];
     const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
@@ -262,9 +307,14 @@ export default function ProgrammingPage() {
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const startOffset = startInDay % SHIFT_MIN;
             const dayDate = addDays(currentDate, dayIdx);
-            const shiftKey = `${format(dayDate, 'yyyy-MM-dd')}_${shiftIdx + 1}`;
+            const dateStr = format(dayDate, 'yyyy-MM-dd');
+            const shiftId = String(shiftIdx + 1);
+            
+            const shiftKey = `${dateStr}_${shiftId}`;
+            const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
+            
             const isShiftDisabled = currentDisabled[shiftKey];
-            const techName = MACHINE_LANES[techKey][String(shiftIdx + 1)]?.[chosenLane];
+            const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[chosenLane];
 
             if (isShiftDisabled || !techName) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
@@ -303,7 +353,7 @@ export default function ProgrammingPage() {
                     quantidadeNoBloco: qInShift, 
                     tempoMinutos: pInShift, 
                     setupMinutos: sInShift, 
-                    turno: String(shiftIdx + 1), 
+                    turno: shiftId, 
                     startOffsetMin: winStart, 
                     tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', 
                     techKey, 
@@ -320,7 +370,6 @@ export default function ProgrammingPage() {
         return actualPointer;
     };
 
-    // ALOCAÇÃO OTIMIZADA: Prioriza preencher Etapa 1 em paralelo para ocupar todas as máquinas
     novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
     
     novaFila.forEach(job => {
@@ -440,16 +489,41 @@ export default function ProgrammingPage() {
             </DialogContent>
           </Dialog>
 
-          <Button variant="outline" className="h-10 text-[10px] font-black uppercase" onClick={() => recalculatePlan([], disabledShifts)}><Eraser className="h-4 w-4 mr-2" /> Limpar</Button>
+          <Button variant="outline" className="h-10 text-[10px] font-black uppercase" onClick={() => recalculatePlan([], disabledShifts, techOverrides)}><Eraser className="h-4 w-4 mr-2" /> Limpar</Button>
           <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
           <Button className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase shadow-lg" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha</Button>
         </div>
       </div>
 
+      <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}>
+        <DialogContent className="sm:max-w-[350px]">
+          <DialogHeader>
+            <DialogTitle>Substituir Técnico</DialogTitle>
+            <DialogDescription>Selecione o profissional que assumirá esta raia de produção.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-4">
+            {ALL_TECHNICIANS.map(tech => (
+              <Button 
+                key={tech} 
+                variant={activeSwap?.currentTech === tech ? "default" : "outline"}
+                className={cn("justify-start h-11", tech === "Alisson França" && "border-blue-500/50 text-blue-400")}
+                onClick={() => handleTechSwap(tech)}
+              >
+                <UserRoundPen className="h-4 w-4 mr-3 opacity-50" />
+                {tech}
+                {tech === "Alisson França" && <span className="ml-auto text-[8px] font-black uppercase bg-blue-500/20 px-1.5 rounded">Folgista</span>}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-6">
         {[0, 1, 2].map(d => {
             const day = addDays(currentDate, d);
-            const dayItems = planejamentoData.filter(i => isSameDay(parse(i.dataExecucao, 'dd/MM/yyyy', new Date()), day));
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const dayItems = planejamentoData.filter(i => i.dataExecucao === format(day, 'dd/MM/yyyy'));
+            
             return (
                 <div key={d} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
                     <div className="bg-muted/40 p-4 border-b-2 border-primary flex justify-between items-center">
@@ -459,7 +533,7 @@ export default function ProgrammingPage() {
                         </div>
                     </div>
                     {TURNOS.map(t => {
-                        const shiftKey = `${format(day, 'yyyy-MM-dd')}_${t.id}`;
+                        const shiftKey = `${dateStr}_${t.id}`;
                         const isDisabled = disabledShifts[shiftKey];
                         return (
                             <div key={t.id} className={cn("grid grid-cols-[100px_1fr] border-b border-border/20 last:border-0 relative", isDisabled && "bg-stripes")}>
@@ -471,17 +545,39 @@ export default function ProgrammingPage() {
                                     {!isDisabled && (
                                         <>
                                             <Ruler />
-                                            {['TORNO', 'CENTRO', 'ADM'].map(cat => (MACHINE_LANES[cat][t.id] || []).map((tech, lIdx) => tech && (
-                                                <div key={`${tech}-${lIdx}`} className="grid grid-cols-[155px_1fr] items-center mb-3">
-                                                    <div className="pr-3 truncate"><div className={cn("text-[9px] font-mono font-black uppercase", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>{cat}</div><div className="text-[11px] font-bold truncate">{tech}</div></div>
-                                                    <div className="relative h-[38px] border border-border/50 rounded bg-black/20 overflow-hidden">
-                                                        {PAUSAS.map(p => (
-                                                            <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-2 w-2 text-yellow-500/30" /></div>
-                                                        ))}
-                                                        {dayItems.filter(i => i.techKey === cat && i.laneIndex === lIdx && i.turno === t.id).map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
-                                                    </div>
-                                                </div>
-                                            )))}
+                                            {['TORNO', 'CENTRO', 'ADM'].map(cat => {
+                                                const overrideKey = `${dateStr}_${cat}_${t.id}`;
+                                                const tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
+                                                
+                                                if (!tech) return null;
+
+                                                return (
+                                                  <div key={`${cat}-${t.id}`} className="grid grid-cols-[155px_1fr] items-center mb-3">
+                                                      <div 
+                                                        className="pr-3 truncate cursor-pointer group/tech"
+                                                        onClick={() => {
+                                                          setActiveSwap({ day: dateStr, shiftId: t.id, category: cat, currentTech: tech });
+                                                          setIsSwapDialogOpen(true);
+                                                        }}
+                                                      >
+                                                        <div className={cn("text-[9px] font-mono font-black uppercase flex items-center gap-1.5", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>
+                                                          {cat}
+                                                          <UserRoundPen className="h-2 w-2 opacity-0 group-hover/tech:opacity-100 transition-opacity" />
+                                                        </div>
+                                                        <div className="text-[11px] font-bold truncate flex items-center gap-1.5">
+                                                          {tech}
+                                                          {tech === "Alisson França" && <Badge variant="outline" className="h-3.5 text-[7px] border-blue-500 text-blue-400 px-1 font-black">FOLGISTA</Badge>}
+                                                        </div>
+                                                      </div>
+                                                      <div className="relative h-[38px] border border-border/50 rounded bg-black/20 overflow-hidden">
+                                                          {PAUSAS.map(p => (
+                                                              <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-2 w-2 text-yellow-500/30" /></div>
+                                                          ))}
+                                                          {dayItems.filter(i => i.techKey === cat && i.turno === t.id).map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
+                                                      </div>
+                                                  </div>
+                                                );
+                                            })}
                                         </>
                                     )}
                                 </div>
