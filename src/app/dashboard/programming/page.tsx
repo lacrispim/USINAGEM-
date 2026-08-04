@@ -21,7 +21,8 @@ import {
   Plus,
   Trash2,
   MapPin,
-  UserRoundPen
+  UserRoundPen,
+  Filter
 } from 'lucide-react';
 import { format, addDays, isSameDay, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -191,6 +192,9 @@ export default function ProgrammingPage() {
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Estado para filtro de site
+  const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
@@ -225,6 +229,17 @@ export default function ProgrammingPage() {
     }
     else if (planoDoc === null) setLoading(false);
   }, [filaDoc, planoDoc, configDoc]);
+
+  // Dados filtrados para exibição
+  const filteredFila = useMemo(() => {
+    if (selectedSiteFilter === 'all') return fila;
+    return fila.filter(item => item.site === selectedSiteFilter);
+  }, [fila, selectedSiteFilter]);
+
+  const filteredPlanejamento = useMemo(() => {
+    if (selectedSiteFilter === 'all') return planejamentoData;
+    return planejamentoData.filter(item => item.site === selectedSiteFilter);
+  }, [planejamentoData, selectedSiteFilter]);
 
   const toggleConcluded = async (itemId: string) => {
     if (!firestore || !planejamentoData) return;
@@ -451,15 +466,33 @@ export default function ProgrammingPage() {
 
   return (
     <div className="flex flex-col gap-6 p-4">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div>
-            <h1 className="text-3xl font-bold uppercase font-['Barlow_Condensed']">Plano de Carga CNC</h1>
-            <p className="text-[11px] tracking-widest text-muted-foreground uppercase font-bold">Time Técnico · Jornada 7h Disponíveis</p>
+      <div className="flex flex-col xl:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+            <div>
+                <h1 className="text-3xl font-bold uppercase font-['Barlow_Condensed']">Plano de Carga CNC</h1>
+                <p className="text-[11px] tracking-widest text-muted-foreground uppercase font-bold">Time Técnico · Jornada 7h Disponíveis</p>
+            </div>
+            <div className="h-10 w-px bg-border mx-2 hidden xl:block" />
+            <div className="flex items-center gap-2 bg-card border rounded-md px-3 h-11">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                <Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}>
+                    <SelectTrigger className="border-0 bg-transparent shadow-none focus:ring-0 p-0 h-auto text-[10px] font-black uppercase w-[150px]">
+                        <SelectValue placeholder="Filtro de Site" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>
+                        {FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="h-10" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-          <div className="flex items-center gap-2 font-bold min-w-[120px] justify-center"><CalendarDays className="h-4 w-4 text-primary" />{format(currentDate, 'dd/MM/yyyy')}</div>
-          <Button variant="outline" className="h-10" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
+
+        <div className="flex items-center gap-3 flex-wrap justify-center">
+          <div className="flex items-center bg-card border rounded-md p-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-2 font-bold px-4 text-xs min-w-[100px] justify-center text-primary"><CalendarDays className="h-3.5 w-3.5" />{format(currentDate, 'dd/MM/yyyy')}</div>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
+          </div>
           
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
@@ -520,7 +553,7 @@ export default function ProgrammingPage() {
         {[0, 1, 2].map(d => {
             const day = addDays(currentDate, d);
             const dateStr = format(day, 'yyyy-MM-dd');
-            const dayItems = planejamentoData.filter(i => i.dataExecucao === format(day, 'dd/MM/yyyy'));
+            const dayItems = filteredPlanejamento.filter(i => i.dataExecucao === format(day, 'dd/MM/yyyy'));
             
             return (
                 <div key={d} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
@@ -529,6 +562,11 @@ export default function ProgrammingPage() {
                             <span className="text-xl font-bold font-['Barlow_Condensed'] uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
                         </div>
+                        {selectedSiteFilter !== 'all' && (
+                            <Badge variant="outline" className="border-primary/50 text-primary text-[10px] font-black">
+                                VISUALIZANDO APENAS: {selectedSiteFilter}
+                            </Badge>
+                        )}
                     </div>
                     {TURNOS.map(t => {
                         const shiftKey = `${dateStr}_${t.id}`;
@@ -593,7 +631,16 @@ export default function ProgrammingPage() {
       </div>
       
       <Card className="shadow-lg border-border">
-        <CardHeader className="bg-muted/5 border-b"><CardTitle className="font-['Barlow_Condensed'] text-xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle></CardHeader>
+        <CardHeader className="bg-muted/5 border-b flex flex-row items-center justify-between">
+            <CardTitle className="font-['Barlow_Condensed'] text-xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle>
+            {selectedSiteFilter !== 'all' && (
+                <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-black text-muted-foreground uppercase">Exibindo:</span>
+                    <Badge className="bg-primary text-primary-foreground font-black text-[9px]">{selectedSiteFilter}</Badge>
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedSiteFilter('all')} className="h-6 px-2 text-[9px] font-black uppercase text-destructive hover:bg-destructive/10">Limpar Filtro</Button>
+                </div>
+            )}
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -609,9 +656,9 @@ export default function ProgrammingPage() {
                 </TableRow>
             </TableHeader>
             <TableBody>
-              {fila.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição</TableCell></TableRow>
-              ) : fila.map((job, idx) => (
+              {filteredFila.length === 0 ? (
+                <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição{selectedSiteFilter !== 'all' ? ` para ${selectedSiteFilter}` : ''}</TableCell></TableRow>
+              ) : filteredFila.map((job, idx) => (
                 <TableRow key={job.id} className="hover:bg-muted/5">
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-1">
