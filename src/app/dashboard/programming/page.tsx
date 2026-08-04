@@ -308,6 +308,12 @@ export default function ProgrammingPage() {
     }
   };
 
+  const updateJobField = async (id: string, field: keyof JobBase, value: any) => {
+    const newFila = fila.map(j => j.id === id ? { ...j, [field]: value } : j);
+    setFila(newFila);
+    await recalculatePlan(newFila);
+  };
+
   const moveJobToPosition = async (currentIdx: number, newPos: number) => {
     const targetIdx = Math.max(0, Math.min(fila.length - 1, newPos - 1));
     if (currentIdx === targetIdx) return;
@@ -356,7 +362,7 @@ export default function ProgrammingPage() {
             const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
             
             const isShiftDisabled = currentDisabled[shiftKey];
-            const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[chosenLane];
+            const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
 
             if (isShiftDisabled || !techName) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
@@ -728,11 +734,11 @@ export default function ProgrammingPage() {
                     <TableHead className="w-20 text-center">POS</TableHead>
                     <TableHead className="w-20 text-center">AÇÕES</TableHead>
                     <TableHead>FÁBRICA / SITE</TableHead>
-                    <TableHead>FLUXO</TableHead>
+                    <TableHead>FLUXO (E1 → E2)</TableHead>
                     <TableHead>REQ.</TableHead>
                     <TableHead>PEÇA</TableHead>
                     <TableHead className="text-right">QTD</TableHead>
-                    <TableHead className="text-right">TEMPO</TableHead>
+                    <TableHead className="text-right">TEMPO (T|C|S)</TableHead>
                     <TableHead className="w-10"></TableHead>
                 </TableRow>
             </TableHeader>
@@ -784,22 +790,64 @@ export default function ProgrammingPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                          {(!job.etapa1 && !job.etapa2) ? (
-                              <Badge variant="destructive" className="text-[8px] animate-pulse">AGUARDANDO</Badge>
-                          ) : (
-                              <div className="flex items-center gap-1 text-[9px] font-bold">
-                                  {job.etapa1 && <span className="bg-primary/10 px-1 rounded">{job.etapa1}</span>}
-                                  {job.etapa2 && <span>→</span>}
-                                  {job.etapa2 && <span className="bg-primary/20 px-1 rounded">{job.etapa2}</span>}
-                              </div>
-                          )}
+                      <div className="flex items-center gap-1">
+                          <Input 
+                            className="h-7 w-16 text-[9px] font-black uppercase p-1 bg-background/50 border-primary/20" 
+                            defaultValue={job.etapa1}
+                            onBlur={(e) => updateJobField(job.id, 'etapa1', e.target.value.toUpperCase())}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                          />
+                          <span className="text-[10px] opacity-30">→</span>
+                          <Input 
+                            className="h-7 w-16 text-[9px] font-black uppercase p-1 bg-background/50 border-primary/20" 
+                            defaultValue={job.etapa2}
+                            onBlur={(e) => updateJobField(job.id, 'etapa2', e.target.value.toUpperCase())}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                          />
                       </div>
                     </TableCell>
                     <TableCell className="font-mono font-bold">#{job.requisicao}</TableCell>
                     <TableCell className="uppercase text-[10px] font-medium max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
-                    <TableCell className="text-right font-mono font-bold">{job.quantidade} pç</TableCell>
-                    <TableCell className="text-right text-[10px] text-muted-foreground">{Number(job.torno) + Number(job.centro) + Number(job.setup)} min</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end items-center gap-1">
+                        <Input 
+                          type="number"
+                          className="h-7 w-14 text-right text-[10px] font-black p-1 bg-background/50 border-primary/20" 
+                          defaultValue={job.quantidade}
+                          onBlur={(e) => updateJobField(job.id, 'quantidade', Number(e.target.value))}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                        />
+                        <span className="text-[9px] font-bold text-muted-foreground">pç</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[8px] font-bold text-muted-foreground">T:</span>
+                          <Input 
+                            type="number"
+                            className="h-6 w-12 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
+                            defaultValue={job.torno}
+                            onBlur={(e) => updateJobField(job.id, 'torno', Number(e.target.value))}
+                          />
+                          <span className="text-[8px] font-bold text-muted-foreground">C:</span>
+                          <Input 
+                            type="number"
+                            className="h-6 w-12 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
+                            defaultValue={job.centro}
+                            onBlur={(e) => updateJobField(job.id, 'centro', Number(e.target.value))}
+                          />
+                          <span className="text-[8px] font-bold text-muted-foreground">S:</span>
+                          <Input 
+                            type="number"
+                            className="h-6 w-10 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
+                            defaultValue={job.setup}
+                            onBlur={(e) => updateJobField(job.id, 'setup', Number(e.target.value))}
+                          />
+                        </div>
+                        <span className="text-[8px] font-black uppercase text-primary/50">Total: {Number(job.torno) + Number(job.centro) + Number(job.setup)}m</span>
+                      </div>
+                    </TableCell>
                     <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteManual(job.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
                   </TableRow>
                 );
