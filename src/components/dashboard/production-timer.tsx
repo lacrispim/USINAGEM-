@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -21,6 +22,10 @@ export function ProductionTimer({
 
   useEffect(() => {
     setTimeInSeconds(initialTimeInMinutes * 60);
+    // Se o valor for resetado para zero via prop (vinda do formulário), para o cronômetro
+    if (initialTimeInMinutes === 0) {
+        setIsActive(false);
+    }
   }, [initialTimeInMinutes]);
 
   useEffect(() => {
@@ -80,16 +85,16 @@ export function ProductionTimer({
           <Button type="button" onClick={handleStartPause}>
             {isActive ? (
               <>
-                <Pause className="mr-2" /> Pausar
+                <Pause className="mr-2 h-4 w-4" /> Pausar
               </>
             ) : (
               <>
-                <Play className="mr-2" /> Iniciar
+                <Play className="mr-2 h-4 w-4" /> Iniciar
               </>
             )}
           </Button>
           <Button type="button" variant="secondary" onClick={handleReset}>
-            <RotateCcw className="mr-2" /> Zerar
+            <RotateCcw className="mr-2 h-4 w-4" /> Zerar
           </Button>
         </div>
       </CardContent>

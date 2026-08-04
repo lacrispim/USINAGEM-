@@ -235,19 +235,19 @@ export default function ProductionRegistryPage() {
 
     toast({ title: 'Sucesso', description: 'Produção enviada com sucesso.' });
     
-    // Resetar campos preservando contexto do técnico
-    const currentValues = productionForm.getValues();
+    // Resetar campos - preservando APENAS a data
+    const savedDate = values.date;
     productionForm.reset({ 
-        operatorId: currentValues.operatorId,
-        date: currentValues.date,
-        factory: currentValues.factory,
-        machine: currentValues.machine,
-        status: currentValues.status,
-        activityType: currentValues.activityType,
+        date: savedDate,
+        operatorId: '',
+        factory: '',
         formsNumber: '', 
         quantityProduced: 0, 
         machiningTime: 0, 
-        observations: '' 
+        observations: '',
+        machine: 'TORNO CNC CENTUR 30',
+        activityType: 'USINAGEM',
+        status: 'Em produção'
     });
   }
 
@@ -277,17 +277,18 @@ export default function ProductionRegistryPage() {
 
     toast({ title: 'Sucesso', description: 'Perda enviada com sucesso.' });
     
-    // Resetar campos preservando contexto
-    const currentValues = lossForm.getValues();
+    // Resetar campos - preservando APENAS a data
+    const savedDate = values.date;
     lossForm.reset({ 
-        operatorId: currentValues.operatorId,
-        date: currentValues.date,
-        factory: currentValues.factory,
-        machine: currentValues.machine,
-        lossReason: currentValues.lossReason,
+        date: savedDate,
+        operatorId: '',
+        factory: '',
+        machine: 'TORNO CNC CENTUR 30',
+        lossReason: '',
         timeLost: 0, 
         deadPartsQuantity: 0, 
-        observations: '' 
+        observations: '',
+        formsNumber: ''
     });
   }
 
@@ -415,7 +416,7 @@ export default function ProductionRegistryPage() {
               <form onSubmit={productionForm.handleSubmit(onProductionSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={productionForm.control} name="operatorId" render={({field}) => (
-                    <FormItem><FormLabel>Operador</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>
+                    <FormItem><FormLabel>Operador</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>
                   )} />
                   <FormField control={productionForm.control} name="date" render={({field}) => (
                     <FormItem><FormLabel>Data</FormLabel><FormControl><Input placeholder="dd/MM/yyyy" {...field} /></FormControl></FormItem>
@@ -423,7 +424,7 @@ export default function ProductionRegistryPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={productionForm.control} name="factory" render={({field}) => (
-                    <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
+                    <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
                   )} />
                   <FormField control={productionForm.control} name="formsNumber" render={({field}) => (
                     <FormItem><FormLabel>Nº Forms</FormLabel><FormControl><Input placeholder="Ex: 815" {...field} /></FormControl></FormItem>
@@ -462,21 +463,21 @@ export default function ProductionRegistryPage() {
               <form onSubmit={lossForm.handleSubmit(onLossSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={lossForm.control} name="operatorId" render={({field}) => (
-                    <FormItem><FormLabel>Operador</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>
+                    <FormItem><FormLabel>Operador</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>
                   )} />
                   <FormField control={lossForm.control} name="date" render={({field}) => (
                     <FormItem><FormLabel>Data</FormLabel><FormControl><Input placeholder="dd/MM/yyyy" {...field} /></FormControl></FormItem>
                   )} />
                 </div>
                 <FormField control={lossForm.control} name="lossReason" render={({field}) => (
-                    <FormItem><FormLabel>Motivo da Parada</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Motivo" /></SelectTrigger></FormControl><SelectContent>{lossReasonDetails.map(r => <SelectItem key={r.value} value={r.value}>{r.value}</SelectItem>)}</SelectContent></Select></FormItem>
+                    <FormItem><FormLabel>Motivo da Parada</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Motivo" /></SelectTrigger></FormControl><SelectContent>{lossReasonDetails.map(r => <SelectItem key={r.value} value={r.value}>{r.value}</SelectItem>)}</SelectContent></Select></FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                     <FormField control={lossForm.control} name="timeLost" render={({field}) => (
                         <FormItem><FormLabel>Tempo Perdido (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
                     )} />
                     <FormField control={lossForm.control} name="factory" render={({field}) => (
-                        <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
+                        <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
                     )} />
                 </div>
                 <FormField control={lossForm.control} name="observations" render={({field}) => (
