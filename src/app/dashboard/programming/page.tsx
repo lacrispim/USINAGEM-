@@ -525,20 +525,23 @@ export default function ProgrammingPage() {
 
   return (
     <div className="flex flex-col gap-6 p-4">
-      <div className="flex flex-col xl:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-wrap">
-            <div>
-                <h1 className="text-3xl font-bold uppercase font-['Barlow_Condensed']">Plano de Carga CNC</h1>
-                <p className="text-[11px] tracking-widest text-muted-foreground uppercase font-bold">Time Técnico · Jornada 7h Disponíveis</p>
-            </div>
-            <div className="h-10 w-px bg-border mx-2 hidden xl:block" />
-            
-            {/* Filtro de Site */}
-            <div className="flex items-center gap-2 bg-card border rounded-md px-3 h-11">
+      {/* Cabeçalho Organizado */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 border-b border-border/50 pb-6 mb-2">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8">
+          <div>
+            <h1 className="text-4xl font-black uppercase font-['Barlow_Condensed'] tracking-tighter leading-none">Plano de Carga CNC</h1>
+            <p className="text-[10px] tracking-[0.2em] text-muted-foreground uppercase font-black mt-1 opacity-70">Time Técnico · Jornada 7h Disponíveis</p>
+          </div>
+          
+          <div className="h-10 w-px bg-border hidden md:block" />
+
+          {/* Filtros Consolidados */}
+          <div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1 shadow-inner">
+            <div className="flex items-center px-2">
                 <Filter className="h-3.5 w-3.5 text-muted-foreground" />
                 <Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}>
-                    <SelectTrigger className="border-0 bg-transparent shadow-none focus:ring-0 p-0 h-auto text-[10px] font-black uppercase w-[150px]">
-                        <SelectValue placeholder="Filtro de Site" />
+                    <SelectTrigger className="h-9 w-[160px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0">
+                        <SelectValue placeholder="Fábrica" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>
@@ -546,12 +549,13 @@ export default function ProgrammingPage() {
                     </SelectContent>
                 </Select>
             </div>
+            
+            <div className="h-4 w-px bg-border/50" />
 
-            {/* Filtro de Equipamento */}
-            <div className="flex items-center gap-2 bg-card border rounded-md px-3 h-11">
+            <div className="flex items-center px-2">
                 <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
                 <Select value={selectedEquipmentFilter} onValueChange={setSelectedEquipmentFilter}>
-                    <SelectTrigger className="border-0 bg-transparent shadow-none focus:ring-0 p-0 h-auto text-[10px] font-black uppercase w-[120px]">
+                    <SelectTrigger className="h-9 w-[140px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0">
                         <SelectValue placeholder="Equipamento" />
                     </SelectTrigger>
                     <SelectContent>
@@ -562,68 +566,87 @@ export default function ProgrammingPage() {
                     </SelectContent>
                 </Select>
             </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap justify-center">
-          <div className="flex items-center bg-card border rounded-md p-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-            <div className="flex items-center gap-2 font-bold px-4 text-xs min-w-[100px] justify-center text-primary"><CalendarDays className="h-3.5 w-3.5" />{format(currentDate, 'dd/MM/yyyy')}</div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
+        <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
+          {/* Navegação de Data */}
+          <div className="flex items-center bg-card/50 border rounded-lg p-1 shadow-inner">
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-2 font-black px-4 text-[11px] min-w-[120px] justify-center text-primary">
+              <CalendarDays className="h-3.5 w-3.5 opacity-60" />
+              {format(currentDate, 'dd/MM/yyyy')}
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
           </div>
-          
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="secondary" className="h-10 text-[10px] font-black uppercase"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader><DialogTitle>Adicionar Requisição Manual</DialogTitle></DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Requisição</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} /></div>
-                  <div className="space-y-2"><Label>Nome da Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} /></div>
-                </div>
-                <div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div>
-                  <div className="space-y-2"><Label>Setup (min)</Label><Input type="number" value={newItem.setup} onChange={e => setNewItem({...newItem, setup: Number(e.target.value)})} /></div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2"><Label>Torno (min)</Label><Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} /></div>
-                  <div className="space-y-2"><Label>Centro (min)</Label><Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})} /></div>
-                  <div className="space-y-2"><Label>Prog (min)</Label><Input type="number" value={newItem.prog} onChange={e => setNewItem({...newItem, prog: Number(e.target.value)})} /></div>
-                </div>
-              </div>
-              <DialogFooter><Button onClick={handleAddManual} className="w-full">Adicionar na Fila</Button></DialogFooter>
-            </DialogContent>
-          </Dialog>
 
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" className="h-10 text-[10px] font-black uppercase">
-                <Eraser className="h-4 w-4 mr-2" /> Limpar
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Tem certeza que deseja limpar tudo?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta ação irá remover permanentemente todas as requisições da fila e limpar o cronograma de produção. Esta operação não pode ser desfeita.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={() => recalculatePlan([], disabledShifts, techOverrides)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Limpar Tudo
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          
-          <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
-          <Button className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase shadow-lg" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha</Button>
+          <div className="h-6 w-px bg-border hidden lg:block" />
+
+          {/* Ações Agrupadas */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="secondary" className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none hover:scale-[1.02] transition-transform">
+                  <Plus className="h-4 w-4 mr-2" /> Nova Requisição
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader><DialogTitle>Adicionar Requisição Manual</DialogTitle></DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Requisição</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} /></div>
+                    <div className="space-y-2"><Label>Nome da Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} /></div>
+                  </div>
+                  <div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div>
+                    <div className="space-y-2"><Label>Setup (min)</Label><Input type="number" value={newItem.setup} onChange={e => setNewItem({...newItem, setup: Number(e.target.value)})} /></div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2"><Label>Torno (min)</Label><Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} /></div>
+                    <div className="space-y-2"><Label>Centro (min)</Label><Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})} /></div>
+                    <div className="space-y-2"><Label>Prog (min)</Label><Input type="number" value={newItem.prog} onChange={e => setNewItem({...newItem, prog: Number(e.target.value)})} /></div>
+                  </div>
+                </div>
+                <DialogFooter><Button onClick={handleAddManual} className="w-full">Adicionar na Fila</Button></DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="h-10 text-[10px] font-black uppercase border-destructive/20 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all flex-1 sm:flex-none">
+                  <Eraser className="h-4 w-4 mr-2" /> Limpar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Tem certeza que deseja limpar tudo?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação irá remover permanentemente todas as requisições da fila e limpar o cronograma de produção. Esta operação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={() => recalculatePlan([], disabledShifts, techOverrides)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Limpar Tudo
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            
+            <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
+            <Button 
+                className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase shadow-lg hover:opacity-90 flex-1 sm:flex-none transition-opacity" 
+                onClick={() => fileInputRef.current?.click()} 
+                disabled={isImporting}
+            >
+                {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} 
+                Importar Planilha
+            </Button>
+          </div>
         </div>
       </div>
 
