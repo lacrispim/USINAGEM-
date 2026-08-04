@@ -176,7 +176,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
         item.isConcluded && "opacity-40 grayscale-[0.5] border-green-500 border-2"
       )} 
       style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
-      title={`#${item.requisicao} - ${item.nomeDaPeca} [${normalizeSiteName(item.site)}] ${item.isConcluded ? '(Concluído)' : ''}`}
+      title={`#${item.requisicao} - ${item.nomeDaPeca} [${normalizeSiteName(item.site)}] - Tempo neste turno: ${Math.round(totalMin)}min ${item.isConcluded ? '(Concluído)' : ''}`}
     >
       {item.setupMinutos > 0 && (
         <div 
@@ -188,7 +188,18 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
       )}
       <div className="flex-1 flex items-center gap-1.5 px-1.5 min-w-0 text-white overflow-hidden relative">
         <span className="font-mono text-[9px] font-black shrink-0">#{item.requisicao}</span>
-        {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[8px] font-bold shrink-0">{item.quantidadeNoBloco}pç</span>}
+        
+        <div className="flex items-center gap-0.5 shrink-0">
+          {item.quantidadeNoBloco > 0 && (
+            <span className="bg-white/20 px-1 rounded-[1px] text-[8px] font-bold">
+              {item.quantidadeNoBloco}pç
+            </span>
+          )}
+          <span className="bg-black/40 px-1 rounded-[1px] text-[8px] font-black text-yellow-400 border border-yellow-400/20">
+            {Math.round(totalMin)}m
+          </span>
+        </div>
+
         <span className="text-[8px] opacity-80 truncate uppercase font-bold leading-none">{item.nomeDaPeca}</span>
         <span className="text-[6px] ml-auto opacity-60 font-black border border-white/20 px-0.5 rounded shrink-0">{normalizeSiteName(item.site)?.substring(0,3)}</span>
         
