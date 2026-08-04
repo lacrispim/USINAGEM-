@@ -141,6 +141,14 @@ const PAUSAS = [
   { start: 180, duration: 15, label: 'CAFÉ', icon: Coffee }
 ];
 
+// Helper to normalize site names (handles Valinhos consolidation and casing)
+const normalizeSiteName = (site: string | undefined): string => {
+  if (!site) return 'VALINHOS';
+  const s = String(site).toUpperCase().trim();
+  if (s.includes('VALINHOS')) return 'VALINHOS';
+  return s;
+};
+
 const Ruler = () => {
   const marks = [];
   for (let m = 0; m <= SHIFT_MIN; m += 60) {
@@ -168,7 +176,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
         item.isConcluded && "opacity-40 grayscale-[0.5] border-green-500 border-2"
       )} 
       style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
-      title={`#${item.requisicao} - ${item.nomeDaPeca} [${item.site}] ${item.isConcluded ? '(Concluído)' : ''}`}
+      title={`#${item.requisicao} - ${item.nomeDaPeca} [${normalizeSiteName(item.site)}] ${item.isConcluded ? '(Concluído)' : ''}`}
     >
       {item.setupMinutos > 0 && (
         <div 
@@ -182,7 +190,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
         <span className="font-mono text-[9px] font-black shrink-0">#{item.requisicao}</span>
         {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[8px] font-bold shrink-0">{item.quantidadeNoBloco}pç</span>}
         <span className="text-[8px] opacity-80 truncate uppercase font-bold leading-none">{item.nomeDaPeca}</span>
-        <span className="text-[6px] ml-auto opacity-60 font-black border border-white/20 px-0.5 rounded shrink-0">{item.site?.substring(0,3)}</span>
+        <span className="text-[6px] ml-auto opacity-60 font-black border border-white/20 px-0.5 rounded shrink-0">{normalizeSiteName(item.site)?.substring(0,3)}</span>
         
         {item.isConcluded && (
           <div className="absolute right-1 top-1/2 -translate-y-1/2">
@@ -246,13 +254,13 @@ export default function ProgrammingPage() {
 
   const filteredFila = useMemo(() => {
     if (selectedSiteFilter === 'all') return fila;
-    return fila.filter(item => item.site === selectedSiteFilter);
+    return fila.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
   }, [fila, selectedSiteFilter]);
 
   const filteredPlanejamento = useMemo(() => {
     let data = planejamentoData;
     if (selectedSiteFilter !== 'all') {
-      data = data.filter(item => item.site === selectedSiteFilter);
+      data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
     }
     return data;
   }, [planejamentoData, selectedSiteFilter]);
@@ -408,7 +416,7 @@ export default function ProgrammingPage() {
                     jobId: job.id, 
                     laneIndex: chosenLane,
                     isConcluded: false,
-                    site: job.site || 'VALINHOS'
+                    site: normalizeSiteName(job.site)
                 });
             }
             actualPointer = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
@@ -456,8 +464,8 @@ export default function ProgrammingPage() {
       };
 
       const novaFila: JobBase[] = json.map((row, i) => {
-          let site = String(findVal(row, ['site', 'fabrica', 'Fábrica', 'unidade', 'unidade de negócio']) || 'VALINHOS').toUpperCase();
-          if (site.includes('VALINHOS')) site = 'VALINHOS';
+          const rawSite = String(findVal(row, ['site', 'fabrica', 'Fábrica', 'unidade', 'unidade de negócio']) || 'VALINHOS');
+          const site = normalizeSiteName(rawSite);
           
           return {
             id: `job-${i}-${Date.now()}`,
@@ -492,7 +500,7 @@ export default function ProgrammingPage() {
       torno: Number(newItem.torno) || 0,
       centro: Number(newItem.centro) || 0,
       prog: Number(newItem.prog) || 0,
-      site: newItem.site || 'VALINHOS',
+      site: normalizeSiteName(newItem.site),
       etapa1: newItem.etapa1 || '',
       etapa2: newItem.etapa2 || ''
     };
@@ -752,6 +760,7 @@ export default function ProgrammingPage() {
                 <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição{selectedSiteFilter !== 'all' ? ` para ${selectedSiteFilter}` : ''}</TableCell></TableRow>
               ) : filteredFila.map((job, idx) => {
                 const globalIdx = fila.findIndex(f => f.id === job.id);
+                const normalizedSite = normalizeSiteName(job.site);
                 return (
                   <TableRow key={job.id} className="hover:bg-muted/5">
                     <TableCell className="text-center px-4">
@@ -791,7 +800,7 @@ export default function ProgrammingPage() {
                     <TableCell>
                       <div className="flex items-center gap-1.5">
                           <MapPin className="h-3 w-3 text-primary" />
-                          <span className="text-[10px] font-black uppercase text-foreground">{job.site || 'VALINHOS'}</span>
+                          <span className="text-[10px] font-black uppercase text-foreground">{normalizedSite}</span>
                       </div>
                     </TableCell>
                     <TableCell>
