@@ -55,7 +55,7 @@ const operatorList = [
 // Orçamento de horas para comparação de capacidade
 const availableHoursBudget: Record<string, number> = {
   'AGUAÍ': 285, 'INDAIATUBA': 68, 'IGARASSU': 107, 'GARANHUNS': 94,
-  'SUAPE': 113, 'VINHEDO': 112, 'VALINHOS (DOVE/SABONETE)': 166, 'POUSO ALEGRE': 124,
+  'SUAPE': 113, 'VINHEDO': 112, 'VALINHOS': 166, 'POUSO ALEGRE': 124,
 };
 
 const normalizeOperatorName = (name: any) => {
@@ -75,9 +75,9 @@ const normalizeOperatorName = (name: any) => {
 const normalizeFactoryName = (name: any): string => {
   if (!name) return 'N/A';
   const n = String(name).toUpperCase().trim();
-  // Consolida Valinhos Dove e Sabonete em uma única unidade visual
-  if (n.includes('VALINHOS DOVE') || n.includes('VALINHOS SABONETE') || n === 'VALINHOS') {
-    return 'VALINHOS (DOVE/SABONETE)';
+  // Consolida Valinhos Dove e Sabonete em uma única unidade visual "VALINHOS"
+  if (n.includes('VALINHOS')) {
+    return 'VALINHOS';
   }
   if (n.includes('VINHEDO')) return 'VINHEDO';
   if (n.includes('AGUAI') || n.includes('AGUAÍ')) return 'AGUAÍ';

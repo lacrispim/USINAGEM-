@@ -106,7 +106,7 @@ const TURNOS = [
   { id: '3', label: '3T', range: '20:00-03:00' },
 ];
 
-const FACTORIES = ["VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
+const FACTORIES = ["VALINHOS", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
 
 const ALL_TECHNICIANS = [
   "Alisson França", 
@@ -222,7 +222,7 @@ export default function ProgrammingPage() {
     torno: 0,
     centro: 0,
     prog: 0,
-    site: 'VALINHOS DOVE',
+    site: 'VALINHOS',
     etapa1: '',
     etapa2: ''
   });
@@ -359,7 +359,7 @@ export default function ProgrammingPage() {
             const shiftId = String(shiftIdx + 1);
             
             const shiftKey = `${dateStr}_${shiftId}`;
-            const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
+            const overrideKey = `${dateStr}_techKey_${shiftId}`;
             
             const isShiftDisabled = currentDisabled[shiftKey];
             const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
@@ -455,19 +455,24 @@ export default function ProgrammingPage() {
           return undefined;
       };
 
-      const novaFila: JobBase[] = json.map((row, i) => ({
-          id: `job-${i}-${Date.now()}`,
-          requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
-          nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
-          quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
-          setup: Number(findVal(row, ['Tempo setup TORNO', 'Tempo setup CENTRO', 'setup', 'Setup Minutos']) || 20),
-          torno: Number(findVal(row, ['Tempo de Planejamento Torno Minutos todas as peças solicitadas', 'torno', 'torno minutos', 'torno min']) || 0),
-          centro: Number(findVal(row, ['Tempo de Planejamento Centro Minutos todas as peças solicitadas', 'centro', 'centro minutos', 'centro min']) || 0),
-          prog: Number(findVal(row, ['Tempo Programação Minutos', 'Tempo de Planejamento Programação Minutos todas as peças solicitadas', 'prog', 'programação', 'Programação Minutos']) || 0),
-          site: String(findVal(row, ['site', 'fabrica', 'Fábrica', 'unidade', 'unidade de negócio']) || 'VALINHOS DOVE').toUpperCase(),
-          etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || ''),
-          etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
-      }));
+      const novaFila: JobBase[] = json.map((row, i) => {
+          let site = String(findVal(row, ['site', 'fabrica', 'Fábrica', 'unidade', 'unidade de negócio']) || 'VALINHOS').toUpperCase();
+          if (site.includes('VALINHOS')) site = 'VALINHOS';
+          
+          return {
+            id: `job-${i}-${Date.now()}`,
+            requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
+            nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
+            quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
+            setup: Number(findVal(row, ['Tempo setup TORNO', 'Tempo setup CENTRO', 'setup', 'Setup Minutos']) || 20),
+            torno: Number(findVal(row, ['Tempo de Planejamento Torno Minutos todas as peças solicitadas', 'torno', 'torno minutos', 'torno min']) || 0),
+            centro: Number(findVal(row, ['Tempo de Planejamento Centro Minutos todas as peças solicitadas', 'centro', 'centro minutos', 'centro min']) || 0),
+            prog: Number(findVal(row, ['Tempo Programação Minutos', 'Tempo de Planejamento Programação Minutos todas as peças solicitadas', 'prog', 'programação', 'Programação Minutos']) || 0),
+            site: site,
+            etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || ''),
+            etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
+          };
+      });
       await recalculatePlan(novaFila);
       setIsImporting(false);
     };
@@ -487,12 +492,12 @@ export default function ProgrammingPage() {
       torno: Number(newItem.torno) || 0,
       centro: Number(newItem.centro) || 0,
       prog: Number(newItem.prog) || 0,
-      site: newItem.site || 'VALINHOS DOVE',
+      site: newItem.site || 'VALINHOS',
       etapa1: newItem.etapa1 || '',
       etapa2: newItem.etapa2 || ''
     };
     const nf = [...fila, job]; setFila(nf); await recalculatePlan(nf); setIsAddDialogOpen(false);
-    setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS DOVE', etapa1: '', etapa2: '' });
+    setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: '', etapa2: '' });
   };
 
   const handleDeleteManual = async (id: string) => {
@@ -786,7 +791,7 @@ export default function ProgrammingPage() {
                     <TableCell>
                       <div className="flex items-center gap-1.5">
                           <MapPin className="h-3 w-3 text-primary" />
-                          <span className="text-[10px] font-black uppercase text-foreground">{job.site || 'VALINHOS DOVE'}</span>
+                          <span className="text-[10px] font-black uppercase text-foreground">{job.site || 'VALINHOS'}</span>
                       </div>
                     </TableCell>
                     <TableCell>

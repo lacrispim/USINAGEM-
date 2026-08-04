@@ -88,7 +88,7 @@ const lossReasonDetails = [
 ];
 
 const operatorList = ["Alisson França", "Daniel Solivo", "Rodrigo Cantano", "Gustavo Gozzi", "William Martinucci", "Nathan Xavier", "Jair Melo", "Marcos Barbosa"];
-const factoryList = ["VALINHOS DOVE", "VALINHOS SABONETE", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
+const factoryList = ["VALINHOS", "VINHEDO", "POUSO ALEGRE", "INDAIATUBA", "AGUAÍ", "SUAPE", "IGARASSU", "GARANHUNS", "TORRE"];
 
 const productionFormSchema = z.object({
   operatorId: z.string().min(1, 'ID do Operador é obrigatório.'),
