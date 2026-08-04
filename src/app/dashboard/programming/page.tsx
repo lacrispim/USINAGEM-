@@ -41,6 +41,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -520,7 +531,31 @@ export default function ProgrammingPage() {
             </DialogContent>
           </Dialog>
 
-          <Button variant="outline" className="h-10 text-[10px] font-black uppercase" onClick={() => recalculatePlan([], disabledShifts, techOverrides)}><Eraser className="h-4 w-4 mr-2" /> Limpar</Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="h-10 text-[10px] font-black uppercase">
+                <Eraser className="h-4 w-4 mr-2" /> Limpar
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Tem certeza que deseja limpar tudo?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação irá remover permanentemente todas as requisições da fila e limpar o cronograma de produção. Esta operação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => recalculatePlan([], disabledShifts, techOverrides)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Limpar Tudo
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          
           <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
           <Button className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase shadow-lg" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha</Button>
         </div>
