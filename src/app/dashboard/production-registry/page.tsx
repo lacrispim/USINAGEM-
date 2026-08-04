@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, User, FileSpreadsheet, Edit, Trash2, Save, XCircle, Search, Filter, CalendarDays, Factory, History, Pencil, Clock, MessageSquare } from 'lucide-react';
+import { CalendarIcon, FileSpreadsheet, Trash2, Search, Filter, Pencil, Clock } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -31,7 +32,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -40,17 +41,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import {
   Dialog,
   DialogContent,
@@ -62,9 +52,9 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { addDoc, collection, serverTimestamp, orderBy, query, deleteDoc, doc, updateDoc, limit } from 'firebase/firestore';
-import { format, parse, startOfDay, endOfDay } from 'date-fns';
+import { format, parse, startOfDay, endOfDay, isValid } from 'date-fns';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { Label } from '@/components/ui/label';
@@ -163,15 +153,22 @@ export default function ProductionRegistryPage() {
   const productionRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
   const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
   
-  const { data: productionRecords, isLoading: loadingProduction } = useCollection(productionRecordsQuery);
-  const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossRecordsQuery);
+  const { data: productionRecords } = useCollection(productionRecordsQuery);
+  const { data: lossRecords } = useCollection(lossRecordsQuery);
+
+  const getRecordDate = (field: any) => {
+    if (!field) return null;
+    if (field.toDate) return field.toDate();
+    if (field instanceof Date) return field;
+    return null;
+  };
 
   const filteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
     if (selectedCategory !== 'all' && selectedCategory !== 'PRODUCAO') return [];
 
     return productionRecords.filter(record => {
-      const recordDate = record.date?.toDate ? record.date.toDate() : null;
+      const recordDate = getRecordDate(record.date);
       if (!recordDate) return false;
       if (selectedDate && (recordDate < startOfDay(selectedDate) || recordDate > endOfDay(selectedDate))) return false;
       if (selectedMonth !== 'all' && recordDate.getMonth() !== parseInt(selectedMonth)) return false;
@@ -187,7 +184,7 @@ export default function ProductionRegistryPage() {
     if (selectedCategory === 'PRODUCAO') return [];
 
     return lossRecords.filter(record => {
-      const recordDate = record.date?.toDate ? record.date.toDate() : null;
+      const recordDate = getRecordDate(record.date);
       if (!recordDate) return false;
       if (selectedDate && (recordDate < startOfDay(selectedDate) || recordDate > endOfDay(selectedDate))) return false;
       if (selectedMonth !== 'all' && recordDate.getMonth() !== parseInt(selectedMonth)) return false;
@@ -201,24 +198,75 @@ export default function ProductionRegistryPage() {
 
   async function onProductionSubmit(values: ProductionFormValues) {
     if (!firestore) return;
-    try {
-      await addDoc(collection(firestore, 'productionRecords'), { ...values, date: parse(values.date, 'dd/MM/yyyy', new Date()), createdAt: serverTimestamp() });
-      toast({ title: 'Sucesso', description: 'Produção registrada com sucesso.' });
-      productionForm.reset({ ...productionForm.getValues(), formsNumber: '', quantityProduced: 0, machiningTime: 0, observations: '' });
-    } catch (e) { toast({ title: 'Erro', description: 'Falha ao salvar registro.', variant: 'destructive' }); }
+    const parsedDate = parse(values.date, 'dd/MM/yyyy', new Date());
+    if (!isValid(parsedDate)) {
+        toast({ title: 'Erro', description: 'Data inválida. Use o formato dd/MM/yyyy.', variant: 'destructive' });
+        return;
+    }
+
+    const docData = { 
+        ...values, 
+        date: parsedDate, 
+        createdAt: serverTimestamp() 
+    };
+
+    const colRef = collection(firestore, 'productionRecords');
+    addDoc(colRef, docData).catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+            path: colRef.path,
+            operation: 'create',
+            requestResourceData: docData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+
+    toast({ title: 'Sucesso', description: 'Produção enviada com sucesso.' });
+    productionForm.reset({ 
+        ...productionForm.getValues(), 
+        formsNumber: '', 
+        quantityProduced: 0, 
+        machiningTime: 0, 
+        observations: '' 
+    });
   }
 
   async function onLossSubmit(values: LossFormValues) {
     if (!firestore) return;
-    try {
-      await addDoc(collection(firestore, 'lossRecords'), { ...values, date: parse(values.date, 'dd/MM/yyyy', new Date()), createdAt: serverTimestamp() });
-      toast({ title: 'Sucesso', description: 'Perda registrada com sucesso.' });
-      lossForm.reset({ ...lossForm.getValues(), timeLost: 0, deadPartsQuantity: 0, observations: '' });
-    } catch (e) { toast({ title: 'Erro', description: 'Falha ao salvar perda.', variant: 'destructive' }); }
+    const parsedDate = parse(values.date, 'dd/MM/yyyy', new Date());
+    if (!isValid(parsedDate)) {
+        toast({ title: 'Erro', description: 'Data inválida. Use o formato dd/MM/yyyy.', variant: 'destructive' });
+        return;
+    }
+
+    const docData = { 
+        ...values, 
+        date: parsedDate, 
+        createdAt: serverTimestamp() 
+    };
+
+    const colRef = collection(firestore, 'lossRecords');
+    addDoc(colRef, docData).catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+            path: colRef.path,
+            operation: 'create',
+            requestResourceData: docData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+
+    toast({ title: 'Sucesso', description: 'Perda enviada com sucesso.' });
+    lossForm.reset({ 
+        ...lossForm.getValues(), 
+        timeLost: 0, 
+        deadPartsQuantity: 0, 
+        observations: '' 
+    });
   }
 
   const handleEdit = (type: 'production' | 'loss', record: any) => {
-    const formattedDate = record.date?.toDate ? format(record.date.toDate(), 'dd/MM/yyyy') : record.date;
+    const recordDate = getRecordDate(record.date);
+    const formattedDate = recordDate ? format(recordDate, 'dd/MM/yyyy') : record.date;
+    
     if (type === 'production') {
       editProductionForm.reset({
         operatorId: record.operatorId,
@@ -250,46 +298,73 @@ export default function ProductionRegistryPage() {
 
   const onUpdateProduction = async (values: ProductionFormValues) => {
     if (!firestore || !editingRecord) return;
-    try {
-      await updateDoc(doc(firestore, 'productionRecords', editingRecord.id), {
+    const parsedDate = parse(values.date, 'dd/MM/yyyy', new Date());
+    const docRef = doc(firestore, 'productionRecords', editingRecord.id);
+    const updateData = {
         ...values,
-        date: parse(values.date, 'dd/MM/yyyy', new Date()),
+        date: parsedDate,
         updatedAt: serverTimestamp()
-      });
-      toast({ title: 'Sucesso', description: 'Registro de produção atualizado.' });
-      setEditingRecord(null);
-    } catch (e) {
-      toast({ title: 'Erro', description: 'Falha ao atualizar registro.', variant: 'destructive' });
-    }
+    };
+
+    updateDoc(docRef, updateData).catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+    
+    toast({ title: 'Sucesso', description: 'Registro atualizado.' });
+    setEditingRecord(null);
   };
 
   const onUpdateLoss = async (values: LossFormValues) => {
     if (!firestore || !editingRecord) return;
-    try {
-      await updateDoc(doc(firestore, 'lossRecords', editingRecord.id), {
+    const parsedDate = parse(values.date, 'dd/MM/yyyy', new Date());
+    const docRef = doc(firestore, 'lossRecords', editingRecord.id);
+    const updateData = {
         ...values,
-        date: parse(values.date, 'dd/MM/yyyy', new Date()),
+        date: parsedDate,
         updatedAt: serverTimestamp()
-      });
-      toast({ title: 'Sucesso', description: 'Registro de perda atualizado.' });
-      setEditingRecord(null);
-    } catch (e) {
-      toast({ title: 'Erro', description: 'Falha ao atualizar registro.', variant: 'destructive' });
-    }
+    };
+
+    updateDoc(docRef, updateData).catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+
+    toast({ title: 'Sucesso', description: 'Perda atualizada.' });
+    setEditingRecord(null);
   };
 
   const handleDelete = async (coll: string, id: string) => {
     if (!firestore) return;
-    await deleteDoc(doc(firestore, coll, id));
-    toast({ title: 'Excluído', description: 'Registro removido permanentemente.' });
+    const docRef = doc(firestore, coll, id);
+    deleteDoc(docRef).catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+    toast({ title: 'Excluído', description: 'Registro removido.' });
   };
 
   const exportToExcel = (data: any[], name: string) => {
-    const ws = XLSX.utils.json_to_sheet(data.map(r => ({ 
-        ...r, 
-        date: r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date,
-        apontamento: r.createdAt?.toDate ? format(r.createdAt.toDate(), 'dd/MM HH:mm:ss') : '-'
-    })));
+    const ws = XLSX.utils.json_to_sheet(data.map(r => {
+        const rDate = getRecordDate(r.date);
+        const rCreatedAt = getRecordDate(r.createdAt);
+        return { 
+            ...r, 
+            date: rDate ? format(rDate, 'dd/MM/yyyy') : r.date,
+            apontamento: rCreatedAt ? format(rCreatedAt, 'dd/MM HH:mm:ss') : '-'
+        }
+    }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Dados");
     XLSX.writeFile(wb, `${name}.xlsx`);
@@ -516,12 +591,15 @@ export default function ProductionRegistryPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {filteredProductionRecords.map(r => (
+                    {filteredProductionRecords.map(r => {
+                        const rDate = getRecordDate(r.date);
+                        const rCreatedAt = getRecordDate(r.createdAt);
+                        return (
                         <TableRow key={r.id}>
                             <TableCell>{r.operatorId}</TableCell>
-                            <TableCell>{r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date}</TableCell>
+                            <TableCell>{rDate ? format(rDate, 'dd/MM/yyyy') : r.date}</TableCell>
                             <TableCell className="text-primary font-mono text-[11px] font-bold">
-                                {r.createdAt?.toDate ? format(r.createdAt.toDate(), 'dd/MM HH:mm') : '-'}
+                                {rCreatedAt ? format(rCreatedAt, 'dd/MM HH:mm') : '-'}
                             </TableCell>
                             <TableCell>{r.factory}</TableCell>
                             <TableCell className="font-mono font-bold">#{r.formsNumber}</TableCell>
@@ -538,7 +616,8 @@ export default function ProductionRegistryPage() {
                               </div>
                             </TableCell>
                         </TableRow>
-                    ))}
+                        )
+                    })}
                 </TableBody>
             </Table>
         </CardContent>
@@ -564,12 +643,15 @@ export default function ProductionRegistryPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {filteredLossRecords.map(r => (
+                    {filteredLossRecords.map(r => {
+                        const rDate = getRecordDate(r.date);
+                        const rCreatedAt = getRecordDate(r.createdAt);
+                        return (
                         <TableRow key={r.id}>
                             <TableCell>{r.operatorId}</TableCell>
-                            <TableCell>{r.date?.toDate ? format(r.date.toDate(), 'dd/MM/yyyy') : r.date}</TableCell>
+                            <TableCell>{rDate ? format(rDate, 'dd/MM/yyyy') : r.date}</TableCell>
                             <TableCell className="text-primary font-mono text-[11px] font-bold">
-                                {r.createdAt?.toDate ? format(r.createdAt.toDate(), 'dd/MM HH:mm') : '-'}
+                                {rCreatedAt ? format(rCreatedAt, 'dd/MM HH:mm') : '-'}
                             </TableCell>
                             <TableCell>{r.factory}</TableCell>
                             <TableCell><Badge className="bg-yellow-500 text-black">{r.lossReason}</Badge></TableCell>
@@ -584,7 +666,8 @@ export default function ProductionRegistryPage() {
                               </div>
                             </TableCell>
                         </TableRow>
-                    ))}
+                        )
+                    })}
                 </TableBody>
             </Table>
         </CardContent>
