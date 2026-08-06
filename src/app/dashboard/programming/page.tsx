@@ -716,9 +716,19 @@ export default function ProgrammingPage() {
                   )}
               </TableCell>
               <TableCell>
-                <div className="flex items-center gap-1.5">
-                    <MapPin className="h-3 w-3 text-primary" />
-                    <span className="text-[10px] font-black uppercase text-foreground">{normalizedSite}</span>
+                <div className="flex items-center gap-1.5 min-w-[120px]">
+                    <Select 
+                        value={normalizedSite} 
+                        onValueChange={(v) => updateJobField(job.id, 'site', v)}
+                    >
+                        <SelectTrigger className="h-7 text-[10px] font-black uppercase border-primary/20 bg-background/50">
+                            <MapPin className="h-3 w-3 text-primary mr-1" />
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {FACTORIES.map(f => <SelectItem key={f} value={f} className="text-[10px] font-bold">{f}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
                 </div>
               </TableCell>
               <TableCell>
@@ -738,8 +748,22 @@ export default function ProgrammingPage() {
                     />
                 </div>
               </TableCell>
-              <TableCell className="font-mono font-bold">#{job.requisicao}</TableCell>
-              <TableCell className="uppercase text-[10px] font-medium max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
+              <TableCell>
+                 <Input 
+                    className="h-7 w-20 font-mono font-bold text-[10px] p-1 bg-background/50 border-primary/20" 
+                    defaultValue={job.requisicao}
+                    onBlur={(e) => updateJobField(job.id, 'requisicao', e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                />
+              </TableCell>
+              <TableCell>
+                 <Input 
+                    className="h-7 w-full min-w-[150px] uppercase text-[10px] font-medium p-1 bg-background/50 border-primary/20" 
+                    defaultValue={job.nomeDaPeca}
+                    onBlur={(e) => updateJobField(job.id, 'nomeDaPeca', e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                />
+              </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end items-center gap-1">
                   <Input 
