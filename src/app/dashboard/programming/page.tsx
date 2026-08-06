@@ -60,7 +60,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Label } from "@/components/label";
 import {
   Select,
   SelectContent,
@@ -352,7 +352,6 @@ export default function ProgrammingPage() {
     const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
     const novosPlanItems: PlanejamentoItem[] = [];
     const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
-    const jobCompletionTimes: Record<string, number> = {};
 
     const concluidos = new Set(
         planejamentoData.filter(i => i.isConcluded)
@@ -448,18 +447,12 @@ export default function ProgrammingPage() {
         return actualPointer;
     };
 
-    // Lógica Flow Shop: Agendar S1 e S2 do Job 1, depois Job 2...
     novaFila.forEach(job => {
-        // 1. Programação (Sempre primeiro)
         const progEnd = allocateTask(job, 'ADM', 0, 'prog', 'stage-prog');
-
-        // 2. Etapa 1 (Inicia após Programação ou Início do Plano)
         const e1 = String(job.etapa1 || '').toUpperCase();
         let e1End = progEnd;
         if (e1.includes('TORNO')) e1End = allocateTask(job, 'TORNO', progEnd, 'torno', 'stage-1');
         else if (e1.includes('CENTRO')) e1End = allocateTask(job, 'CENTRO', progEnd, 'centro', 'stage-1');
-
-        // 3. Etapa 2 (Inicia IMEDIATAMENTE após a Etapa 1 terminar)
         const e2 = String(job.etapa2 || '').toUpperCase();
         if (e2.includes('TORNO')) allocateTask(job, 'TORNO', e1End, 'torno', 'stage-2');
         else if (e2.includes('CENTRO')) allocateTask(job, 'CENTRO', e1End, 'centro', 'stage-2');
@@ -560,7 +553,6 @@ export default function ProgrammingPage() {
       try {
         const workbook = XLSX.read(new Uint8Array(event.target?.result as ArrayBuffer), { type: 'array' });
         const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-        
         const findVal = (row: any, keys: string[]) => {
             for (const key of keys) {
                 const rowKey = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
@@ -568,11 +560,9 @@ export default function ProgrammingPage() {
             }
             return undefined;
         };
-
         const novaFila: JobBase[] = json.map((row, i) => {
             const rawSite = String(findVal(row, ['site', 'fabrica', 'Fábrica', 'unidade', 'unidade de negócio']) || 'VALINHOS');
             const site = normalizeSiteName(rawSite);
-            
             return {
               id: `job-${i}-${Date.now()}`,
               requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
@@ -587,14 +577,12 @@ export default function ProgrammingPage() {
               etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
             };
         });
-
         const start = startOfDay(new Date());
         setPlanStartDate(start);
         await setDoc(doc(firestore, 'programacaoState', 'config'), {
             planStartDate: format(start, 'yyyy-MM-dd'),
             updatedAt: serverTimestamp()
         }, { merge: true });
-
         await recalculatePlan(novaFila, disabledShifts, techOverrides, start);
         toast({ title: "Sucesso", description: `${novaFila.length} itens importados.` });
       } catch (err) {
@@ -632,7 +620,7 @@ export default function ProgrammingPage() {
     const nf = fila.filter(j => j.id !== id); setFila(nf); await recalculatePlan(nf);
   };
 
-  const renderFilaTable = (jobs: JobBase[]) => (
+  const renderFilaTable = (jobs: JobBase[], isGlobal: boolean = false) => (
     <Table>
       <TableHeader>
           <TableRow>
@@ -651,8 +639,9 @@ export default function ProgrammingPage() {
       <TableBody>
         {jobs.length === 0 ? (
           <TableRow><TableCell colSpan={10} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada nesta categoria</TableCell></TableRow>
-        ) : jobs.map((job) => {
+        ) : jobs.map((job, localIdx) => {
           const globalIdx = indexById.get(job.id) ?? 0;
+          const displayIdx = isGlobal ? globalIdx + 1 : localIdx + 1;
           const normalizedSite = normalizeSiteName(job.site);
           const stats = jobCompletionStats.get(job.id);
           const isFullyConcluded = stats && stats.total > 0 && stats.total === stats.concluded;
@@ -663,23 +652,58 @@ export default function ProgrammingPage() {
               <TableCell className="text-center px-4">
                   <Input 
                       type="number" 
-                      defaultValue={globalIdx + 1}
+                      defaultValue={displayIdx}
+                      key={`${job.id}-${displayIdx}`}
                       className="h-10 w-12 text-center text-sm font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all"
                       onFocus={(e) => e.target.select()}
                       onBlur={(e) => {
                           const newPos = parseInt(e.target.value);
-                          if (!isNaN(newPos) && newPos !== globalIdx + 1 && newPos > 0) {
-                              moveJobToPosition(globalIdx, newPos);
+                          if (isNaN(newPos) || newPos < 1) { e.target.value = String(displayIdx); return; }
+                          
+                          if (isGlobal) {
+                              if (newPos !== globalIdx + 1) moveJobToPosition(globalIdx, newPos);
                           } else {
-                              e.target.value = String(globalIdx + 1);
+                              if (newPos !== localIdx + 1) {
+                                  const targetItem = jobs[Math.min(newPos - 1, jobs.length - 1)];
+                                  const targetGlobalIdx = indexById.get(targetItem.id) ?? 0;
+                                  moveJobToPosition(globalIdx, targetGlobalIdx + 1);
+                              }
                           }
                       }}
                   />
               </TableCell>
               <TableCell className="text-center">
                 <div className="flex flex-col items-center gap-1">
-                    <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, globalIdx)} disabled={globalIdx === 0}><ArrowUp className="h-3 w-3" /></Button>
-                    <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, globalIdx + 2)} disabled={globalIdx === fila.length - 1}><ArrowDown className="h-3 w-3" /></Button>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-6 w-6" 
+                      onClick={() => {
+                        if (isGlobal) moveJobToPosition(globalIdx, globalIdx);
+                        else if (localIdx > 0) {
+                          const targetGlobal = indexById.get(jobs[localIdx - 1].id) ?? 0;
+                          moveJobToPosition(globalIdx, targetGlobal + 1);
+                        }
+                      }} 
+                      disabled={isGlobal ? globalIdx === 0 : localIdx === 0}
+                    >
+                      <ArrowUp className="h-3 w-3" />
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-6 w-6" 
+                      onClick={() => {
+                        if (isGlobal) moveJobToPosition(globalIdx, globalIdx + 2);
+                        else if (localIdx < jobs.length - 1) {
+                          const targetGlobal = indexById.get(jobs[localIdx + 1].id) ?? 0;
+                          moveJobToPosition(globalIdx, targetGlobal + 1);
+                        }
+                      }} 
+                      disabled={isGlobal ? globalIdx === fila.length - 1 : localIdx === jobs.length - 1}
+                    >
+                      <ArrowDown className="h-3 w-3" />
+                    </Button>
                 </div>
               </TableCell>
               <TableCell>
@@ -757,26 +781,11 @@ export default function ProgrammingPage() {
                 <div className="flex flex-col items-end gap-1">
                   <div className="flex items-center gap-1">
                     <span className="text-[8px] font-bold text-muted-foreground">T:</span>
-                    <Input 
-                      type="number"
-                      className="h-6 w-12 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
-                      defaultValue={job.torno}
-                      onBlur={(e) => updateJobField(job.id, 'torno', Number(e.target.value))}
-                    />
+                    <Input type="number" className="h-6 w-12 text-right text-[9px] p-1 bg-background/50 border-primary/10" defaultValue={job.torno} onBlur={(e) => updateJobField(job.id, 'torno', Number(e.target.value))} />
                     <span className="text-[8px] font-bold text-muted-foreground">C:</span>
-                    <Input 
-                      type="number"
-                      className="h-6 w-12 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
-                      defaultValue={job.centro}
-                      onBlur={(e) => updateJobField(job.id, 'centro', Number(e.target.value))}
-                    />
+                    <Input type="number" className="h-6 w-12 text-right text-[9px] p-1 bg-background/50 border-primary/10" defaultValue={job.centro} onBlur={(e) => updateJobField(job.id, 'centro', Number(e.target.value))} />
                     <span className="text-[8px] font-bold text-muted-foreground">S:</span>
-                    <Input 
-                      type="number"
-                      className="h-6 w-10 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
-                      defaultValue={job.setup}
-                      onBlur={(e) => updateJobField(job.id, 'setup', Number(e.target.value))}
-                    />
+                    <Input type="number" className="h-6 w-10 text-right text-[9px] p-1 bg-background/50 border-primary/10" defaultValue={job.setup} onBlur={(e) => updateJobField(job.id, 'setup', Number(e.target.value))} />
                   </div>
                 </div>
               </TableCell>
@@ -828,7 +837,6 @@ export default function ProgrammingPage() {
                 <DialogFooter><Button onClick={handleAddManual} className="w-full">Adicionar na Fila</Button></DialogFooter>
               </DialogContent>
             </Dialog>
-
             <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
             <Button className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
                 {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha
@@ -956,14 +964,14 @@ export default function ProgrammingPage() {
             <div className="px-6 py-2 bg-muted/5 border-b">
               <TabsList className="grid grid-cols-3 w-full max-md h-9">
                 <TabsTrigger value="all" className="text-[10px] font-black uppercase">GERAL</TabsTrigger>
-                <TabsTrigger value="torno" className="text-[10px] font-black uppercase">TORNO CNC</TabsTrigger>
-                <TabsTrigger value="centro" className="text-[10px] font-black uppercase">CENTRO CNC</TabsTrigger>
+                <TabsTrigger value="etapa1" className="text-[10px] font-black uppercase">ETAPA 1</TabsTrigger>
+                <TabsTrigger value="etapa2" className="text-[10px] font-black uppercase">ETAPA 2</TabsTrigger>
               </TabsList>
             </div>
             
-            <TabsContent value="all" className="m-0">{renderFilaTable(filteredFila)}</TabsContent>
-            <TabsContent value="torno" className="m-0">{renderFilaTable(filteredFila.filter(j => Number(j.torno) > 0))}</TabsContent>
-            <TabsContent value="centro" className="m-0">{renderFilaTable(filteredFila.filter(j => Number(j.centro) > 0))}</TabsContent>
+            <TabsContent value="all" className="m-0">{renderFilaTable(filteredFila, true)}</TabsContent>
+            <TabsContent value="etapa1" className="m-0">{renderFilaTable(filteredFila.filter(j => j.etapa1 && j.etapa1 !== ''), false)}</TabsContent>
+            <TabsContent value="etapa2" className="m-0">{renderFilaTable(filteredFila.filter(j => j.etapa2 && j.etapa2 !== ''), false)}</TabsContent>
           </Tabs>
         </CardContent>
       </Card>
