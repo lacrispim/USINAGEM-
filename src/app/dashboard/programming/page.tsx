@@ -226,6 +226,7 @@ export default function ProgrammingPage() {
   
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
   const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<string>('all');
+  const [requisitionFilter, setRequisitionFilter] = useState<string>('');
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
@@ -262,17 +263,26 @@ export default function ProgrammingPage() {
   }, [filaDoc, planoDoc, configDoc]);
 
   const filteredFila = useMemo(() => {
-    if (selectedSiteFilter === 'all') return fila;
-    return fila.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
-  }, [fila, selectedSiteFilter]);
+    let data = fila;
+    if (selectedSiteFilter !== 'all') {
+      data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
+    }
+    if (requisitionFilter) {
+      data = data.filter(item => item.requisicao.toLowerCase().includes(requisitionFilter.toLowerCase()));
+    }
+    return data;
+  }, [fila, selectedSiteFilter, requisitionFilter]);
 
   const filteredPlanejamento = useMemo(() => {
     let data = planejamentoData;
     if (selectedSiteFilter !== 'all') {
       data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
     }
+    if (requisitionFilter) {
+      data = data.filter(item => item.requisicao.toLowerCase().includes(requisitionFilter.toLowerCase()));
+    }
     return data;
-  }, [planejamentoData, selectedSiteFilter]);
+  }, [planejamentoData, selectedSiteFilter, requisitionFilter]);
 
   const toggleConcluded = async (itemId: string) => {
     if (!firestore || !planejamentoData) return;
@@ -627,6 +637,18 @@ export default function ProgrammingPage() {
                     </SelectContent>
                 </Select>
             </div>
+
+            <div className="h-4 w-px bg-border/50 hidden md:block" />
+
+            <div className="flex items-center px-2 flex-1 md:flex-none border-l md:border-l-0 border-border/20 md:border-transparent">
+                <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <Input 
+                  placeholder="PESQUISAR REQ." 
+                  value={requisitionFilter}
+                  onChange={(e) => setRequisitionFilter(e.target.value)}
+                  className="h-9 w-full md:w-[120px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
+                />
+            </div>
           </div>
 
           <div className="flex items-center bg-card/50 border rounded-lg p-1 shadow-inner w-full md:w-auto justify-center">
@@ -680,6 +702,11 @@ export default function ProgrammingPage() {
                           {selectedSiteFilter !== 'all' && (
                               <Badge variant="outline" className="border-primary/50 text-primary text-[10px] font-black">
                                   SITE: {selectedSiteFilter}
+                              </Badge>
+                          )}
+                          {requisitionFilter && (
+                              <Badge variant="outline" className="border-blue-500/50 text-blue-400 text-[10px] font-black">
+                                  BUSCA: {requisitionFilter.toUpperCase()}
                               </Badge>
                           )}
                           {selectedEquipmentFilter !== 'all' && (
@@ -756,13 +783,17 @@ export default function ProgrammingPage() {
       <Card className="shadow-lg border-border">
         <CardHeader className="bg-muted/5 border-b flex flex-row items-center justify-between">
             <CardTitle className="text-xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle>
-            {selectedSiteFilter !== 'all' && (
-                <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-black text-muted-foreground uppercase">Exibindo:</span>
+            <div className="flex items-center gap-2">
+                {selectedSiteFilter !== 'all' && (
                     <Badge className="bg-primary text-primary-foreground font-black text-[9px]">{selectedSiteFilter}</Badge>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedSiteFilter('all')} className="h-6 px-2 text-[9px] font-black uppercase text-destructive hover:bg-destructive/10">Limpar Filtro</Button>
-                </div>
-            )}
+                )}
+                {requisitionFilter && (
+                    <Badge variant="outline" className="border-blue-500 text-blue-400 font-black text-[9px]">REQ: {requisitionFilter.toUpperCase()}</Badge>
+                )}
+                {(selectedSiteFilter !== 'all' || requisitionFilter) && (
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedSiteFilter('all'); setRequisitionFilter(''); }} className="h-6 px-2 text-[9px] font-black uppercase text-destructive hover:bg-destructive/10">Limpar Filtros</Button>
+                )}
+            </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -781,7 +812,7 @@ export default function ProgrammingPage() {
             </TableHeader>
             <TableBody>
               {filteredFila.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição{selectedSiteFilter !== 'all' ? ` para ${selectedSiteFilter}` : ''}</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada para o filtro</TableCell></TableRow>
               ) : filteredFila.map((job, idx) => {
                 const globalIdx = fila.findIndex(f => f.id === job.id);
                 const normalizedSite = normalizeSiteName(job.site);
