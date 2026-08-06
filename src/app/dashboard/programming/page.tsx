@@ -170,7 +170,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
     <div 
       onClick={() => onToggle(item.id)}
       className={cn(
-        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm hover:scale-[1.01] transition-all z-10 cursor-pointer group", 
+        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm hover:scale-[1.01] transition-all z-[5] cursor-pointer group", 
         isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]"),
         item.isConcluded && "opacity-40 grayscale-[0.5] border-green-500 border-2"
       )} 
@@ -709,57 +709,59 @@ export default function ProgrammingPage() {
                         const shiftKey = `${dateStr}_${t.id}`;
                         const isDisabled = disabledShifts[shiftKey];
                         return (
-                            <div key={t.id} className={cn("grid grid-cols-[100px_1fr] border-b border-border/20 last:border-0 relative", isDisabled && "bg-stripes")}>
-                                <div className="bg-muted/5 border-r border-border/20 p-4 flex flex-col justify-center items-center gap-2">
+                            <div key={t.id} className={cn("grid grid-cols-[100px_1fr] border-b border-border/20 last:border-0 relative overflow-hidden", isDisabled && "bg-stripes")}>
+                                <div className="bg-muted/5 border-r border-border/20 p-4 flex flex-col justify-center items-center gap-2 z-20">
                                     <span className={cn("text-2xl font-bold", isDisabled ? "text-muted-foreground" : "text-foreground")}>{t.label}</span>
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => toggleShift(day, t.id)}>{isDisabled ? <PowerOff className="h-3.5 w-3.5 text-destructive" /> : <Power className="h-3.5 w-3.5 text-green-500" />}</Button>
                                 </div>
-                                <div className="p-4 bg-background/20">
-                                    {!isDisabled && (
-                                        <>
-                                            <Ruler />
-                                            {['TORNO', 'CENTRO', 'ADM']
-                                              .filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat)
-                                              .map(cat => {
-                                                const overrideKey = `${dateStr}_${cat}_${t.id}`;
-                                                const tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
-                                                
-                                                if (!tech) return null;
+                                <div className="p-4 bg-background/20 overflow-x-auto min-w-0 custom-scrollbar">
+                                    <div className="min-w-[800px] relative">
+                                        {!isDisabled && (
+                                            <>
+                                                <Ruler />
+                                                {['TORNO', 'CENTRO', 'ADM']
+                                                  .filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat)
+                                                  .map(cat => {
+                                                    const overrideKey = `${dateStr}_${cat}_${t.id}`;
+                                                    const tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
+                                                    
+                                                    if (!tech) return null;
 
-                                                return (
-                                                  <div key={`${cat}-${t.id}`} className="grid grid-cols-[155px_1fr] items-center mb-3">
-                                                      <div 
-                                                        className="pr-3 truncate cursor-pointer group/tech"
-                                                        onClick={() => {
-                                                          setActiveSwap({ day: dateStr, shiftId: t.id, category: cat, currentTech: tech });
-                                                          setIsSwapDialogOpen(true);
-                                                        }}
-                                                      >
-                                                        <div className={cn("text-[9px] font-mono font-black uppercase flex items-center gap-1.5", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>
-                                                          {cat}
-                                                          <UserRoundPen className="h-2 w-2 opacity-0 group-hover/tech:opacity-100 transition-opacity" />
-                                                        </div>
-                                                        <div className="text-[11px] font-bold truncate flex items-center gap-1.5">
-                                                          {tech}
-                                                          {tech === "Marcos Barbosa" && <Badge variant="outline" className="h-3.5 text-[7px] border-blue-500 text-blue-400 px-1 font-black">FOLGISTA</Badge>}
-                                                        </div>
+                                                    return (
+                                                      <div key={`${cat}-${t.id}`} className="grid grid-cols-[155px_1fr] items-center mb-3">
+                                                          <div 
+                                                            className="pr-3 truncate cursor-pointer group/tech"
+                                                            onClick={() => {
+                                                              setActiveSwap({ day: dateStr, shiftId: t.id, category: cat, currentTech: tech });
+                                                              setIsSwapDialogOpen(true);
+                                                            }}
+                                                          >
+                                                            <div className={cn("text-[9px] font-mono font-black uppercase flex items-center gap-1.5", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>
+                                                              {cat}
+                                                              <UserRoundPen className="h-2 w-2 opacity-0 group-hover/tech:opacity-100 transition-opacity" />
+                                                            </div>
+                                                            <div className="text-[11px] font-bold truncate flex items-center gap-1.5">
+                                                              {tech}
+                                                              {tech === "Marcos Barbosa" && <Badge variant="outline" className="h-3.5 text-[7px] border-blue-500 text-blue-400 px-1 font-black">FOLGISTA</Badge>}
+                                                            </div>
+                                                          </div>
+                                                          <div className="relative h-[38px] border border-border/50 rounded bg-black/20 overflow-hidden">
+                                                              {PAUSAS.map(p => (
+                                                                  <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-2 w-2 text-yellow-500/30" /></div>
+                                                              ))}
+                                                              {dayItems.filter(i => i.techKey === cat && i.turno === t.id).map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
+                                                          </div>
                                                       </div>
-                                                      <div className="relative h-[38px] border border-border/50 rounded bg-black/20 overflow-hidden">
-                                                          {PAUSAS.map(p => (
-                                                              <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-2 w-2 text-yellow-500/30" /></div>
-                                                          ))}
-                                                          {dayItems.filter(i => i.techKey === cat && i.turno === t.id).map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
-                                                      </div>
-                                                  </div>
-                                                );
-                                            })}
-                                        </>
-                                    )}
-                                    {isDisabled && (
-                                      <div className="h-full flex items-center justify-center opacity-20">
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Turno Desativado</span>
-                                      </div>
-                                    )}
+                                                    );
+                                                })}
+                                            </>
+                                        )}
+                                        {isDisabled && (
+                                          <div className="h-full flex items-center justify-center opacity-20 py-10">
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Turno Desativado</span>
+                                          </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -930,6 +932,19 @@ export default function ProgrammingPage() {
       <style jsx global>{`
         .bg-stripes {
           background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 10px, transparent 10px, transparent 20px);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255,255,255,0.05);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.1);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255,255,255,0.2);
         }
       `}</style>
     </div>
