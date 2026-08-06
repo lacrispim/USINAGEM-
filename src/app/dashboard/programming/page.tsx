@@ -27,7 +27,9 @@ import {
   Cpu,
   Search,
   Anchor,
-  ArrowLeftToLine
+  ArrowLeftToLine,
+  Clock,
+  CheckCircle2
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -272,6 +274,18 @@ export default function ProgrammingPage() {
 
   // Indexação para Busca O(1) na tabela
   const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
+
+  // Mapa de Status de Conclusão por Job
+  const jobCompletionStats = useMemo(() => {
+    const map = new Map<string, { total: number, concluded: number }>();
+    for (const item of planejamentoData) {
+      const stats = map.get(item.jobId) || { total: 0, concluded: 0 };
+      stats.total++;
+      if (item.isConcluded) stats.concluded++;
+      map.set(item.jobId, stats);
+    }
+    return map;
+  }, [planejamentoData]);
 
   // Filtros Otimizados
   const filteredFila = useMemo(() => {
@@ -899,6 +913,7 @@ export default function ProgrammingPage() {
                 <TableRow>
                     <TableHead className="w-20 text-center">POS</TableHead>
                     <TableHead className="w-20 text-center">AÇÕES</TableHead>
+                    <TableHead>STATUS</TableHead>
                     <TableHead>FÁBRICA / SITE</TableHead>
                     <TableHead>FLUXO (E1 → E2)</TableHead>
                     <TableHead>REQ.</TableHead>
@@ -910,12 +925,18 @@ export default function ProgrammingPage() {
             </TableHeader>
             <TableBody>
               {filteredFila.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada para o filtro</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada para o filtro</TableCell></TableRow>
               ) : filteredFila.map((job) => {
                 const globalIdx = indexById.get(job.id) ?? 0;
                 const normalizedSite = normalizeSiteName(job.site);
+                
+                // Cálculo de Status
+                const stats = jobCompletionStats.get(job.id);
+                const isFullyConcluded = stats && stats.total > 0 && stats.total === stats.concluded;
+                const isPartiallyConcluded = stats && stats.concluded > 0 && stats.concluded < stats.total;
+
                 return (
-                  <TableRow key={job.id} className="hover:bg-muted/5">
+                  <TableRow key={job.id} className={cn("hover:bg-muted/5 transition-colors", isFullyConcluded && "bg-green-500/5 opacity-80")}>
                     <TableCell className="text-center px-4">
                         <div className="relative group/pos">
                           <Input 
@@ -949,6 +970,21 @@ export default function ProgrammingPage() {
                           <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, globalIdx)} disabled={globalIdx === 0}><ArrowUp className="h-3 w-3" /></Button>
                           <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, globalIdx + 2)} disabled={globalIdx === fila.length - 1}><ArrowDown className="h-3 w-3" /></Button>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                        {isFullyConcluded ? (
+                            <div className="flex items-center gap-1.5 text-green-500 font-black text-[9px] uppercase">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                CONCLUÍDO
+                            </div>
+                        ) : isPartiallyConcluded ? (
+                            <div className="flex items-center gap-1.5 text-yellow-500 font-black text-[9px] uppercase">
+                                <Clock className="h-3.5 w-3.5" />
+                                {Math.round((stats.concluded / stats.total) * 100)}%
+                            </div>
+                        ) : (
+                            <div className="text-muted-foreground/40 font-black text-[9px] uppercase">PENDENTE</div>
+                        )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5">
