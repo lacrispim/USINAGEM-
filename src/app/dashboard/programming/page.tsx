@@ -68,6 +68,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface JobBase {
   id: string;
@@ -636,6 +637,157 @@ export default function ProgrammingPage() {
     const nf = fila.filter(j => j.id !== id); setFila(nf); await recalculatePlan(nf);
   };
 
+  const renderFilaTable = (jobs: JobBase[]) => (
+    <Table>
+      <TableHeader>
+          <TableRow>
+              <TableHead className="w-20 text-center">POS</TableHead>
+              <TableHead className="w-20 text-center">AÇÕES</TableHead>
+              <TableHead>STATUS</TableHead>
+              <TableHead>FÁBRICA / SITE</TableHead>
+              <TableHead>FLUXO (E1 → E2)</TableHead>
+              <TableHead>REQ.</TableHead>
+              <TableHead>PEÇA</TableHead>
+              <TableHead className="text-right">QTD</TableHead>
+              <TableHead className="text-right">TEMPO (T|C|S)</TableHead>
+              <TableHead className="w-10"></TableHead>
+          </TableRow>
+      </TableHeader>
+      <TableBody>
+        {jobs.length === 0 ? (
+          <TableRow><TableCell colSpan={10} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada nesta categoria</TableCell></TableRow>
+        ) : jobs.map((job) => {
+          const globalIdx = indexById.get(job.id) ?? 0;
+          const normalizedSite = normalizeSiteName(job.site);
+          
+          const stats = jobCompletionStats.get(job.id);
+          const isFullyConcluded = stats && stats.total > 0 && stats.total === stats.concluded;
+          const isPartiallyConcluded = stats && stats.concluded > 0 && stats.concluded < stats.total;
+
+          return (
+            <TableRow key={job.id} className={cn("hover:bg-muted/5 transition-colors", isFullyConcluded && "bg-green-500/5 opacity-80")}>
+              <TableCell className="text-center px-4">
+                  <div className="relative group/pos">
+                    <Input 
+                        type="number" 
+                        key={`pos-input-${job.id}-${globalIdx}`}
+                        defaultValue={globalIdx + 1}
+                        className="h-10 w-12 text-center text-sm font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all"
+                        onFocus={(e) => e.target.select()}
+                        onBlur={(e) => {
+                            const newPos = parseInt(e.target.value);
+                            if (!isNaN(newPos) && newPos !== globalIdx + 1 && newPos > 0) {
+                                moveJobToPosition(globalIdx, newPos);
+                            } else {
+                                e.target.value = String(globalIdx + 1);
+                            }
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                const val = parseInt((e.target as HTMLInputElement).value);
+                                if (!isNaN(val) && val !== globalIdx + 1 && val > 0) {
+                                    moveJobToPosition(globalIdx, val);
+                                }
+                                (e.target as HTMLInputElement).blur();
+                            }
+                        }}
+                    />
+                  </div>
+              </TableCell>
+              <TableCell className="text-center">
+                <div className="flex flex-col items-center gap-1">
+                    <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, globalIdx)} disabled={globalIdx === 0}><ArrowUp className="h-3 w-3" /></Button>
+                    <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, globalIdx + 2)} disabled={globalIdx === fila.length - 1}><ArrowDown className="h-3 w-3" /></Button>
+                </div>
+              </TableCell>
+              <TableCell>
+                  {isFullyConcluded ? (
+                      <div className="flex items-center gap-1.5 text-green-500 font-black text-[9px] uppercase">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          CONCLUÍDO
+                      </div>
+                  ) : isPartiallyConcluded ? (
+                      <div className="flex items-center gap-1.5 text-yellow-500 font-black text-[9px] uppercase">
+                          <Clock className="h-3.5 w-3.5" />
+                          {Math.round((stats.concluded / stats.total) * 100)}%
+                      </div>
+                  ) : (
+                      <div className="text-muted-foreground/40 font-black text-[9px] uppercase">PENDENTE</div>
+                  )}
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1.5">
+                    <MapPin className="h-3 w-3 text-primary" />
+                    <span className="text-[10px] font-black uppercase text-foreground">{normalizedSite}</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1">
+                    <Input 
+                      className="h-7 w-16 text-[9px] font-black uppercase p-1 bg-background/50 border-primary/20" 
+                      defaultValue={job.etapa1}
+                      onBlur={(e) => updateJobField(job.id, 'etapa1', e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                    />
+                    <span className="text-[10px] opacity-30">→</span>
+                    <Input 
+                      className="h-7 w-16 text-[9px] font-black uppercase p-1 bg-background/50 border-primary/20" 
+                      defaultValue={job.etapa2}
+                      onBlur={(e) => updateJobField(job.id, 'etapa2', e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                    />
+                </div>
+              </TableCell>
+              <TableCell className="font-mono font-bold">#{job.requisicao}</TableCell>
+              <TableCell className="uppercase text-[10px] font-medium max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end items-center gap-1">
+                  <Input 
+                    type="number"
+                    className="h-7 w-14 text-right text-[10px] font-black p-1 bg-background/50 border-primary/20" 
+                    defaultValue={job.quantidade}
+                    onBlur={(e) => updateJobField(job.id, 'quantidade', Number(e.target.value))}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                  />
+                  <span className="text-[9px] font-bold text-muted-foreground">pç</span>
+                </div>
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[8px] font-bold text-muted-foreground">T:</span>
+                    <Input 
+                      type="number"
+                      className="h-6 w-12 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
+                      defaultValue={job.torno}
+                      onBlur={(e) => updateJobField(job.id, 'torno', Number(e.target.value))}
+                    />
+                    <span className="text-[8px] font-bold text-muted-foreground">C:</span>
+                    <Input 
+                      type="number"
+                      className="h-6 w-12 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
+                      defaultValue={job.centro}
+                      onBlur={(e) => updateJobField(job.id, 'centro', Number(e.target.value))}
+                    />
+                    <span className="text-[8px] font-bold text-muted-foreground">S:</span>
+                    <Input 
+                      type="number"
+                      className="h-6 w-10 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
+                      defaultValue={job.setup}
+                      onBlur={(e) => updateJobField(job.id, 'setup', Number(e.target.value))}
+                    />
+                  </div>
+                  <span className="text-[8px] font-black uppercase text-primary/50">Total: {Number(job.torno) + Number(job.centro) + Number(job.setup)}m</span>
+                </div>
+              </TableCell>
+              <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteManual(job.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+
   return (
     <div className="flex flex-col gap-6 p-4">
       <div className="flex flex-col gap-6 border-b border-border/50 pb-6 mb-2">
@@ -908,155 +1060,27 @@ export default function ProgrammingPage() {
             </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead className="w-20 text-center">POS</TableHead>
-                    <TableHead className="w-20 text-center">AÇÕES</TableHead>
-                    <TableHead>STATUS</TableHead>
-                    <TableHead>FÁBRICA / SITE</TableHead>
-                    <TableHead>FLUXO (E1 → E2)</TableHead>
-                    <TableHead>REQ.</TableHead>
-                    <TableHead>PEÇA</TableHead>
-                    <TableHead className="text-right">QTD</TableHead>
-                    <TableHead className="text-right">TEMPO (T|C|S)</TableHead>
-                    <TableHead className="w-10"></TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredFila.length === 0 ? (
-                <TableRow><TableCell colSpan={10} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada para o filtro</TableCell></TableRow>
-              ) : filteredFila.map((job) => {
-                const globalIdx = indexById.get(job.id) ?? 0;
-                const normalizedSite = normalizeSiteName(job.site);
-                
-                // Cálculo de Status
-                const stats = jobCompletionStats.get(job.id);
-                const isFullyConcluded = stats && stats.total > 0 && stats.total === stats.concluded;
-                const isPartiallyConcluded = stats && stats.concluded > 0 && stats.concluded < stats.total;
-
-                return (
-                  <TableRow key={job.id} className={cn("hover:bg-muted/5 transition-colors", isFullyConcluded && "bg-green-500/5 opacity-80")}>
-                    <TableCell className="text-center px-4">
-                        <div className="relative group/pos">
-                          <Input 
-                              type="number" 
-                              key={`pos-input-${job.id}-${globalIdx}`}
-                              defaultValue={globalIdx + 1}
-                              className="h-10 w-12 text-center text-sm font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all"
-                              onFocus={(e) => e.target.select()}
-                              onBlur={(e) => {
-                                  const newPos = parseInt(e.target.value);
-                                  if (!isNaN(newPos) && newPos !== globalIdx + 1 && newPos > 0) {
-                                      moveJobToPosition(globalIdx, newPos);
-                                  } else {
-                                      e.target.value = String(globalIdx + 1);
-                                  }
-                              }}
-                              onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                      const val = parseInt((e.target as HTMLInputElement).value);
-                                      if (!isNaN(val) && val !== globalIdx + 1 && val > 0) {
-                                          moveJobToPosition(globalIdx, val);
-                                      }
-                                      (e.target as HTMLInputElement).blur();
-                                  }
-                              }}
-                          />
-                        </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex flex-col items-center gap-1">
-                          <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, globalIdx)} disabled={globalIdx === 0}><ArrowUp className="h-3 w-3" /></Button>
-                          <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, globalIdx + 2)} disabled={globalIdx === fila.length - 1}><ArrowDown className="h-3 w-3" /></Button>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                        {isFullyConcluded ? (
-                            <div className="flex items-center gap-1.5 text-green-500 font-black text-[9px] uppercase">
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                CONCLUÍDO
-                            </div>
-                        ) : isPartiallyConcluded ? (
-                            <div className="flex items-center gap-1.5 text-yellow-500 font-black text-[9px] uppercase">
-                                <Clock className="h-3.5 w-3.5" />
-                                {Math.round((stats.concluded / stats.total) * 100)}%
-                            </div>
-                        ) : (
-                            <div className="text-muted-foreground/40 font-black text-[9px] uppercase">PENDENTE</div>
-                        )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                          <MapPin className="h-3 w-3 text-primary" />
-                          <span className="text-[10px] font-black uppercase text-foreground">{normalizedSite}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                          <Input 
-                            className="h-7 w-16 text-[9px] font-black uppercase p-1 bg-background/50 border-primary/20" 
-                            defaultValue={job.etapa1}
-                            onBlur={(e) => updateJobField(job.id, 'etapa1', e.target.value.toUpperCase())}
-                            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                          />
-                          <span className="text-[10px] opacity-30">→</span>
-                          <Input 
-                            className="h-7 w-16 text-[9px] font-black uppercase p-1 bg-background/50 border-primary/20" 
-                            defaultValue={job.etapa2}
-                            onBlur={(e) => updateJobField(job.id, 'etapa2', e.target.value.toUpperCase())}
-                            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                          />
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono font-bold">#{job.requisicao}</TableCell>
-                    <TableCell className="uppercase text-[10px] font-medium max-w-[200px] truncate">{job.nomeDaPeca}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end items-center gap-1">
-                        <Input 
-                          type="number"
-                          className="h-7 w-14 text-right text-[10px] font-black p-1 bg-background/50 border-primary/20" 
-                          defaultValue={job.quantidade}
-                          onBlur={(e) => updateJobField(job.id, 'quantidade', Number(e.target.value))}
-                          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                        />
-                        <span className="text-[9px] font-bold text-muted-foreground">pç</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[8px] font-bold text-muted-foreground">T:</span>
-                          <Input 
-                            type="number"
-                            className="h-6 w-12 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
-                            defaultValue={job.torno}
-                            onBlur={(e) => updateJobField(job.id, 'torno', Number(e.target.value))}
-                          />
-                          <span className="text-[8px] font-bold text-muted-foreground">C:</span>
-                          <Input 
-                            type="number"
-                            className="h-6 w-12 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
-                            defaultValue={job.centro}
-                            onBlur={(e) => updateJobField(job.id, 'centro', Number(e.target.value))}
-                          />
-                          <span className="text-[8px] font-bold text-muted-foreground">S:</span>
-                          <Input 
-                            type="number"
-                            className="h-6 w-10 text-right text-[9px] p-1 bg-background/50 border-primary/10" 
-                            defaultValue={job.setup}
-                            onBlur={(e) => updateJobField(job.id, 'setup', Number(e.target.value))}
-                          />
-                        </div>
-                        <span className="text-[8px] font-black uppercase text-primary/50">Total: {Number(job.torno) + Number(job.centro) + Number(job.setup)}m</span>
-                      </div>
-                    </TableCell>
-                    <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteManual(job.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <Tabs defaultValue="all" className="w-full">
+            <div className="px-6 py-2 bg-muted/5 border-b">
+              <TabsList className="grid grid-cols-3 w-full max-w-md h-9">
+                <TabsTrigger value="all" className="text-[10px] font-black uppercase">GERAL</TabsTrigger>
+                <TabsTrigger value="torno" className="text-[10px] font-black uppercase">TORNO CNC</TabsTrigger>
+                <TabsTrigger value="centro" className="text-[10px] font-black uppercase">CENTRO CNC</TabsTrigger>
+              </TabsList>
+            </div>
+            
+            <TabsContent value="all" className="m-0">
+              {renderFilaTable(filteredFila)}
+            </TabsContent>
+            
+            <TabsContent value="torno" className="m-0">
+              {renderFilaTable(filteredFila.filter(j => Number(j.torno) > 0))}
+            </TabsContent>
+            
+            <TabsContent value="centro" className="m-0">
+              {renderFilaTable(filteredFila.filter(j => Number(j.centro) > 0))}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
       
