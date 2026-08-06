@@ -273,10 +273,8 @@ export default function ProgrammingPage() {
     }
   }, [filaDoc, planoDoc, configDoc]);
 
-  // Indexação para Busca O(1) na tabela
   const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
 
-  // Mapa de Status de Conclusão por Job
   const jobCompletionStats = useMemo(() => {
     const map = new Map<string, { total: number, concluded: number }>();
     for (const item of planejamentoData) {
@@ -288,7 +286,6 @@ export default function ProgrammingPage() {
     return map;
   }, [planejamentoData]);
 
-  // Filtros Otimizados
   const filteredFila = useMemo(() => {
     let data = fila;
     if (selectedSiteFilter !== 'all') {
@@ -316,7 +313,6 @@ export default function ProgrammingPage() {
     return data;
   }, [planejamentoData, selectedSiteFilter, deferredRequisitionFilter]);
 
-  // Indexação Espacial do Plano para Renderização Instantânea da Timeline
   const planIndex = useMemo(() => {
     const map = new Map<string, PlanejamentoItem[]>();
     for (const i of filteredPlanejamento) {
@@ -363,7 +359,7 @@ export default function ProgrammingPage() {
             .map(i => `${i.jobId}|${i.techKey}|${i.dataExecucao}|${i.turno}`)
     );
 
-    const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
+    const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog', stageSuffix: string) => {
         let prodTime = Number(job[type]) || 0;
         let setupTime = (type === 'torno' || type === 'centro') ? (Number(job.setup) || 20) : 0;
         if (prodTime <= 0 && setupTime <= 0 && type !== 'prog') return minStartTime;
@@ -420,7 +416,7 @@ export default function ProgrammingPage() {
             }
 
             if (sInShift > 0 || pInShift > 0) {
-                const deterministicId = `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${type}`;
+                const deterministicId = `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${type}-${stageSuffix}`;
                 const concludedKey = `${job.id}|${techKey}|${displayDateStr}|${shiftId}`;
 
                 novosPlanItems.push({ 
@@ -448,26 +444,25 @@ export default function ProgrammingPage() {
             if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
         }
         
-        if (iterations >= 500) {
-            toast({ title: "Aviso de Carga", description: `Cálculo interrompido para #${job.requisicao} por excesso de turnos (limite 500).`, variant: "destructive" });
-        }
-
         lanePointers[laneId] = actualPointer;
         return actualPointer;
     };
 
-    novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
+    // Lógica Flow Shop: Agendar S1 e S2 do Job 1, depois Job 2...
     novaFila.forEach(job => {
+        // 1. Programação (Sempre primeiro)
+        const progEnd = allocateTask(job, 'ADM', 0, 'prog', 'stage-prog');
+
+        // 2. Etapa 1 (Inicia após Programação ou Início do Plano)
         const e1 = String(job.etapa1 || '').toUpperCase();
-        if (e1.includes('TORNO')) jobCompletionTimes[job.id] = allocateTask(job, 'TORNO', 0, 'torno');
-        else if (e1.includes('CENTRO')) jobCompletionTimes[job.id] = allocateTask(job, 'CENTRO', 0, 'centro');
-        else jobCompletionTimes[job.id] = 0;
-    });
-    novaFila.forEach(job => {
+        let e1End = progEnd;
+        if (e1.includes('TORNO')) e1End = allocateTask(job, 'TORNO', progEnd, 'torno', 'stage-1');
+        else if (e1.includes('CENTRO')) e1End = allocateTask(job, 'CENTRO', progEnd, 'centro', 'stage-1');
+
+        // 3. Etapa 2 (Inicia IMEDIATAMENTE após a Etapa 1 terminar)
         const e2 = String(job.etapa2 || '').toUpperCase();
-        const minStart = jobCompletionTimes[job.id] || 0;
-        if (e2.includes('TORNO')) allocateTask(job, 'TORNO', minStart, 'torno');
-        else if (e2.includes('CENTRO')) allocateTask(job, 'CENTRO', minStart, 'centro');
+        if (e2.includes('TORNO')) allocateTask(job, 'TORNO', e1End, 'torno', 'stage-2');
+        else if (e2.includes('CENTRO')) allocateTask(job, 'CENTRO', e1End, 'centro', 'stage-2');
     });
 
     const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
@@ -476,7 +471,7 @@ export default function ProgrammingPage() {
         await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
         await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
     } catch (error) {
-        toast({ title: "Erro de Salvamento", description: "Falha ao gravar cronograma no banco de dados.", variant: "destructive" });
+        toast({ title: "Erro de Salvamento", description: "Falha ao gravar cronograma.", variant: "destructive" });
     }
   };
 
@@ -536,8 +531,8 @@ export default function ProgrammingPage() {
   };
 
   const updateJobField = useCallback(async (id: string, field: keyof JobBase, value: any) => {
-    const job = fila.find(j => j.id === id);
-    if (!job || job[field] === value) return;
+    const currentJob = fila.find(j => j.id === id);
+    if (!currentJob || currentJob[field] === value) return;
 
     const newFila = fila.map(j => j.id === id ? { ...j, [field]: value } : j);
     setFila(newFila);
@@ -603,7 +598,7 @@ export default function ProgrammingPage() {
         await recalculatePlan(novaFila, disabledShifts, techOverrides, start);
         toast({ title: "Sucesso", description: `${novaFila.length} itens importados.` });
       } catch (err) {
-          toast({ title: "Erro na Importação", description: "Formato de arquivo inválido ou erro no processamento.", variant: "destructive" });
+          toast({ title: "Erro na Importação", description: "Falha ao processar planilha.", variant: "destructive" });
       } finally {
           setIsImporting(false);
           e.target.value = ''; 
@@ -659,7 +654,6 @@ export default function ProgrammingPage() {
         ) : jobs.map((job) => {
           const globalIdx = indexById.get(job.id) ?? 0;
           const normalizedSite = normalizeSiteName(job.site);
-          
           const stats = jobCompletionStats.get(job.id);
           const isFullyConcluded = stats && stats.total > 0 && stats.total === stats.concluded;
           const isPartiallyConcluded = stats && stats.concluded > 0 && stats.concluded < stats.total;
@@ -667,32 +661,20 @@ export default function ProgrammingPage() {
           return (
             <TableRow key={job.id} className={cn("hover:bg-muted/5 transition-colors", isFullyConcluded && "bg-green-500/5 opacity-80")}>
               <TableCell className="text-center px-4">
-                  <div className="relative group/pos">
-                    <Input 
-                        type="number" 
-                        key={`pos-input-${job.id}-${globalIdx}`}
-                        defaultValue={globalIdx + 1}
-                        className="h-10 w-12 text-center text-sm font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all"
-                        onFocus={(e) => e.target.select()}
-                        onBlur={(e) => {
-                            const newPos = parseInt(e.target.value);
-                            if (!isNaN(newPos) && newPos !== globalIdx + 1 && newPos > 0) {
-                                moveJobToPosition(globalIdx, newPos);
-                            } else {
-                                e.target.value = String(globalIdx + 1);
-                            }
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                const val = parseInt((e.target as HTMLInputElement).value);
-                                if (!isNaN(val) && val !== globalIdx + 1 && val > 0) {
-                                    moveJobToPosition(globalIdx, val);
-                                }
-                                (e.target as HTMLInputElement).blur();
-                            }
-                        }}
-                    />
-                  </div>
+                  <Input 
+                      type="number" 
+                      defaultValue={globalIdx + 1}
+                      className="h-10 w-12 text-center text-sm font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all"
+                      onFocus={(e) => e.target.select()}
+                      onBlur={(e) => {
+                          const newPos = parseInt(e.target.value);
+                          if (!isNaN(newPos) && newPos !== globalIdx + 1 && newPos > 0) {
+                              moveJobToPosition(globalIdx, newPos);
+                          } else {
+                              e.target.value = String(globalIdx + 1);
+                          }
+                      }}
+                  />
               </TableCell>
               <TableCell className="text-center">
                 <div className="flex flex-col items-center gap-1">
@@ -716,20 +698,18 @@ export default function ProgrammingPage() {
                   )}
               </TableCell>
               <TableCell>
-                <div className="flex items-center gap-1.5 min-w-[120px]">
-                    <Select 
-                        value={normalizedSite} 
-                        onValueChange={(v) => updateJobField(job.id, 'site', v)}
-                    >
-                        <SelectTrigger className="h-7 text-[10px] font-black uppercase border-primary/20 bg-background/50">
-                            <MapPin className="h-3 w-3 text-primary mr-1" />
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {FACTORIES.map(f => <SelectItem key={f} value={f} className="text-[10px] font-bold">{f}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
+                  <Select 
+                      value={normalizedSite} 
+                      onValueChange={(v) => updateJobField(job.id, 'site', v)}
+                  >
+                      <SelectTrigger className="h-7 text-[10px] font-black uppercase border-primary/20 bg-background/50">
+                          <MapPin className="h-3 w-3 text-primary mr-1" />
+                          <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                          {FACTORIES.map(f => <SelectItem key={f} value={f} className="text-[10px] font-bold">{f}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
@@ -765,7 +745,6 @@ export default function ProgrammingPage() {
                 />
               </TableCell>
               <TableCell className="text-right">
-                <div className="flex justify-end items-center gap-1">
                   <Input 
                     type="number"
                     className="h-7 w-14 text-right text-[10px] font-black p-1 bg-background/50 border-primary/20" 
@@ -773,8 +752,6 @@ export default function ProgrammingPage() {
                     onBlur={(e) => updateJobField(job.id, 'quantidade', Number(e.target.value))}
                     onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
                   />
-                  <span className="text-[9px] font-bold text-muted-foreground">pç</span>
-                </div>
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex flex-col items-end gap-1">
@@ -801,7 +778,6 @@ export default function ProgrammingPage() {
                       onBlur={(e) => updateJobField(job.id, 'setup', Number(e.target.value))}
                     />
                   </div>
-                  <span className="text-[8px] font-black uppercase text-primary/50">Total: {Number(job.torno) + Number(job.centro) + Number(job.setup)}m</span>
                 </div>
               </TableCell>
               <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteManual(job.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
@@ -822,27 +798,21 @@ export default function ProgrammingPage() {
           </div>
           
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
-            <Button 
-                variant="outline" 
-                onClick={handleReanchor}
-                className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none hover:bg-primary/10 transition-colors"
-                title="Sincroniza o início do plano com o dia de hoje"
-            >
+            <Button variant="outline" onClick={handleReanchor} className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none">
               <Anchor className="h-4 w-4 mr-2" /> Reancorar Plano
             </Button>
-
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="secondary" className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none hover:scale-[1.02] transition-transform">
-                  <Plus className="h-4 w-4 mr-2" /> Nova Requisição
-                </Button>
-              </DialogTrigger>
+              <DialogTrigger asChild><Button variant="secondary" className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button></DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader><DialogTitle>Adicionar Requisição Manual</DialogTitle></DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><Label>Requisição</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} /></div>
                     <div className="space-y-2"><Label>Nome da Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Etapa 1</Label><Input placeholder="TORNO ou CENTRO" value={newItem.etapa1} onChange={e => setNewItem({...newItem, etapa1: e.target.value.toUpperCase()})} /></div>
+                    <div className="space-y-2"><Label>Etapa 2</Label><Input placeholder="TORNO ou CENTRO" value={newItem.etapa2} onChange={e => setNewItem({...newItem, etapa2: e.target.value.toUpperCase()})} /></div>
                   </div>
                   <div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
                   <div className="grid grid-cols-2 gap-4">
@@ -859,114 +829,46 @@ export default function ProgrammingPage() {
               </DialogContent>
             </Dialog>
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="h-10 text-[10px] font-black uppercase border-destructive/20 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all flex-1 sm:flex-none">
-                  <Eraser className="h-4 w-4 mr-2" /> Limpar
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Tem certeza que deseja limpar tudo?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação irá remover permanentemente todas as requisições da fila e limpar o cronograma de produção. Esta operação não pode ser desfeita.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={() => recalculatePlan([], disabledShifts, techOverrides)}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Limpar Tudo
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            
             <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
-            <Button 
-                className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase shadow-lg hover:opacity-90 flex-1 sm:flex-none transition-opacity" 
-                onClick={() => fileInputRef.current?.click()} 
-                disabled={isImporting}
-            >
-                {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} 
-                Importar Planilha
+            <Button className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+                {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha
             </Button>
           </div>
         </div>
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1 shadow-inner w-full md:w-auto">
-            <div className="flex items-center px-2 flex-1 md:flex-none">
-                <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}>
-                    <SelectTrigger className="h-9 w-full md:w-[160px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0">
-                        <SelectValue placeholder="Fábrica" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>
-                        {FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
-            
-            <div className="h-4 w-px bg-border/50 hidden md:block" />
-
-            <div className="flex items-center px-2 flex-1 md:flex-none border-l md:border-l-0 border-border/20 md:border-transparent">
-                <Cpu className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <Select value={selectedEquipmentFilter} onValueChange={setSelectedEquipmentFilter}>
-                    <SelectTrigger className="h-9 w-full md:w-[140px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0">
-                        <SelectValue placeholder="Equipamento" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">TODOS</SelectItem>
-                        <SelectItem value="TORNO">TORNO CNC</SelectItem>
-                        <SelectItem value="CENTRO">CENTRO CNC</SelectItem>
-                        <SelectItem value="ADM">PROGRAMAÇÃO</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
+          <div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1 w-full md:w-auto">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground ml-2" />
+            <Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}>
+                <SelectTrigger className="h-9 w-[160px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0"><SelectValue placeholder="Fábrica" /></SelectTrigger>
+                <SelectContent><SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
+            </Select>
+            <div className="h-4 w-px bg-border/50" />
+            <Cpu className="h-3.5 w-3.5 text-muted-foreground ml-2" />
+            <Select value={selectedEquipmentFilter} onValueChange={setSelectedEquipmentFilter}>
+                <SelectTrigger className="h-9 w-[140px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0"><SelectValue placeholder="Equipamento" /></SelectTrigger>
+                <SelectContent><SelectItem value="all">TODOS</SelectItem><SelectItem value="TORNO">TORNO CNC</SelectItem><SelectItem value="CENTRO">CENTRO CNC</SelectItem><SelectItem value="ADM">PROGRAMAÇÃO</SelectItem></SelectContent>
+            </Select>
           </div>
 
-          <div className="flex items-center bg-card/50 border rounded-lg p-1 shadow-inner w-full md:w-auto justify-center">
+          <div className="flex items-center bg-card/50 border rounded-lg p-1 w-full md:w-auto justify-center">
             {planStartDate && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 hover:bg-muted text-primary" 
-                onClick={() => setCurrentDate(planStartDate)}
-                title="Ir para o início do plano"
-              >
-                <ArrowLeftToLine className="h-4 w-4" />
-              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setCurrentDate(planStartDate)} title="Ir para o início do plano"><ArrowLeftToLine className="h-4 w-4" /></Button>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-            <div className="flex items-center gap-2 font-black px-4 text-[11px] min-w-[120px] justify-center text-primary">
-              <CalendarDays className="h-3.5 w-3.5 opacity-60" />
-              {format(currentDate, 'dd/MM/yyyy')}
-            </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-2 font-black px-4 text-[11px] min-w-[120px] justify-center text-primary"><CalendarDays className="h-3.5 w-3.5 opacity-60" />{format(currentDate, 'dd/MM/yyyy')}</div>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
           </div>
         </div>
       </div>
 
       <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}>
         <DialogContent className="sm:max-w-[350px]">
-          <DialogHeader>
-            <DialogTitle>Substituir Técnico</DialogTitle>
-            <DialogDescription>Selecione o profissional que assumirá esta raia de produção.</DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Substituir Técnico</DialogTitle></DialogHeader>
           <div className="grid gap-2 py-4">
             {ALL_TECHNICIANS.map(tech => (
-              <Button 
-                key={tech} 
-                variant={activeSwap?.currentTech === tech ? "default" : "outline"}
-                className={cn("justify-start h-11", tech === "Marcos Barbosa" && "border-blue-500/50 text-blue-400")}
-                onClick={() => handleTechSwap(tech)}
-              >
-                <UserRoundPen className="h-4 w-4 mr-3 opacity-50" />
-                {tech}
+              <Button key={tech} variant={activeSwap?.currentTech === tech ? "default" : "outline"} className="justify-start h-11" onClick={() => handleTechSwap(tech)}>
+                <UserRoundPen className="h-4 w-4 mr-3 opacity-50" />{tech}
                 {tech === "Marcos Barbosa" && <span className="ml-auto text-[8px] font-black uppercase bg-blue-500/20 px-1.5 rounded">Folgista</span>}
               </Button>
             ))}
@@ -979,14 +881,10 @@ export default function ProgrammingPage() {
             const day = addDays(currentDate, d);
             const displayDate = format(day, 'dd/MM/yyyy');
             const dateStr = format(day, 'yyyy-MM-dd');
-            
             return (
                 <div key={d} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
                     <div className="bg-muted/10 p-4 border-b border-border flex justify-between items-center">
-                        <div className="flex items-center gap-4">
-                            <span className="text-xl font-bold uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
-                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
-                        </div>
+                        <div className="flex items-center gap-4"><span className="text-xl font-bold uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span><span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span></div>
                     </div>
                     {TURNOS.map(t => {
                         const shiftKey = `${dateStr}_${t.id}`;
@@ -1002,49 +900,25 @@ export default function ProgrammingPage() {
                                         {!isDisabled && (
                                             <>
                                                 <Ruler />
-                                                {['TORNO', 'CENTRO', 'ADM']
-                                                  .filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat)
-                                                  .map(cat => {
+                                                {['TORNO', 'CENTRO', 'ADM'].filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat).map(cat => {
                                                     const overrideKey = `${dateStr}_${cat}_${t.id}`;
                                                     const tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
-                                                    
                                                     if (!tech) return null;
-                                                    
                                                     const itemsForLane = planIndex.get(`${displayDate}|${t.id}|${cat}`) || [];
-
                                                     return (
                                                       <div key={`${cat}-${t.id}`} className="grid grid-cols-[155px_1fr] items-center mb-3">
-                                                          <div 
-                                                            className="pr-3 truncate cursor-pointer group/tech"
-                                                            onClick={() => {
-                                                              setActiveSwap({ day: dateStr, shiftId: t.id, category: cat, currentTech: tech });
-                                                              setIsSwapDialogOpen(true);
-                                                            }}
-                                                          >
-                                                            <div className={cn("text-[9px] font-mono font-black uppercase flex items-center gap-1.5", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>
-                                                              {cat}
-                                                              <UserRoundPen className="h-2 w-2 opacity-0 group-hover/tech:opacity-100 transition-opacity" />
-                                                            </div>
-                                                            <div className="text-[11px] font-bold truncate flex items-center gap-1.5">
-                                                              {tech}
-                                                              {tech === "Marcos Barbosa" && <Badge variant="outline" className="h-3.5 text-[7px] border-blue-500 text-blue-400 px-1 font-black">FOLGISTA</Badge>}
-                                                            </div>
+                                                          <div className="pr-3 truncate cursor-pointer group/tech" onClick={() => { setActiveSwap({ day: dateStr, shiftId: t.id, category: cat, currentTech: tech }); setIsSwapDialogOpen(true); }}>
+                                                            <div className={cn("text-[9px] font-mono font-black uppercase flex items-center gap-1.5", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>{cat}<UserRoundPen className="h-2 w-2 opacity-0 group-hover/tech:opacity-100 transition-opacity" /></div>
+                                                            <div className="text-[11px] font-bold truncate flex items-center gap-1.5">{tech}{tech === "Marcos Barbosa" && <Badge variant="outline" className="h-3.5 text-[7px] border-blue-500 text-blue-400 px-1 font-black">FOLGISTA</Badge>}</div>
                                                           </div>
                                                           <div className="relative h-[38px] border border-border/50 rounded bg-black/20 overflow-hidden">
-                                                              {PAUSAS.map(p => (
-                                                                  <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-2 w-2 text-yellow-500/30" /></div>
-                                                              ))}
+                                                              {PAUSAS.map(p => (<div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-2 w-2 text-yellow-500/30" /></div>))}
                                                               {itemsForLane.map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
                                                           </div>
                                                       </div>
                                                     );
                                                 })}
                                             </>
-                                        )}
-                                        {isDisabled && (
-                                          <div className="h-full flex items-center justify-center opacity-20 py-10">
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Turno Desativado</span>
-                                          </div>
                                         )}
                                     </div>
                                 </div>
@@ -1061,70 +935,44 @@ export default function ProgrammingPage() {
             <div className="space-y-1">
                 <CardTitle className="text-xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle>
                 <div className="flex items-center gap-2">
-                    {selectedSiteFilter !== 'all' && (
-                        <Badge className="bg-primary text-primary-foreground font-black text-[9px]">{selectedSiteFilter}</Badge>
-                    )}
-                    {(selectedSiteFilter !== 'all' || requisitionFilter) && (
-                        <Button variant="ghost" size="sm" onClick={() => { setSelectedSiteFilter('all'); setRequisitionFilter(''); }} className="h-6 px-2 text-[9px] font-black uppercase text-destructive hover:bg-destructive/10">Limpar Filtros</Button>
-                    )}
+                    {selectedSiteFilter !== 'all' && (<Badge className="bg-primary text-primary-foreground font-black text-[9px]">{selectedSiteFilter}</Badge>)}
+                    {(selectedSiteFilter !== 'all' || requisitionFilter) && (<Button variant="ghost" size="sm" onClick={() => { setSelectedSiteFilter('all'); setRequisitionFilter(''); }} className="h-6 px-2 text-[9px] font-black uppercase text-destructive hover:bg-destructive/10">Limpar Filtros</Button>)}
                 </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-background border rounded-md px-3 h-10 w-full sm:w-[280px] shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+            <div className="flex items-center gap-2 bg-background border rounded-md px-3 h-10 w-full sm:w-[280px] shadow-sm">
                 <Search className="h-4 w-4 text-muted-foreground shrink-0" />
                 <Input 
                   placeholder="PESQUISAR REQ. OU PEÇA..." 
                   value={requisitionFilter}
                   onChange={(e) => setRequisitionFilter(e.target.value)}
-                  className="h-full w-full text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50 p-0"
+                  className="h-full w-full text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus-visible:ring-0 p-0"
                 />
-                {requisitionFilter && (
-                   <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-transparent" onClick={() => setRequisitionFilter('')}><Trash2 className="h-3 w-3 text-muted-foreground" /></Button>
-                )}
+                {requisitionFilter && (<Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-transparent" onClick={() => setRequisitionFilter('')}><Trash2 className="h-3 w-3 text-muted-foreground" /></Button>)}
             </div>
         </CardHeader>
         <CardContent className="p-0">
           <Tabs defaultValue="all" className="w-full">
             <div className="px-6 py-2 bg-muted/5 border-b">
-              <TabsList className="grid grid-cols-3 w-full max-w-md h-9">
+              <TabsList className="grid grid-cols-3 w-full max-md h-9">
                 <TabsTrigger value="all" className="text-[10px] font-black uppercase">GERAL</TabsTrigger>
                 <TabsTrigger value="torno" className="text-[10px] font-black uppercase">TORNO CNC</TabsTrigger>
                 <TabsTrigger value="centro" className="text-[10px] font-black uppercase">CENTRO CNC</TabsTrigger>
               </TabsList>
             </div>
             
-            <TabsContent value="all" className="m-0">
-              {renderFilaTable(filteredFila)}
-            </TabsContent>
-            
-            <TabsContent value="torno" className="m-0">
-              {renderFilaTable(filteredFila.filter(j => Number(j.torno) > 0))}
-            </TabsContent>
-            
-            <TabsContent value="centro" className="m-0">
-              {renderFilaTable(filteredFila.filter(j => Number(j.centro) > 0))}
-            </TabsContent>
+            <TabsContent value="all" className="m-0">{renderFilaTable(filteredFila)}</TabsContent>
+            <TabsContent value="torno" className="m-0">{renderFilaTable(filteredFila.filter(j => Number(j.torno) > 0))}</TabsContent>
+            <TabsContent value="centro" className="m-0">{renderFilaTable(filteredFila.filter(j => Number(j.centro) > 0))}</TabsContent>
           </Tabs>
         </CardContent>
       </Card>
       
       <style jsx global>{`
-        .bg-stripes {
-          background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 10px, transparent 10px, transparent 20px);
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-          height: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(255,255,255,0.05);
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.1);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(255,255,255,0.2);
-        }
+        .bg-stripes { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 10px, transparent 10px, transparent 20px); }
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
       `}</style>
     </div>
   );
