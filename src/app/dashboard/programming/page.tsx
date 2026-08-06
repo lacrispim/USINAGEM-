@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
@@ -60,7 +59,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/label";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
