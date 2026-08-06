@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CalendarIcon, FileSpreadsheet, Trash2, Search, Filter, Pencil, Clock } from 'lucide-react';
+import { CalendarIcon, FileSpreadsheet, Trash2, Search, Filter, Pencil, Clock, Zap } from 'lucide-react';
 import { ProductionTimer } from '@/components/dashboard/production-timer';
 import {
   Form,
@@ -54,7 +54,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { addDoc, collection, serverTimestamp, orderBy, query, deleteDoc, doc, updateDoc, limit } from 'firebase/firestore';
-import { format, parse, startOfDay, endOfDay, isValid } from 'date-fns';
+import { format, parse, startOfDay, endOfDay, isValid, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { Label } from '@/components/ui/label';
@@ -182,13 +182,23 @@ export default function ProductionRegistryPage() {
     return null;
   };
 
+  const isRestrictedByPerformance = useMemo(() => {
+    return selectedMonth === 'all' && !selectedDate && selectedOperator === 'all' && selectedFactory === 'all' && !formsFilter;
+  }, [selectedMonth, selectedDate, selectedOperator, selectedFactory, formsFilter]);
+
   const filteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
     if (selectedCategory !== 'all' && selectedCategory !== 'PRODUCAO') return [];
 
+    const fifteenDaysAgo = startOfDay(subDays(new Date(), 15));
+
     return productionRecords.filter(record => {
       const recordDate = getRecordDate(record.date);
       if (!recordDate) return false;
+
+      // Restrição de performance: Apenas 15 dias se nenhum filtro estiver ativo
+      if (isRestrictedByPerformance && recordDate < fifteenDaysAgo) return false;
+
       if (selectedDate && (recordDate < startOfDay(selectedDate) || recordDate > endOfDay(selectedDate))) return false;
       if (selectedMonth !== 'all' && recordDate.getMonth() !== parseInt(selectedMonth)) return false;
       if (selectedOperator !== 'all' && record.operatorId !== selectedOperator) return false;
@@ -196,15 +206,21 @@ export default function ProductionRegistryPage() {
       if (formsFilter && !record.formsNumber?.toLowerCase().includes(formsFilter.toLowerCase())) return false;
       return true;
     });
-  }, [productionRecords, selectedOperator, selectedFactory, selectedDate, selectedMonth, formsFilter, selectedCategory]);
+  }, [productionRecords, selectedOperator, selectedFactory, selectedDate, selectedMonth, formsFilter, selectedCategory, isRestrictedByPerformance]);
 
   const filteredLossRecords = useMemo(() => {
     if (!lossRecords) return [];
     if (selectedCategory === 'PRODUCAO') return [];
 
+    const fifteenDaysAgo = startOfDay(subDays(new Date(), 15));
+
     return lossRecords.filter(record => {
       const recordDate = getRecordDate(record.date);
       if (!recordDate) return false;
+
+      // Restrição de performance: Apenas 15 dias se nenhum filtro estiver ativo
+      if (isRestrictedByPerformance && recordDate < fifteenDaysAgo) return false;
+
       if (selectedDate && (recordDate < startOfDay(selectedDate) || recordDate > endOfDay(selectedDate))) return false;
       if (selectedMonth !== 'all' && recordDate.getMonth() !== parseInt(selectedMonth)) return false;
       if (selectedOperator !== 'all' && record.operatorId !== selectedOperator) return false;
@@ -213,7 +229,7 @@ export default function ProductionRegistryPage() {
       if (selectedCategory !== 'all' && record.lossReason !== selectedCategory) return false;
       return true;
     });
-  }, [lossRecords, selectedOperator, selectedFactory, selectedDate, selectedMonth, formsFilter, selectedCategory]);
+  }, [lossRecords, selectedOperator, selectedFactory, selectedDate, selectedMonth, formsFilter, selectedCategory, isRestrictedByPerformance]);
 
   async function onProductionSubmit(values: ProductionFormValues) {
     if (!firestore) return;
@@ -590,7 +606,7 @@ export default function ProductionRegistryPage() {
         </div>
         <div className="grid w-full sm:max-w-[120px] gap-1.5">
             <Label className="text-[10px] font-black uppercase text-muted-foreground">Mês</Label>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}><SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem>{months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent></Select>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}><SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Mês Atual</SelectItem>{months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent></Select>
         </div>
         <div className="grid w-full sm:max-w-[160px] gap-1.5">
             <Label className="text-[10px] font-black uppercase text-muted-foreground">Dia</Label>
@@ -609,7 +625,13 @@ export default function ProductionRegistryPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-            <div><CardTitle>Histórico de Produção</CardTitle><CardDescription>Registros filtrados.</CardDescription></div>
+            <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2">
+                    Histórico de Produção
+                    {isRestrictedByPerformance && <Badge variant="secondary" className="text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"><Zap className="h-2 w-2" /> Auto (15 dias)</Badge>}
+                </CardTitle>
+                <CardDescription>Registros filtrados.</CardDescription>
+            </div>
             <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredProductionRecords, 'Producao')}><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar</Button>
         </CardHeader>
         <CardContent>
@@ -629,7 +651,9 @@ export default function ProductionRegistryPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {filteredProductionRecords.map(r => {
+                    {filteredProductionRecords.length === 0 ? (
+                        <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground italic">Nenhum registro encontrado para este período.</TableCell></TableRow>
+                    ) : filteredProductionRecords.map(r => {
                         const rDate = getRecordDate(r.date);
                         const rCreatedAt = getRecordDate(r.createdAt);
                         return (
@@ -663,7 +687,13 @@ export default function ProductionRegistryPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-            <div><CardTitle>Histórico de Perdas</CardTitle><CardDescription>Paradas e inatividades registradas.</CardDescription></div>
+            <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2">
+                    Histórico de Perdas
+                    {isRestrictedByPerformance && <Badge variant="secondary" className="text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"><Zap className="h-2 w-2" /> Auto (15 dias)</Badge>}
+                </CardTitle>
+                <CardDescription>Paradas e inatividades registradas.</CardDescription>
+            </div>
             <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredLossRecords, 'Perdas')}><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar</Button>
         </CardHeader>
         <CardContent>
@@ -681,7 +711,9 @@ export default function ProductionRegistryPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {filteredLossRecords.map(r => {
+                    {filteredLossRecords.length === 0 ? (
+                        <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground italic">Nenhum registro de perda encontrado.</TableCell></TableRow>
+                    ) : filteredLossRecords.map(r => {
                         const rDate = getRecordDate(r.date);
                         const rCreatedAt = getRecordDate(r.createdAt);
                         return (
