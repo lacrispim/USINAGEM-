@@ -25,9 +25,11 @@ import {
   UserRoundPen,
   Filter,
   Cpu,
-  Search
+  Search,
+  Anchor,
+  ArrowLeftToLine
 } from 'lucide-react';
-import { format, addDays, startOfDay, parse } from 'date-fns';
+import { format, addDays, startOfDay, parse, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -224,6 +226,7 @@ export default function ProgrammingPage() {
   const [disabledShifts, setDisabledShifts] = useState<Record<string, boolean>>({});
   const [techOverrides, setTechOverrides] = useState<Record<string, string>>({});
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [planStartDate, setPlanStartDate] = useState<Date | null>(null);
   
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
   const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<string>('all');
@@ -257,6 +260,10 @@ export default function ProgrammingPage() {
     if (configDoc) {
       setDisabledShifts(configDoc.disabledShifts || {});
       setTechOverrides(configDoc.techOverrides || {});
+      if (configDoc.planStartDate) {
+        const parsed = parse(configDoc.planStartDate, 'yyyy-MM-dd', new Date());
+        if (isValid(parsed)) setPlanStartDate(parsed);
+      }
     }
     if (planoDoc) { 
       setPlanejamentoData(planoDoc.data || []); 
@@ -323,6 +330,157 @@ export default function ProgrammingPage() {
     }
   }, [firestore, toast, planejamentoData]);
 
+  const recalculatePlan = async (
+    novaFila: JobBase[], 
+    currentDisabled = disabledShifts, 
+    currentOverrides = techOverrides,
+    anchor?: Date
+  ) => {
+    if (!firestore) return;
+    
+    const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
+    const novosPlanItems: PlanejamentoItem[] = [];
+    const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
+    const jobCompletionTimes: Record<string, number> = {};
+
+    const concluidos = new Set(
+        planejamentoData.filter(i => i.isConcluded)
+            .map(i => `${i.jobId}|${i.techKey}|${i.dataExecucao}|${i.turno}`)
+    );
+
+    const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
+        let prodTime = Number(job[type]) || 0;
+        let setupTime = (type === 'torno' || type === 'centro') ? (Number(job.setup) || 20) : 0;
+        if (prodTime <= 0 && setupTime <= 0 && type !== 'prog') return minStartTime;
+        if (type === 'prog' && prodTime <= 0) return minStartTime;
+        
+        const laneId = `${techKey}_0`;
+        let actualPointer = Math.max(lanePointers[laneId] || 0, minStartTime);
+        let pendingSetup = setupTime;
+        let pendingProd = prodTime;
+        let doneProdTime = 0;
+        const cycleTime = job.quantidade > 0 ? prodTime / job.quantidade : prodTime;
+
+        let iterations = 0;
+        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 500) {
+            iterations++;
+            const dayIdx = Math.floor(actualPointer / (SHIFT_MIN * 3));
+            const startInDay = actualPointer % (SHIFT_MIN * 3);
+            const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
+            const startOffset = startInDay % SHIFT_MIN;
+            const dayDate = addDays(baseDate, dayIdx);
+            const dateStr = format(dayDate, 'yyyy-MM-dd');
+            const displayDateStr = format(dayDate, 'dd/MM/yyyy');
+            const shiftId = String(shiftIdx + 1);
+            
+            const shiftKey = `${dateStr}_${shiftId}`;
+            const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
+            
+            const isShiftDisabled = currentDisabled[shiftKey];
+            const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
+
+            if (isShiftDisabled || !techName) {
+                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
+                continue;
+            }
+
+            let winStart = startOffset;
+            for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) winStart = p.start + p.duration; }
+            if (winStart >= SHIFT_MIN - 1) { actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN); continue; }
+
+            const effectiveAvail = SHIFT_MIN - winStart;
+            let sInShift = pendingSetup > 0 ? Math.min(pendingSetup, effectiveAvail) : 0;
+            pendingSetup -= sInShift;
+            let pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
+            let qInShift = 0;
+            
+            if (pInShift > 0 && cycleTime > 0) {
+                const before = Math.floor(doneProdTime / cycleTime + 1e-7);
+                doneProdTime += pInShift;
+                qInShift = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7)) - before;
+                pendingProd -= pInShift;
+            } else if (pInShift > 0 && pendingProd > 0 && cycleTime <= 0) {
+                pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
+                pendingProd -= pInShift;
+            }
+
+            if (sInShift > 0 || pInShift > 0) {
+                const deterministicId = `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${type}`;
+                const concludedKey = `${job.id}|${techKey}|${displayDateStr}|${shiftId}`;
+
+                novosPlanItems.push({ 
+                    id: deterministicId, 
+                    dataExecucao: displayDateStr, 
+                    tecnico: techName, 
+                    equipamento: type.toUpperCase(), 
+                    requisicao: job.requisicao, 
+                    nomeDaPeca: job.nomeDaPeca, 
+                    quantidadeTotal: job.quantidade, 
+                    quantidadeNoBloco: qInShift, 
+                    tempoMinutos: pInShift, 
+                    setupMinutos: sInShift, 
+                    turno: shiftId, 
+                    startOffsetMin: winStart, 
+                    tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', 
+                    techKey, 
+                    jobId: job.id, 
+                    laneIndex: 0,
+                    isConcluded: concluidos.has(concludedKey),
+                    site: normalizeSiteName(job.site)
+                });
+            }
+            actualPointer = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
+            if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
+        }
+        
+        if (iterations >= 500) {
+            toast({ title: "Aviso de Carga", description: `Cálculo interrompido para #${job.requisicao} por excesso de turnos (limite 500).`, variant: "destructive" });
+        }
+
+        lanePointers[laneId] = actualPointer;
+        return actualPointer;
+    };
+
+    novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
+    novaFila.forEach(job => {
+        const e1 = String(job.etapa1 || '').toUpperCase();
+        if (e1.includes('TORNO')) jobCompletionTimes[job.id] = allocateTask(job, 'TORNO', 0, 'torno');
+        else if (e1.includes('CENTRO')) jobCompletionTimes[job.id] = allocateTask(job, 'CENTRO', 0, 'centro');
+        else jobCompletionTimes[job.id] = 0;
+    });
+    novaFila.forEach(job => {
+        const e2 = String(job.etapa2 || '').toUpperCase();
+        const minStart = jobCompletionTimes[job.id] || 0;
+        if (e2.includes('TORNO')) allocateTask(job, 'TORNO', minStart, 'torno');
+        else if (e2.includes('CENTRO')) allocateTask(job, 'CENTRO', minStart, 'centro');
+    });
+
+    const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
+    
+    try {
+        await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
+        await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
+    } catch (error) {
+        toast({ title: "Erro de Salvamento", description: "Falha ao gravar cronograma no banco de dados.", variant: "destructive" });
+    }
+  };
+
+  const handleReanchor = async () => {
+    if (!firestore) return;
+    const now = startOfDay(new Date());
+    setPlanStartDate(now);
+    try {
+      await setDoc(doc(firestore, 'programacaoState', 'config'), {
+        planStartDate: format(now, 'yyyy-MM-dd'),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      await recalculatePlan(fila, disabledShifts, techOverrides, now);
+      toast({ title: "Âncora Atualizada", description: "O cronograma agora começa a partir de hoje." });
+    } catch (e) {
+      toast({ title: "Erro", description: "Falha ao atualizar âncora.", variant: "destructive" });
+    }
+  };
+
   const toggleShift = async (day: Date, shiftId: string) => {
     if (!firestore) return;
     const key = `${format(day, 'yyyy-MM-dd')}_${shiftId}`;
@@ -369,7 +527,7 @@ export default function ProgrammingPage() {
     const newFila = fila.map(j => j.id === id ? { ...j, [field]: value } : j);
     setFila(newFila);
     await recalculatePlan(newFila);
-  }, [fila]);
+  }, [fila, disabledShifts, techOverrides, planStartDate]);
 
   const moveJobToPosition = useCallback(async (currentIdx: number, newPos: number) => {
     const targetIdx = Math.max(0, Math.min(fila.length - 1, newPos - 1));
@@ -382,143 +540,7 @@ export default function ProgrammingPage() {
     setFila(newFila);
     await recalculatePlan(newFila);
     toast({ title: "Sequência Alterada", description: `Item movido para a posição ${targetIdx + 1}.` });
-  }, [fila]);
-
-  const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides) => {
-    if (!firestore) return;
-    
-    const novosPlanItems: PlanejamentoItem[] = [];
-    const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
-    const jobCompletionTimes: Record<string, number> = {};
-
-    // Preservar estado "Concluído" baseado em chaves estáveis
-    const concluidos = new Set(
-        planejamentoData.filter(i => i.isConcluded)
-            .map(i => `${i.jobId}|${i.techKey}|${i.dataExecucao}|${i.turno}`)
-    );
-
-    // Data de ancoragem fixa para o plano (hoje)
-    const planBaseDate = startOfDay(new Date());
-
-    const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
-        let prodTime = Number(job[type]) || 0;
-        let setupTime = (type === 'torno' || type === 'centro') ? (Number(job.setup) || 20) : 0;
-        if (prodTime <= 0 && setupTime <= 0 && type !== 'prog') return minStartTime;
-        if (type === 'prog' && prodTime <= 0) return minStartTime;
-        
-        const laneId = `${techKey}_0`;
-        let actualPointer = Math.max(lanePointers[laneId] || 0, minStartTime);
-        let pendingSetup = setupTime;
-        let pendingProd = prodTime;
-        let doneProdTime = 0;
-        const cycleTime = job.quantidade > 0 ? prodTime / job.quantidade : prodTime;
-
-        let iterations = 0;
-        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 500) {
-            iterations++;
-            const dayIdx = Math.floor(actualPointer / (SHIFT_MIN * 3));
-            const startInDay = actualPointer % (SHIFT_MIN * 3);
-            const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
-            const startOffset = startInDay % SHIFT_MIN;
-            const dayDate = addDays(planBaseDate, dayIdx);
-            const dateStr = format(dayDate, 'yyyy-MM-dd');
-            const displayDateStr = format(dayDate, 'dd/MM/yyyy');
-            const shiftId = String(shiftIdx + 1);
-            
-            const shiftKey = `${dateStr}_${shiftId}`;
-            const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
-            
-            const isShiftDisabled = currentDisabled[shiftKey];
-            const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
-
-            if (isShiftDisabled || !techName) {
-                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
-                continue;
-            }
-
-            let winStart = startOffset;
-            for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) winStart = p.start + p.duration; }
-            if (winStart >= SHIFT_MIN - 1) { actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN); continue; }
-
-            const effectiveAvail = SHIFT_MIN - winStart;
-            let sInShift = pendingSetup > 0 ? Math.min(pendingSetup, effectiveAvail) : 0;
-            pendingSetup -= sInShift;
-            let pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
-            let qInShift = 0;
-            
-            if (pInShift > 0 && cycleTime > 0) {
-                const before = Math.floor(doneProdTime / cycleTime + 1e-7);
-                doneProdTime += pInShift;
-                qInShift = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7)) - before;
-                pendingProd -= pInShift;
-            } else if (pInShift > 0 && pendingProd > 0 && cycleTime <= 0) {
-                pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
-                pendingProd -= pInShift;
-            }
-
-            if (sInShift > 0 || pInShift > 0) {
-                // ID Determinístico para evitar remounts agressivos
-                const deterministicId = `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${type}`;
-                const concludedKey = `${job.id}|${techKey}|${displayDateStr}|${shiftId}`;
-
-                novosPlanItems.push({ 
-                    id: deterministicId, 
-                    dataExecucao: displayDateStr, 
-                    tecnico: techName, 
-                    equipamento: type.toUpperCase(), 
-                    requisicao: job.requisicao, 
-                    nomeDaPeca: job.nomeDaPeca, 
-                    quantidadeTotal: job.quantidade, 
-                    quantidadeNoBloco: qInShift, 
-                    tempoMinutos: pInShift, 
-                    setupMinutos: sInShift, 
-                    turno: shiftId, 
-                    startOffsetMin: winStart, 
-                    tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', 
-                    techKey, 
-                    jobId: job.id, 
-                    laneIndex: 0,
-                    isConcluded: concluidos.has(concluidos.has(concludedKey) ? concludedKey : ''),
-                    site: normalizeSiteName(job.site)
-                });
-            }
-            actualPointer = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
-            if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
-        }
-        
-        if (iterations >= 500) {
-            toast({ title: "Aviso de Carga", description: `Cálculo interrompido para #${job.requisicao} por excesso de turnos (limite 500).`, variant: "destructive" });
-        }
-
-        lanePointers[laneId] = actualPointer;
-        return actualPointer;
-    };
-
-    novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
-    
-    novaFila.forEach(job => {
-        const e1 = String(job.etapa1 || '').toUpperCase();
-        if (e1.includes('TORNO')) jobCompletionTimes[job.id] = allocateTask(job, 'TORNO', 0, 'torno');
-        else if (e1.includes('CENTRO')) jobCompletionTimes[job.id] = allocateTask(job, 'CENTRO', 0, 'centro');
-        else jobCompletionTimes[job.id] = 0;
-    });
-    
-    novaFila.forEach(job => {
-        const e2 = String(job.etapa2 || '').toUpperCase();
-        const minStart = jobCompletionTimes[job.id] || 0;
-        if (e2.includes('TORNO')) allocateTask(job, 'TORNO', minStart, 'torno');
-        else if (e2.includes('CENTRO')) allocateTask(job, 'CENTRO', minStart, 'centro');
-    });
-
-    const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
-    
-    try {
-        await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
-        await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
-    } catch (error) {
-        toast({ title: "Erro de Salvamento", description: "Falha ao gravar cronograma no banco de dados.", variant: "destructive" });
-    }
-  };
+  }, [fila, disabledShifts, techOverrides, planStartDate]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file || !firestore) return;
@@ -555,13 +577,21 @@ export default function ProgrammingPage() {
               etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
             };
         });
-        await recalculatePlan(novaFila);
+
+        const start = startOfDay(new Date());
+        setPlanStartDate(start);
+        await setDoc(doc(firestore, 'programacaoState', 'config'), {
+            planStartDate: format(start, 'yyyy-MM-dd'),
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        await recalculatePlan(novaFila, disabledShifts, techOverrides, start);
         toast({ title: "Sucesso", description: `${novaFila.length} itens importados.` });
       } catch (err) {
           toast({ title: "Erro na Importação", description: "Formato de arquivo inválido ou erro no processamento.", variant: "destructive" });
       } finally {
           setIsImporting(false);
-          e.target.value = ''; // Reset file input
+          e.target.value = ''; 
       }
     };
     reader.readAsArrayBuffer(file);
@@ -602,6 +632,15 @@ export default function ProgrammingPage() {
           </div>
           
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+            <Button 
+                variant="outline" 
+                onClick={handleReanchor}
+                className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none hover:bg-primary/10 transition-colors"
+                title="Sincroniza o início do plano com o dia de hoje"
+            >
+              <Anchor className="h-4 w-4 mr-2" /> Reancorar Plano
+            </Button>
+
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="secondary" className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none hover:scale-[1.02] transition-transform">
@@ -701,6 +740,17 @@ export default function ProgrammingPage() {
           </div>
 
           <div className="flex items-center bg-card/50 border rounded-lg p-1 shadow-inner w-full md:w-auto justify-center">
+            {planStartDate && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 hover:bg-muted text-primary" 
+                onClick={() => setCurrentDate(planStartDate)}
+                title="Ir para o início do plano"
+              >
+                <ArrowLeftToLine className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
             <div className="flex items-center gap-2 font-black px-4 text-[11px] min-w-[120px] justify-center text-primary">
               <CalendarDays className="h-3.5 w-3.5 opacity-60" />
@@ -735,7 +785,7 @@ export default function ProgrammingPage() {
       </Dialog>
 
       <div className="space-y-6">
-        {[0, 1, 2].map(d => {
+        {[0, 1, 2, 3, 4].map(d => {
             const day = addDays(currentDate, d);
             const displayDate = format(day, 'dd/MM/yyyy');
             const dateStr = format(day, 'yyyy-MM-dd');
