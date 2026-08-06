@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -23,11 +24,10 @@ import {
   MapPin,
   UserRoundPen,
   Filter,
-  Hash,
   Cpu,
   Search
 } from 'lucide-react';
-import { format, addDays, isSameDay, parse } from 'date-fns';
+import { format, addDays, startOfDay, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -148,14 +148,15 @@ const normalizeSiteName = (site: string | undefined): string => {
   return s;
 };
 
-const Ruler = () => {
+const Ruler = React.memo(() => {
   const marks = [];
   for (let m = 0; m <= SHIFT_MIN; m += 60) {
     const pc = (m / SHIFT_MIN) * 100;
     marks.push(<div key={m} className="absolute top-0 h-full flex flex-col items-center" style={{ left: `${pc}%` }}><div className={cn("w-px bg-border", m % 120 === 0 ? "h-[9px] bg-muted-foreground" : "h-[5px]")} />{m % 60 === 0 && <span className="text-[9px] font-mono text-muted-foreground leading-none mt-1">{m / 60}h</span>}</div>);
   }
   return <div className="relative h-[18px] ml-[155px] border-b border-border/50 mb-1">{marks}</div>;
-};
+});
+Ruler.displayName = 'Ruler';
 
 const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, onToggle: (id: string) => void }) => {
   const totalMin = (item.tempoMinutos || 0) + (item.setupMinutos || 0);
@@ -211,6 +212,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
     </div>
   );
 });
+TimelineBar.displayName = 'TimelineBar';
 
 export default function ProgrammingPage() {
   const firestore = useFirestore();
@@ -221,17 +223,17 @@ export default function ProgrammingPage() {
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [disabledShifts, setDisabledShifts] = useState<Record<string, boolean>>({});
   const [techOverrides, setTechOverrides] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [isImporting, setIsImporting] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
   const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<string>('all');
   const [requisitionFilter, setRequisitionFilter] = useState<string>('');
+  const deferredRequisitionFilter = useDeferredValue(requisitionFilter);
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
   const [activeSwap, setActiveSwap] = useState<{ day: string, shiftId: string, category: string, currentTech: string } | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const [newItem, setNewItem] = useState<Partial<JobBase>>({
     requisicao: '',
@@ -246,9 +248,9 @@ export default function ProgrammingPage() {
     etapa2: ''
   });
 
-  const { data: filaDoc } = useDoc(useMemo(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]));
-  const { data: planoDoc } = useDoc(useMemo(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]));
-  const { data: configDoc } = useDoc(useMemo(() => firestore ? doc(firestore, 'programacaoState', 'config') : null, [firestore]));
+  const { data: filaDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]));
+  const { data: planoDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]));
+  const { data: configDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'config') : null, [firestore]));
 
   useEffect(() => {
     if (filaDoc) setFila(filaDoc.data || []);
@@ -258,44 +260,68 @@ export default function ProgrammingPage() {
     }
     if (planoDoc) { 
       setPlanejamentoData(planoDoc.data || []); 
-      setLoading(false); 
     }
-    else if (planoDoc === null) setLoading(false);
   }, [filaDoc, planoDoc, configDoc]);
 
+  // Indexação para Busca O(1) na tabela
+  const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
+
+  // Filtros Otimizados
   const filteredFila = useMemo(() => {
     let data = fila;
     if (selectedSiteFilter !== 'all') {
       data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
     }
-    if (requisitionFilter) {
-      data = data.filter(item => item.requisicao.toLowerCase().includes(requisitionFilter.toLowerCase()));
+    if (deferredRequisitionFilter) {
+      const search = deferredRequisitionFilter.toLowerCase();
+      data = data.filter(item => 
+        item.requisicao.toLowerCase().includes(search) || 
+        item.nomeDaPeca.toLowerCase().includes(search)
+      );
     }
     return data;
-  }, [fila, selectedSiteFilter, requisitionFilter]);
+  }, [fila, selectedSiteFilter, deferredRequisitionFilter]);
 
   const filteredPlanejamento = useMemo(() => {
     let data = planejamentoData;
     if (selectedSiteFilter !== 'all') {
       data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
     }
-    if (requisitionFilter) {
-      data = data.filter(item => item.requisicao.toLowerCase().includes(requisitionFilter.toLowerCase()));
+    if (deferredRequisitionFilter) {
+      const search = deferredRequisitionFilter.toLowerCase();
+      data = data.filter(item => item.requisicao.toLowerCase().includes(search));
     }
     return data;
-  }, [planejamentoData, selectedSiteFilter, requisitionFilter]);
+  }, [planejamentoData, selectedSiteFilter, deferredRequisitionFilter]);
 
-  const toggleConcluded = async (itemId: string) => {
+  // Indexação Espacial do Plano para Renderização Instantânea da Timeline
+  const planIndex = useMemo(() => {
+    const map = new Map<string, PlanejamentoItem[]>();
+    for (const i of filteredPlanejamento) {
+      const k = `${i.dataExecucao}|${i.turno}|${i.techKey}`;
+      let arr = map.get(k);
+      if (!arr) { arr = []; map.set(k, arr); }
+      arr.push(i);
+    }
+    return map;
+  }, [filteredPlanejamento]);
+
+  const toggleConcluded = useCallback(async (itemId: string) => {
     if (!firestore || !planejamentoData) return;
-    const updatedPlano = planejamentoData.map(item => item.id === itemId ? { ...item, isConcluded: !item.isConcluded } : item);
-    setPlanejamentoData(updatedPlano);
+    
+    let updatedPlano: PlanejamentoItem[] = [];
+    setPlanejamentoData(prev => {
+        updatedPlano = prev.map(item => item.id === itemId ? { ...item, isConcluded: !item.isConcluded } : item);
+        return updatedPlano;
+    });
+
     const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
     try {
       await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(updatedPlano), updatedAt: serverTimestamp() });
     } catch (e) {
       toast({ title: "Erro", description: "Falha ao salvar status.", variant: "destructive" });
     }
-  };
+  }, [firestore, toast, planejamentoData]);
 
   const toggleShift = async (day: Date, shiftId: string) => {
     if (!firestore) return;
@@ -336,13 +362,16 @@ export default function ProgrammingPage() {
     }
   };
 
-  const updateJobField = async (id: string, field: keyof JobBase, value: any) => {
+  const updateJobField = useCallback(async (id: string, field: keyof JobBase, value: any) => {
+    const job = fila.find(j => j.id === id);
+    if (!job || job[field] === value) return;
+
     const newFila = fila.map(j => j.id === id ? { ...j, [field]: value } : j);
     setFila(newFila);
     await recalculatePlan(newFila);
-  };
+  }, [fila]);
 
-  const moveJobToPosition = async (currentIdx: number, newPos: number) => {
+  const moveJobToPosition = useCallback(async (currentIdx: number, newPos: number) => {
     const targetIdx = Math.max(0, Math.min(fila.length - 1, newPos - 1));
     if (currentIdx === targetIdx) return;
     
@@ -352,14 +381,24 @@ export default function ProgrammingPage() {
     
     setFila(newFila);
     await recalculatePlan(newFila);
-    toast({ title: "Sequência Alterada", description: `Item movido para a posição ${targetIdx + 1}. Cronograma recalculado.` });
-  };
+    toast({ title: "Sequência Alterada", description: `Item movido para a posição ${targetIdx + 1}.` });
+  }, [fila]);
 
   const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides) => {
     if (!firestore) return;
+    
     const novosPlanItems: PlanejamentoItem[] = [];
     const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
     const jobCompletionTimes: Record<string, number> = {};
+
+    // Preservar estado "Concluído" baseado em chaves estáveis
+    const concluidos = new Set(
+        planejamentoData.filter(i => i.isConcluded)
+            .map(i => `${i.jobId}|${i.techKey}|${i.dataExecucao}|${i.turno}`)
+    );
+
+    // Data de ancoragem fixa para o plano (hoje)
+    const planBaseDate = startOfDay(new Date());
 
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
         let prodTime = Number(job[type]) || 0;
@@ -367,8 +406,7 @@ export default function ProgrammingPage() {
         if (prodTime <= 0 && setupTime <= 0 && type !== 'prog') return minStartTime;
         if (type === 'prog' && prodTime <= 0) return minStartTime;
         
-        const chosenLane = 0;
-        const laneId = `${techKey}_${chosenLane}`;
+        const laneId = `${techKey}_0`;
         let actualPointer = Math.max(lanePointers[laneId] || 0, minStartTime);
         let pendingSetup = setupTime;
         let pendingProd = prodTime;
@@ -382,8 +420,9 @@ export default function ProgrammingPage() {
             const startInDay = actualPointer % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const startOffset = startInDay % SHIFT_MIN;
-            const dayDate = addDays(currentDate, dayIdx);
+            const dayDate = addDays(planBaseDate, dayIdx);
             const dateStr = format(dayDate, 'yyyy-MM-dd');
+            const displayDateStr = format(dayDate, 'dd/MM/yyyy');
             const shiftId = String(shiftIdx + 1);
             
             const shiftKey = `${dateStr}_${shiftId}`;
@@ -418,9 +457,13 @@ export default function ProgrammingPage() {
             }
 
             if (sInShift > 0 || pInShift > 0) {
+                // ID Determinístico para evitar remounts agressivos
+                const deterministicId = `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${type}`;
+                const concludedKey = `${job.id}|${techKey}|${displayDateStr}|${shiftId}`;
+
                 novosPlanItems.push({ 
-                    id: `pl-${Math.random().toString(36).substr(2, 9)}`, 
-                    dataExecucao: format(dayDate, 'dd/MM/yyyy'), 
+                    id: deterministicId, 
+                    dataExecucao: displayDateStr, 
                     tecnico: techName, 
                     equipamento: type.toUpperCase(), 
                     requisicao: job.requisicao, 
@@ -434,14 +477,19 @@ export default function ProgrammingPage() {
                     tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', 
                     techKey, 
                     jobId: job.id, 
-                    laneIndex: chosenLane,
-                    isConcluded: false,
+                    laneIndex: 0,
+                    isConcluded: concluidos.has(concluidos.has(concludedKey) ? concludedKey : ''),
                     site: normalizeSiteName(job.site)
                 });
             }
             actualPointer = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
             if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
         }
+        
+        if (iterations >= 500) {
+            toast({ title: "Aviso de Carga", description: `Cálculo interrompido para #${job.requisicao} por excesso de turnos (limite 500).`, variant: "destructive" });
+        }
+
         lanePointers[laneId] = actualPointer;
         return actualPointer;
     };
@@ -463,8 +511,13 @@ export default function ProgrammingPage() {
     });
 
     const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
-    await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
-    await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
+    
+    try {
+        await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
+        await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
+    } catch (error) {
+        toast({ title: "Erro de Salvamento", description: "Falha ao gravar cronograma no banco de dados.", variant: "destructive" });
+    }
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -472,37 +525,44 @@ export default function ProgrammingPage() {
     setIsImporting(true);
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const workbook = XLSX.read(new Uint8Array(event.target?.result as ArrayBuffer), { type: 'array' });
-      const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-      
-      const findVal = (row: any, keys: string[]) => {
-          for (const key of keys) {
-              const rowKey = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
-              if (rowKey !== undefined) return row[rowKey];
-          }
-          return undefined;
-      };
+      try {
+        const workbook = XLSX.read(new Uint8Array(event.target?.result as ArrayBuffer), { type: 'array' });
+        const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+        
+        const findVal = (row: any, keys: string[]) => {
+            for (const key of keys) {
+                const rowKey = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
+                if (rowKey !== undefined) return row[rowKey];
+            }
+            return undefined;
+        };
 
-      const novaFila: JobBase[] = json.map((row, i) => {
-          const rawSite = String(findVal(row, ['site', 'fabrica', 'Fábrica', 'unidade', 'unidade de negócio']) || 'VALINHOS');
-          const site = normalizeSiteName(rawSite);
-          
-          return {
-            id: `job-${i}-${Date.now()}`,
-            requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
-            nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
-            quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
-            setup: Number(findVal(row, ['Tempo setup TORNO', 'Tempo setup CENTRO', 'setup', 'Setup Minutos']) || 20),
-            torno: Number(findVal(row, ['Tempo de Planejamento Torno Minutos todas as peças solicitadas', 'torno', 'torno minutos', 'torno min']) || 0),
-            centro: Number(findVal(row, ['Tempo de Planejamento Centro Minutos todas as peças solicitadas', 'centro', 'centro minutos', 'centro min']) || 0),
-            prog: Number(findVal(row, ['Tempo Programação Minutos', 'Tempo de Planejamento Programação Minutos todas as peças solicitadas', 'prog', 'programação', 'Programação Minutos']) || 0),
-            site: site,
-            etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || ''),
-            etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
-          };
-      });
-      await recalculatePlan(novaFila);
-      setIsImporting(false);
+        const novaFila: JobBase[] = json.map((row, i) => {
+            const rawSite = String(findVal(row, ['site', 'fabrica', 'Fábrica', 'unidade', 'unidade de negócio']) || 'VALINHOS');
+            const site = normalizeSiteName(rawSite);
+            
+            return {
+              id: `job-${i}-${Date.now()}`,
+              requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
+              nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
+              quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
+              setup: Number(findVal(row, ['Tempo setup TORNO', 'Tempo setup CENTRO', 'setup', 'Setup Minutos']) || 20),
+              torno: Number(findVal(row, ['Tempo de Planejamento Torno Minutos todas as peças solicitadas', 'torno', 'torno minutos', 'torno min']) || 0),
+              centro: Number(findVal(row, ['Tempo de Planejamento Centro Minutos todas as peças solicitadas', 'centro', 'centro minutos', 'centro min']) || 0),
+              prog: Number(findVal(row, ['Tempo Programação Minutos', 'Tempo de Planejamento Programação Minutos todas as peças solicitadas', 'prog', 'programação', 'Programação Minutos']) || 0),
+              site: site,
+              etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || ''),
+              etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
+            };
+        });
+        await recalculatePlan(novaFila);
+        toast({ title: "Sucesso", description: `${novaFila.length} itens importados.` });
+      } catch (err) {
+          toast({ title: "Erro na Importação", description: "Formato de arquivo inválido ou erro no processamento.", variant: "destructive" });
+      } finally {
+          setIsImporting(false);
+          e.target.value = ''; // Reset file input
+      }
     };
     reader.readAsArrayBuffer(file);
   };
@@ -677,8 +737,8 @@ export default function ProgrammingPage() {
       <div className="space-y-6">
         {[0, 1, 2].map(d => {
             const day = addDays(currentDate, d);
+            const displayDate = format(day, 'dd/MM/yyyy');
             const dateStr = format(day, 'yyyy-MM-dd');
-            const dayItems = filteredPlanejamento.filter(i => i.dataExecucao === format(day, 'dd/MM/yyyy'));
             
             return (
                 <div key={d} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
@@ -686,23 +746,6 @@ export default function ProgrammingPage() {
                         <div className="flex items-center gap-4">
                             <span className="text-xl font-bold uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          {selectedSiteFilter !== 'all' && (
-                              <Badge variant="outline" className="border-primary/50 text-primary text-[10px] font-black">
-                                  SITE: {selectedSiteFilter}
-                              </Badge>
-                          )}
-                          {requisitionFilter && (
-                              <Badge variant="outline" className="border-blue-500/50 text-blue-400 text-[10px] font-black">
-                                  BUSCA: {requisitionFilter.toUpperCase()}
-                              </Badge>
-                          )}
-                          {selectedEquipmentFilter !== 'all' && (
-                              <Badge variant="outline" className="border-purple-500/50 text-purple-400 text-[10px] font-black">
-                                  EQUIPAMENTO: {selectedEquipmentFilter}
-                              </Badge>
-                          )}
                         </div>
                     </div>
                     {TURNOS.map(t => {
@@ -726,6 +769,8 @@ export default function ProgrammingPage() {
                                                     const tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
                                                     
                                                     if (!tech) return null;
+                                                    
+                                                    const itemsForLane = planIndex.get(`${displayDate}|${t.id}|${cat}`) || [];
 
                                                     return (
                                                       <div key={`${cat}-${t.id}`} className="grid grid-cols-[155px_1fr] items-center mb-3">
@@ -749,7 +794,7 @@ export default function ProgrammingPage() {
                                                               {PAUSAS.map(p => (
                                                                   <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-2 w-2 text-yellow-500/30" /></div>
                                                               ))}
-                                                              {dayItems.filter(i => i.techKey === cat && i.turno === t.id).map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
+                                                              {itemsForLane.map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
                                                           </div>
                                                       </div>
                                                     );
@@ -816,8 +861,8 @@ export default function ProgrammingPage() {
             <TableBody>
               {filteredFila.length === 0 ? (
                 <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada para o filtro</TableCell></TableRow>
-              ) : filteredFila.map((job, idx) => {
-                const globalIdx = fila.findIndex(f => f.id === job.id);
+              ) : filteredFila.map((job) => {
+                const globalIdx = indexById.get(job.id) ?? 0;
                 const normalizedSite = normalizeSiteName(job.site);
                 return (
                   <TableRow key={job.id} className="hover:bg-muted/5">
