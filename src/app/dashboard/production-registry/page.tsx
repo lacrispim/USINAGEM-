@@ -2,7 +2,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm, useWatch, Control } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,7 +32,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import {
   Table,
   TableBody,
@@ -119,6 +119,30 @@ const lossFormSchema = z.object({
 type ProductionFormValues = z.infer<typeof productionFormSchema>;
 type LossFormValues = z.infer<typeof lossFormSchema>;
 
+// Componente para isolar o cronômetro do formulário de produção e evitar re-render global
+const IsolatedProductionTimer = ({ control, setValue }: { control: Control<ProductionFormValues>, setValue: any }) => {
+  const time = useWatch({ control, name: 'machiningTime' }) || 0;
+  return (
+    <ProductionTimer 
+      title="Contador de Produção" 
+      initialTimeInMinutes={time} 
+      onTimeChange={(t) => setValue('machiningTime', t)} 
+    />
+  );
+};
+
+// Componente para isolar o cronômetro do formulário de perda
+const IsolatedLossTimer = ({ control, setValue }: { control: Control<LossFormValues>, setValue: any }) => {
+  const time = useWatch({ control, name: 'timeLost' }) || 0;
+  return (
+    <ProductionTimer 
+      title="Contador de Perda" 
+      initialTimeInMinutes={time} 
+      onTimeChange={(t) => setValue('timeLost', t)} 
+    />
+  );
+};
+
 export default function ProductionRegistryPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -169,8 +193,8 @@ export default function ProductionRegistryPage() {
     resolver: zodResolver(lossFormSchema),
   });
 
-  const productionRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
-  const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
+  const productionRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]);
+  const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]);
   
   const { data: productionRecords } = useCollection(productionRecordsQuery);
   const { data: lossRecords } = useCollection(lossRecordsQuery);
@@ -196,7 +220,6 @@ export default function ProductionRegistryPage() {
       const recordDate = getRecordDate(record.date);
       if (!recordDate) return false;
 
-      // Restrição de performance: Apenas 15 dias se nenhum filtro estiver ativo
       if (isRestrictedByPerformance && recordDate < fifteenDaysAgo) return false;
 
       if (selectedDate && (recordDate < startOfDay(selectedDate) || recordDate > endOfDay(selectedDate))) return false;
@@ -218,7 +241,6 @@ export default function ProductionRegistryPage() {
       const recordDate = getRecordDate(record.date);
       if (!recordDate) return false;
 
-      // Restrição de performance: Apenas 15 dias se nenhum filtro estiver ativo
       if (isRestrictedByPerformance && recordDate < fifteenDaysAgo) return false;
 
       if (selectedDate && (recordDate < startOfDay(selectedDate) || recordDate > endOfDay(selectedDate))) return false;
@@ -257,7 +279,6 @@ export default function ProductionRegistryPage() {
 
     toast({ title: 'Sucesso', description: 'Produção enviada com sucesso.' });
     
-    // Resetar campos - preservando APENAS a data
     const savedDate = values.date;
     productionForm.reset({ 
         date: savedDate,
@@ -299,7 +320,6 @@ export default function ProductionRegistryPage() {
 
     toast({ title: 'Sucesso', description: 'Perda enviada com sucesso.' });
     
-    // Resetar campos - preservando APENAS a data
     const savedDate = values.date;
     lossForm.reset({ 
         date: savedDate,
@@ -471,7 +491,7 @@ export default function ProductionRegistryPage() {
                 <FormField control={productionForm.control} name="observations" render={({field}) => (
                     <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Detalhes adicionais..." className="min-h-[80px]" {...field} /></FormControl></FormItem>
                 )} />
-                <ProductionTimer title="Contador de Produção" initialTimeInMinutes={useWatch({control: productionForm.control, name: 'machiningTime'}) || 0} onTimeChange={(t) => productionForm.setValue('machiningTime', t)} />
+                <IsolatedProductionTimer control={productionForm.control} setValue={productionForm.setValue} />
                 <Button type="submit" className="w-full">Registrar Produção</Button>
               </form>
             </Form>
@@ -508,7 +528,7 @@ export default function ProductionRegistryPage() {
                 <FormField control={lossForm.control} name="observations" render={({field}) => (
                     <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Descreva o motivo da parada..." className="min-h-[80px]" {...field} /></FormControl></FormItem>
                 )} />
-                <ProductionTimer title="Contador de Perda" initialTimeInMinutes={useWatch({control: lossForm.control, name: 'timeLost'}) || 0} onTimeChange={(t) => lossForm.setValue('timeLost', t)} />
+                <IsolatedLossTimer control={lossForm.control} setValue={lossForm.setValue} />
                 <Button type="submit" variant="destructive" className="w-full">Registrar Perda</Button>
               </form>
             </Form>
@@ -623,125 +643,128 @@ export default function ProductionRegistryPage() {
         <Button variant="ghost" onClick={() => { setSelectedDate(undefined); setSelectedOperator('all'); setSelectedFactory('all'); setFormsFilter(''); setSelectedCategory('all'); setSelectedMonth('all'); }} className="h-9 text-xs text-destructive">Limpar</Button>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-            <div className="space-y-1">
-                <CardTitle className="flex items-center gap-2">
-                    Histórico de Produção
-                    {isRestrictedByPerformance && <Badge variant="secondary" className="text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"><Zap className="h-2 w-2" /> Auto (15 dias)</Badge>}
-                </CardTitle>
-                <CardDescription>Registros filtrados.</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredProductionRecords, 'Producao')}><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar</Button>
-        </CardHeader>
-        <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Técnico</TableHead>
-                        <TableHead>Data</TableHead>
-                        <TableHead className="text-primary font-bold"><div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Apontamento</div></TableHead>
-                        <TableHead>Fábrica</TableHead>
-                        <TableHead>Nº Forms</TableHead>
-                        <TableHead>Atividade</TableHead>
-                        <TableHead>Produzido</TableHead>
-                        <TableHead>Tempo</TableHead>
-                        <TableHead>Observações</TableHead>
-                        <TableHead>Ações</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {filteredProductionRecords.length === 0 ? (
-                        <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground italic">Nenhum registro encontrado para este período.</TableCell></TableRow>
-                    ) : filteredProductionRecords.map(r => {
-                        const rDate = getRecordDate(r.date);
-                        const rCreatedAt = getRecordDate(r.createdAt);
-                        return (
-                        <TableRow key={r.id}>
-                            <TableCell>{r.operatorId}</TableCell>
-                            <TableCell>{rDate ? format(rDate, 'dd/MM/yyyy') : r.date}</TableCell>
-                            <TableCell className="text-primary font-mono text-[11px] font-bold">
-                                {rCreatedAt ? format(rCreatedAt, 'dd/MM HH:mm') : '-'}
-                            </TableCell>
-                            <TableCell>{r.factory}</TableCell>
-                            <TableCell className="font-mono font-bold">#{r.formsNumber}</TableCell>
-                            <TableCell><Badge variant="outline">{r.activityType}</Badge></TableCell>
-                            <TableCell>{r.quantityProduced} pç</TableCell>
-                            <TableCell>{r.machiningTime} min</TableCell>
-                            <TableCell className="max-w-[150px] truncate text-[10px] text-muted-foreground italic">
-                                {r.observations || '-'}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" onClick={() => handleEdit('production', r)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleDelete('productionRecords', r.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                              </div>
-                            </TableCell>
+      <div className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2">
+                        Histórico de Produção
+                        {isRestrictedByPerformance && <Badge variant="secondary" className="text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"><Zap className="h-2 w-2" /> Auto (15 dias)</Badge>}
+                    </CardTitle>
+                    <CardDescription>Registros filtrados.</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredProductionRecords, 'Producao')}><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar</Button>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Técnico</TableHead>
+                            <TableHead>Data</TableHead>
+                            <TableHead className="text-primary font-bold"><div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Apontamento</div></TableHead>
+                            <TableHead>Fábrica</TableHead>
+                            <TableHead>Nº Forms</TableHead>
+                            <TableHead>Atividade</TableHead>
+                            <TableHead>Produzido</TableHead>
+                            <TableHead>Tempo</TableHead>
+                            <TableHead>Observações</TableHead>
+                            <TableHead>Ações</TableHead>
                         </TableRow>
-                        )
-                    })}
-                </TableBody>
-            </Table>
-        </CardContent>
-      </Card>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredProductionRecords.length === 0 ? (
+                            <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground italic">Nenhum registro encontrado para este período.</TableCell></TableRow>
+                        ) : filteredProductionRecords.map(r => {
+                            const rDate = getRecordDate(r.date);
+                            const rCreatedAt = getRecordDate(r.createdAt);
+                            return (
+                            <TableRow key={r.id}>
+                                <TableCell>{r.operatorId}</TableCell>
+                                <TableCell>{rDate ? format(rDate, 'dd/MM/yyyy') : r.date}</TableCell>
+                                <TableCell className="text-primary font-mono text-[11px] font-bold">
+                                    {rCreatedAt ? format(rCreatedAt, 'dd/MM HH:mm') : '-'}
+                                </TableCell>
+                                <TableCell>{r.factory}</TableCell>
+                                <TableCell className="font-mono font-bold">#{r.formsNumber}</TableCell>
+                                <TableCell><Badge variant="outline">{r.activityType}</Badge></TableCell>
+                                <TableCell>{r.quantityProduced} pç</TableCell>
+                                <TableCell>{r.machiningTime} min</TableCell>
+                                <TableCell className="max-w-[150px] truncate text-[10px] text-muted-foreground italic">
+                                    {r.observations || '-'}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="icon" onClick={() => handleEdit('production', r)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDelete('productionRecords', r.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                  </div>
+                                </TableCell>
+                            </TableRow>
+                            )
+                        })}
+                    </TableBody>
+                </Table>
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-            <div className="space-y-1">
-                <CardTitle className="flex items-center gap-2">
-                    Histórico de Perdas
-                    {isRestrictedByPerformance && <Badge variant="secondary" className="text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"><Zap className="h-2 w-2" /> Auto (15 dias)</Badge>}
-                </CardTitle>
-                <CardDescription>Paradas e inatividades registradas.</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredLossRecords, 'Perdas')}><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar</Button>
-        </CardHeader>
-        <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Técnico</TableHead>
-                        <TableHead>Data</TableHead>
-                        <TableHead className="text-primary font-bold"><div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Apontamento</div></TableHead>
-                        <TableHead>Fábrica</TableHead>
-                        <TableHead>Motivo</TableHead>
-                        <TableHead>Tempo Perdido</TableHead>
-                        <TableHead>Observações</TableHead>
-                        <TableHead>Ações</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {filteredLossRecords.length === 0 ? (
-                        <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground italic">Nenhum registro de perda encontrado.</TableCell></TableRow>
-                    ) : filteredLossRecords.map(r => {
-                        const rDate = getRecordDate(r.date);
-                        const rCreatedAt = getRecordDate(r.createdAt);
-                        return (
-                        <TableRow key={r.id}>
-                            <TableCell>{r.operatorId}</TableCell>
-                            <TableCell>{rDate ? format(rDate, 'dd/MM/yyyy') : r.date}</TableCell>
-                            <TableCell className="text-primary font-mono text-[11px] font-bold">
-                                {rCreatedAt ? format(rCreatedAt, 'dd/MM HH:mm') : '-'}
-                            </TableCell>
-                            <TableCell>{r.factory}</TableCell>
-                            <TableCell><Badge className="bg-yellow-500 text-black">{r.lossReason}</Badge></TableCell>
-                            <TableCell className="text-red-500 font-bold">{r.timeLost} min</TableCell>
-                            <TableCell className="max-w-[150px] truncate text-[10px] text-muted-foreground italic">
-                                {r.observations || '-'}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" onClick={() => handleEdit('loss', r)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleDelete('lossRecords', r.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                              </div>
-                            </TableCell>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2">
+                        Histórico de Perdas
+                        {isRestrictedByPerformance && <Badge variant="secondary" className="text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"><Zap className="h-2 w-2" /> Auto (15 dias)</Badge>}
+                    </CardTitle>
+                    <CardDescription>Paradas e inatividades registradas.</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => exportToExcel(filteredLossRecords, 'Perdas')}><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar</Button>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Técnico</TableHead>
+                            <TableHead>Data</TableHead>
+                            <TableHead className="text-primary font-bold"><div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Apontamento</div></TableHead>
+                            <TableHead>Fábrica</TableHead>
+                            <TableHead>Motivo</TableHead>
+                            <TableHead>Tempo Perdido</TableHead>
+                            <TableHead>Observações</TableHead>
+                            <TableHead>Ações</TableHead>
                         </TableRow>
-                        )
-                    })}
-                </TableBody>
-            </Table>
-        </CardContent>
-      </Card>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredLossRecords.length === 0 ? (
+                            <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground italic">Nenhum registro de perda encontrado.</TableCell></TableRow>
+                        ) : filteredLossRecords.map(r => {
+                            const rDate = getRecordDate(r.date);
+                            const rCreatedAt = getRecordDate(r.createdAt);
+                            return (
+                            <TableRow key={r.id}>
+                                <TableCell>{r.operatorId}</TableCell>
+                                <TableCell>{rDate ? format(rDate, 'dd/MM/yyyy') : r.date}</TableCell>
+                                <TableCell className="text-primary font-mono text-[11px] font-bold">
+                                    {rCreatedAt ? format(rCreatedAt, 'dd/MM HH:mm') : '-'}
+                                </TableCell>
+                                <TableCell>{r.factory}</TableCell>
+                                <TableCell><Badge className="bg-yellow-500 text-black">{r.lossReason}</Badge></TableCell>
+                                <TableCell className="text-red-500 font-bold">{r.timeLost} min</TableCell>
+                                <TableCell className="max-w-[150px] truncate text-[10px] text-muted-foreground italic">
+                                    {r.observations || '-'}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="icon" onClick={() => handleEdit('loss', r)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDelete('lossRecords', r.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                  </div>
+                                </TableCell>
+                            </TableRow>
+                            )
+                        })}
+                    </TableBody>
+                </Table>
+            </CardContent>
+          </Card>
+      </div>
     </div>
   );
 }
+
