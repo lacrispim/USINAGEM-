@@ -67,7 +67,7 @@ const months = [
 ];
 
 const lossReasonDetails = [
-    { value: "MANUTENÇÃO PLANEJADA", description: "LUBRIFICAÇÃO DA MÁQUINA" },
+    { value: "MANUTENÇÃO PLANEJADA", description: "LUBRIFICAÇÃO E PREVENTIVA" },
     { value: "TEMPO DE CAFÉ", description: "PARADA PARA CAFÉ" },
     { value: "LIMPEZA PLANEJADA", description: "LIMPEZA DA MÁQUINA, ÁREA, E CAÇAMBA" },
     { value: "SETUP", description: "SETUP PLANEJADO DE MÁQUINA E SETUP EMERGENCIAL" },
