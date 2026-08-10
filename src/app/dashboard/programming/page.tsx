@@ -126,6 +126,7 @@ const ALL_TECHNICIANS = [
   "Marcos Barbosa"
 ];
 
+// Mapeamento padrão garantindo técnicos em todos os turnos para evitar ociosidade
 const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Gustavo Gozzi'],
@@ -138,7 +139,9 @@ const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
     '3': ['Rodrigo Cantano']
   },
   'ADM': {
-    '1': ['William Martinucci']
+    '1': ['William Martinucci'],
+    '2': ['Daniel Solivo'], // Daniel apoia no 2T ADM
+    '3': ['Rodrigo Cantano'] // Rodrigo apoia no 3T ADM
   }
 };
 
@@ -362,6 +365,7 @@ export default function ProgrammingPage() {
     
     const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
     const novosPlanItems: PlanejamentoItem[] = [];
+    // Ponteiros independentes por recurso para garantir fluxo contínuo
     const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
 
     const concluidos = new Set(
@@ -383,12 +387,13 @@ export default function ProgrammingPage() {
         const cycleTime = job.quantidade > 0 ? prodTime / job.quantidade : prodTime;
 
         let iterations = 0;
-        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 500) {
+        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 1000) {
             iterations++;
             const dayIdx = Math.floor(actualPointer / (SHIFT_MIN * 3));
             const startInDay = actualPointer % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const startOffset = startInDay % SHIFT_MIN;
+            
             const dayDate = addDays(baseDate, dayIdx);
             const dateStr = format(dayDate, 'yyyy-MM-dd');
             const displayDateStr = format(dayDate, 'dd/MM/yyyy');
@@ -400,18 +405,30 @@ export default function ProgrammingPage() {
             const isShiftDisabled = currentDisabled[shiftKey];
             const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
 
+            // Se o turno está desligado ou não tem técnico, pula para o próximo turno IMEDIATAMENTE
             if (isShiftDisabled || !techName) {
                 actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
                 continue;
             }
 
             let winStart = startOffset;
-            for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) winStart = p.start + p.duration; }
-            if (winStart >= SHIFT_MIN - 1) { actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN); continue; }
+            // Ajusta o início da janela ignorando pausas (DDS/Café)
+            for (const p of PAUSAS) { 
+                if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) {
+                    winStart = p.start + p.duration;
+                }
+            }
+
+            // Se o tempo restante no turno for insignificante, pula para o próximo
+            if (winStart >= SHIFT_MIN - 1) { 
+                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN); 
+                continue; 
+            }
 
             const effectiveAvail = SHIFT_MIN - winStart;
             let sInShift = pendingSetup > 0 ? Math.min(pendingSetup, effectiveAvail) : 0;
             pendingSetup -= sInShift;
+            
             let pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
             let qInShift = 0;
             
@@ -450,23 +467,38 @@ export default function ProgrammingPage() {
                     site: normalizeSiteName(job.site)
                 });
             }
+            
+            // Avança o ponteiro exatamente para o fim da tarefa alocada neste turno
             actualPointer = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
-            if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
+            
+            // Se preencheu o turno até o limite, força o pulo para o próximo
+            if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) {
+                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
+            }
         }
         
         lanePointers[laneId] = actualPointer;
         return actualPointer;
     };
 
+    // Flow Shop: Processa cada job em sequência total (E1 -> E2) para evitar ociosidade nas máquinas
     novaFila.forEach(job => {
         const progEnd = allocateTask(job, 'ADM', 0, 'prog', 'stage-prog');
         const e1 = String(job.etapa1 || '').toUpperCase();
         let e1End = progEnd;
-        if (e1.includes('TORNO')) e1End = allocateTask(job, 'TORNO', progEnd, 'torno', 'stage-1');
-        else if (e1.includes('CENTRO')) e1End = allocateTask(job, 'CENTRO', progEnd, 'centro', 'stage-1');
+        
+        if (e1.includes('TORNO')) {
+            e1End = allocateTask(job, 'TORNO', progEnd, 'torno', 'stage-1');
+        } else if (e1.includes('CENTRO')) {
+            e1End = allocateTask(job, 'CENTRO', progEnd, 'centro', 'stage-1');
+        }
+        
         const e2 = String(job.etapa2 || '').toUpperCase();
-        if (e2.includes('TORNO')) allocateTask(job, 'TORNO', e1End, 'torno', 'stage-2');
-        else if (e2.includes('CENTRO')) allocateTask(job, 'CENTRO', e1End, 'centro', 'stage-2');
+        if (e2.includes('TORNO')) {
+            allocateTask(job, 'TORNO', e1End, 'torno', 'stage-2');
+        } else if (e2.includes('CENTRO')) {
+            allocateTask(job, 'CENTRO', e1End, 'centro', 'stage-2');
+        }
     });
 
     const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
@@ -612,7 +644,6 @@ export default function ProgrammingPage() {
             };
         });
         
-        // Reaproveita a âncora existente ou usa hoje se for a primeira vez
         const start = planStartDate ?? startOfDay(new Date());
         setPlanStartDate(start);
         setCurrentDate(start);
@@ -841,7 +872,7 @@ export default function ProgrammingPage() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none">Plano de Carga CNC</h1>
-            <p className="text-[10px] tracking-[0.2em] text-muted-foreground uppercase font-black mt-1 opacity-70">Time Técnico · Jornada 7h Disponíveis</p>
+            <p className="text-[10px] tracking-[0.2em] text-muted-foreground uppercase font-black mt-1 opacity-70">Ocupação Máxima · Todos os Turnos Preenchidos</p>
           </div>
           
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
@@ -855,7 +886,7 @@ export default function ProgrammingPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Deseja limpar todo o planejamento?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Esta ação removerá permanentemente todas as requisições da fila, o cronograma visual e todas as configurações de turnos. Esta operação não pode ser desfeita.
+                    Esta ação removerá permanentemente todas as requisições da fila, o cronograma visual e todas as configurações de turnos.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -875,7 +906,7 @@ export default function ProgrammingPage() {
               <PopoverContent className="w-auto p-0" align="end">
                 <div className="px-3 pt-3 pb-1 border-b border-border/50">
                   <p className="text-[10px] font-black uppercase tracking-widest">Início do plano</p>
-                  <p className="text-[9px] text-muted-foreground">Move todo o cronograma para esta data.</p>
+                  <p className="text-[9px] text-muted-foreground">Define onde a programação começa a preencher os turnos.</p>
                 </div>
                 <Calendar
                   mode="single"
@@ -995,7 +1026,10 @@ export default function ProgrammingPage() {
             return (
                 <div key={d} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
                     <div className="bg-muted/10 p-4 border-b border-border flex justify-between items-center">
-                        <div className="flex items-center gap-4"><span className="text-xl font-bold uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span><span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span></div>
+                        <div className="flex items-center gap-4">
+                            <span className="text-xl font-bold uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
+                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span>
+                        </div>
                     </div>
                     {TURNOS.map(t => {
                         const shiftKey = `${dateStr}_${t.id}`;
@@ -1059,7 +1093,7 @@ export default function ProgrammingPage() {
                   onChange={(e) => setRequisitionFilter(e.target.value)}
                   className="h-full w-full text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus-visible:ring-0 p-0"
                 />
-                {requisitionFilter && (<Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-transparent" onClick={() => setRequisitionFilter('')}><Trash2 className="h-3 w-3 text-muted-foreground" /></Button>)}
+                {requisitionFilter && (<Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-transparent" onClick={() => setRequisitionFilter('')}><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></Button>)}
             </div>
         </CardHeader>
         <CardContent className="p-0">
