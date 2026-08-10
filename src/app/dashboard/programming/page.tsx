@@ -222,6 +222,7 @@ export default function ProgrammingPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const viewInitializedRef = useRef(false);
   
   const [fila, setFila] = useState<JobBase[]>([]);
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
@@ -264,7 +265,14 @@ export default function ProgrammingPage() {
       setTechOverrides(configDoc.techOverrides || {});
       if (configDoc.planStartDate) {
         const parsed = parse(configDoc.planStartDate, 'yyyy-MM-dd', new Date());
-        if (isValid(parsed)) setPlanStartDate(parsed);
+        if (isValid(parsed)) {
+          setPlanStartDate(parsed);
+          // Se for o primeiro carregamento, pula o calendário para o início do plano
+          if (!viewInitializedRef.current) {
+            setCurrentDate(parsed);
+            viewInitializedRef.current = true;
+          }
+        }
       }
     }
     if (planoDoc) { 
@@ -348,6 +356,8 @@ export default function ProgrammingPage() {
   ) => {
     if (!firestore) return;
     
+    // CRÍTICO: Se não houver anchor explícito e tivermos um planStartDate salvo, usamos ele. 
+    // Caso contrário, usamos startOfDay(new Date()) para garantir que o plano não flutue.
     const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
     const novosPlanItems: PlanejamentoItem[] = [];
     const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
@@ -578,6 +588,7 @@ export default function ProgrammingPage() {
         });
         const start = startOfDay(new Date());
         setPlanStartDate(start);
+        setCurrentDate(start);
         await setDoc(doc(firestore, 'programacaoState', 'config'), {
             planStartDate: format(start, 'yyyy-MM-dd'),
             updatedAt: serverTimestamp()
