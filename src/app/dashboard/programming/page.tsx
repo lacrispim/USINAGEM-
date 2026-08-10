@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
@@ -267,7 +268,6 @@ export default function ProgrammingPage() {
         const parsed = parse(configDoc.planStartDate, 'yyyy-MM-dd', new Date());
         if (isValid(parsed)) {
           setPlanStartDate(parsed);
-          // Se for o primeiro carregamento, pula o calendário para o início do plano
           if (!viewInitializedRef.current) {
             setCurrentDate(parsed);
             viewInitializedRef.current = true;
@@ -356,8 +356,6 @@ export default function ProgrammingPage() {
   ) => {
     if (!firestore) return;
     
-    // CRÍTICO: Se não houver anchor explícito e tivermos um planStartDate salvo, usamos ele. 
-    // Caso contrário, usamos startOfDay(new Date()) para garantir que o plano não flutue.
     const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
     const novosPlanItems: PlanejamentoItem[] = [];
     const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
@@ -493,6 +491,26 @@ export default function ProgrammingPage() {
     }
   };
 
+  const handleClearAll = async () => {
+    if (!firestore) return;
+    setFila([]);
+    setPlanejamentoData([]);
+    try {
+      await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: [], updatedAt: serverTimestamp() });
+      await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: [], updatedAt: serverTimestamp() });
+      await setDoc(doc(firestore, 'programacaoState', 'config'), { 
+        planStartDate: null,
+        disabledShifts: {},
+        techOverrides: {},
+        updatedAt: serverTimestamp() 
+      }, { merge: true });
+      setPlanStartDate(null);
+      toast({ title: "Fila Limpa", description: "Todo o planejamento foi removido." });
+    } catch (e) {
+      toast({ title: "Erro", description: "Falha ao limpar dados.", variant: "destructive" });
+    }
+  };
+
   const toggleShift = async (day: Date, shiftId: string) => {
     if (!firestore) return;
     const key = `${format(day, 'yyyy-MM-dd')}_${shiftId}`;
@@ -539,7 +557,7 @@ export default function ProgrammingPage() {
     const newFila = fila.map(j => j.id === id ? { ...j, [field]: value } : j);
     setFila(newFila);
     await recalculatePlan(newFila);
-  }, [fila, disabledShifts, techOverrides, planStartDate]);
+  }, [fila, disabledShifts, techOverrides, planStartDate, planejamentoData]);
 
   const moveJobToPosition = useCallback(async (currentIdx: number, newPos: number) => {
     const targetIdx = Math.max(0, Math.min(fila.length - 1, newPos - 1));
@@ -552,7 +570,7 @@ export default function ProgrammingPage() {
     setFila(newFila);
     await recalculatePlan(newFila);
     toast({ title: "Sequência Alterada", description: `Item movido para a posição ${targetIdx + 1}.` });
-  }, [fila, disabledShifts, techOverrides, planStartDate]);
+  }, [fila, disabledShifts, techOverrides, planStartDate, planejamentoData]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file || !firestore) return;
@@ -669,7 +687,6 @@ export default function ProgrammingPage() {
                       onBlur={(e) => {
                           const newPos = parseInt(e.target.value);
                           if (isNaN(newPos) || newPos < 1) { e.target.value = String(displayIdx); return; }
-                          
                           if (isGlobal) {
                               if (newPos !== globalIdx + 1) moveJobToPosition(globalIdx, newPos);
                           } else {
@@ -817,6 +834,26 @@ export default function ProgrammingPage() {
           </div>
           
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" title="Limpar Todo Planejamento">
+                  <Eraser className="h-5 w-5" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Deseja limpar todo o planejamento?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação removerá permanentemente todas as requisições da fila, o cronograma visual e todas as configurações de turnos. Esta operação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Limpar Tudo</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <Button variant="outline" onClick={handleReanchor} className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none">
               <Anchor className="h-4 w-4 mr-2" /> Reancorar Plano
             </Button>
