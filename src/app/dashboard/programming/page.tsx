@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   ChevronLeft, 
   ChevronRight, 
+  ChevronsLeft,
   Loader, 
   Eraser,
   CalendarDays,
@@ -30,7 +31,7 @@ import {
   Clock,
   CheckCircle2
 } from 'lucide-react';
-import { format, addDays, startOfDay, parse, isValid } from 'date-fns';
+import { format, addDays, startOfDay, parse, isValid, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -610,13 +611,17 @@ export default function ProgrammingPage() {
               etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2', 'Etapa']) || ''),
             };
         });
-        const start = startOfDay(new Date());
+        
+        // Reaproveita a âncora existente ou usa hoje se for a primeira vez
+        const start = planStartDate ?? startOfDay(new Date());
         setPlanStartDate(start);
         setCurrentDate(start);
+        
         await setDoc(doc(firestore, 'programacaoState', 'config'), {
             planStartDate: format(start, 'yyyy-MM-dd'),
             updatedAt: serverTimestamp()
         }, { merge: true });
+        
         await recalculatePlan(novaFila, disabledShifts, techOverrides, start);
         toast({ title: "Sucesso", description: `${novaFila.length} itens importados.` });
       } catch (err) {
@@ -868,8 +873,13 @@ export default function ProgrammingPage() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
+                <div className="px-3 pt-3 pb-1 border-b border-border/50">
+                  <p className="text-[10px] font-black uppercase tracking-widest">Início do plano</p>
+                  <p className="text-[9px] text-muted-foreground">Move todo o cronograma para esta data.</p>
+                </div>
                 <Calendar
                   mode="single"
+                  locale={ptBR}
                   selected={planStartDate || undefined}
                   onSelect={handleSetAnchorDate}
                   initialFocus
@@ -928,10 +938,36 @@ export default function ProgrammingPage() {
 
           <div className="flex items-center bg-card/50 border rounded-lg p-1 w-full md:w-auto justify-center">
             {planStartDate && (
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setCurrentDate(planStartDate)} title="Ir para o início do plano"><ArrowLeftToLine className="h-4 w-4" /></Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-primary" 
+                onClick={() => setCurrentDate(planStartDate)} 
+                title="Ir para o início do plano"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
             )}
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-            <div className="flex items-center gap-2 font-black px-4 text-[11px] min-w-[120px] justify-center text-primary"><CalendarDays className="h-3.5 w-3.5 opacity-60" />{format(currentDate, 'dd/MM/yyyy')}</div>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" className="font-black px-4 text-[11px] min-w-[130px] justify-center text-primary">
+                  <CalendarDays className="h-3.5 w-3.5 opacity-60 mr-2" />
+                  {format(currentDate, 'dd/MM/yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="center">
+                <Calendar
+                  mode="single"
+                  locale={ptBR}
+                  selected={currentDate}
+                  onSelect={(d) => d && setCurrentDate(startOfDay(d))}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
           </div>
         </div>
