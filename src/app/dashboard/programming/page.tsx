@@ -28,11 +28,10 @@ import {
   Cpu,
   Search,
   Anchor,
-  ArrowLeftToLine,
   Clock,
   CheckCircle2
 } from 'lucide-react';
-import { format, addDays, startOfDay, parse, isValid, isSameDay } from 'date-fns';
+import { format, addDays, startOfDay, parse, isValid, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -150,6 +149,10 @@ const PAUSAS = [
   { start: 0, duration: 10, label: 'DDS', icon: Mic },
   { start: 180, duration: 15, label: 'CAFÉ', icon: Coffee }
 ];
+
+// Auxiliares para Escala 6x1 (Domingo de folga)
+const isDomingo = (d: Date) => getDay(d) === 0;
+const nextWorkday = (d: Date) => (isDomingo(d) ? addDays(d, 1) : d);
 
 const normalizeSiteName = (site: string | undefined): string => {
   if (!site) return 'VALINHOS';
@@ -406,18 +409,26 @@ export default function ProgrammingPage() {
 
         let cursor = minStartTime;
         let iterations = 0;
-        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 1000) {
+        // Aumentado para 2000 para suportar pulos de domingo em planos longos
+        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 2000) {
             iterations++;
             const free = nextFree(laneId, cursor);
             cursor = free.start;
 
             const dayIdx = Math.floor(cursor / (SHIFT_MIN * 3));
+            const dayDate = addDays(baseDate, dayIdx);
+            
+            // PULA DOMINGO NO CÁLCULO
+            if (isDomingo(dayDate)) {
+              cursor = (dayIdx + 1) * 3 * SHIFT_MIN; 
+              continue;
+            }
+
             const startInDay = cursor % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const startOffset = startInDay % SHIFT_MIN;
             const shiftAbs = dayIdx * 3 * SHIFT_MIN + shiftIdx * SHIFT_MIN;
             
-            const dayDate = addDays(baseDate, dayIdx);
             const dateStr = format(dayDate, 'yyyy-MM-dd');
             const displayDateStr = format(dayDate, 'dd/MM/yyyy');
             const shiftId = String(shiftIdx + 1);
@@ -501,7 +512,6 @@ export default function ProgrammingPage() {
         return cursor;
     };
 
-    // NOVO MOTOR DE ALOCAÇÃO EM ONDAS
     type OpDef = { job: JobBase; techKey: 'TORNO' | 'CENTRO'; type: 'torno' | 'centro'; order: number; };
     const parseEtapa = (v?: string) => {
         const s = String(v || '').toUpperCase();
@@ -514,10 +524,8 @@ export default function ProgrammingPage() {
     const opsPresas: OpDef[] = [];
     const completion: Record<string, number> = {};
 
-    // 1. Onda: Programação (sempre independente das máquinas)
     novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
 
-    // 2. Classificação de Dependência
     novaFila.forEach((job, order) => {
         const e1 = parseEtapa(job.etapa1);
         const e2 = parseEtapa(job.etapa2);
@@ -527,12 +535,10 @@ export default function ProgrammingPage() {
         if (segunda) opsPresas.push({ job, ...segunda, order });
     });
 
-    // 3. Onda: Operações Livres (ocupam os espaços mais cedo possíveis)
     opsLivres.sort((a, b) => a.order - b.order).forEach(op => {
         completion[op.job.id] = allocateTask(op.job, op.techKey, 0, op.type);
     });
 
-    // 4. Onda: Operações Presas (preenchem buracos respeitando a etapa anterior)
     opsPresas.sort((a, b) => a.order - b.order).forEach(op => {
         allocateTask(op.job, op.techKey, completion[op.job.id] ?? 0, op.type);
     });
@@ -547,9 +553,26 @@ export default function ProgrammingPage() {
     }
   };
 
+  // Filtra dias visíveis pulando domingos
+  const diasVisiveis = useMemo(() => {
+    const dias: Date[] = [];
+    let cursor = startOfDay(currentDate);
+    while (dias.length < 5) {
+      if (!isDomingo(cursor)) dias.push(cursor);
+      cursor = addDays(cursor, 1);
+    }
+    return dias;
+  }, [currentDate]);
+
+  const stepDay = (dir: 1 | -1) =>
+    setCurrentDate(p => {
+      const n = addDays(p, dir);
+      return isDomingo(n) ? addDays(n, dir) : n; 
+    });
+
   const handleSetAnchorDate = async (date: Date | undefined) => {
     if (!firestore || !date) return;
-    const selectedDate = startOfDay(date);
+    const selectedDate = nextWorkday(startOfDay(date));
     setPlanStartDate(selectedDate);
     setCurrentDate(selectedDate);
     setIsAnchorPopoverOpen(false);
@@ -680,7 +703,7 @@ export default function ProgrammingPage() {
             };
         });
         
-        const start = planStartDate ?? startOfDay(new Date());
+        const start = nextWorkday(planStartDate ?? startOfDay(new Date()));
         setPlanStartDate(start);
         setCurrentDate(start);
         
@@ -716,7 +739,7 @@ export default function ProgrammingPage() {
       prog: Number(newItem.prog) || 0,
       site: normalizeSiteName(newItem.site),
       etapa1: newItem.etapa1 || '',
-      etapa2: newItem.etapa2 || []
+      etapa2: newItem.etapa2 || ''
     };
     const nf = [...fila, job]; setFila(nf); await recalculatePlan(nf); setIsAddDialogOpen(false);
     setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: '', etapa2: '' });
@@ -908,7 +931,7 @@ export default function ProgrammingPage() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none">Plano de Carga CNC</h1>
-            <p className="text-[10px] tracking-[0.2em] text-muted-foreground uppercase font-black mt-1 opacity-70">Ocupação Máxima · Todos os Turnos Preenchidos</p>
+            <p className="text-[10px] tracking-[0.2em] text-muted-foreground uppercase font-black mt-1 opacity-70">Escala 6x1 · Domingos de Folga</p>
           </div>
           
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
@@ -949,6 +972,7 @@ export default function ProgrammingPage() {
                   locale={ptBR}
                   selected={planStartDate || undefined}
                   onSelect={handleSetAnchorDate}
+                  disabled={isDomingo}
                   initialFocus
                 />
               </PopoverContent>
@@ -1015,7 +1039,7 @@ export default function ProgrammingPage() {
                 <ChevronsLeft className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(p => addDays(p, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => stepDay(-1)}><ChevronLeft className="h-4 w-4" /></Button>
             
             <Popover>
               <PopoverTrigger asChild>
@@ -1030,12 +1054,13 @@ export default function ProgrammingPage() {
                   locale={ptBR}
                   selected={currentDate}
                   onSelect={(d) => d && setCurrentDate(startOfDay(d))}
+                  disabled={isDomingo}
                   initialFocus
                 />
               </PopoverContent>
             </Popover>
 
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentDate(p => addDays(p, 1))}><ChevronRight className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => stepDay(1)}><ChevronRight className="h-4 w-4" /></Button>
           </div>
         </div>
       </div>
@@ -1055,12 +1080,11 @@ export default function ProgrammingPage() {
       </Dialog>
 
       <div className="space-y-6">
-        {[0, 1, 2, 3, 4].map(d => {
-            const day = addDays(currentDate, d);
+        {diasVisiveis.map((day, d) => {
             const displayDate = format(day, 'dd/MM/yyyy');
             const dateStr = format(day, 'yyyy-MM-dd');
             return (
-                <div key={d} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
+                <div key={dateStr} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
                     <div className="bg-muted/10 p-4 border-b border-border flex justify-between items-center">
                         <div className="flex items-center gap-4">
                             <span className="text-xl font-bold uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span>
