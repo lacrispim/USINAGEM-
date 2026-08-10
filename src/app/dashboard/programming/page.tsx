@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
@@ -126,7 +127,6 @@ const ALL_TECHNICIANS = [
   "Marcos Barbosa"
 ];
 
-// Mapeamento padrão garantindo técnicos em todos os turnos para evitar ociosidade
 const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Gustavo Gozzi'],
@@ -140,8 +140,8 @@ const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
   },
   'ADM': {
     '1': ['William Martinucci'],
-    '2': ['Daniel Solivo'], // Daniel apoia no 2T ADM
-    '3': ['Rodrigo Cantano'] // Rodrigo apoia no 3T ADM
+    '2': ['Daniel Solivo'], 
+    '3': ['Rodrigo Cantano']
   }
 };
 
@@ -186,7 +186,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
         item.isConcluded && "opacity-40 grayscale-[0.5] border-green-500 border-2"
       )} 
       style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
-      title={`#${item.requisicao} - ${item.nomeDaPeca} [${normalizeSiteName(item.site)}] - Tempo neste turno: ${Math.round(totalMin)}min ${item.isConcluded ? '(Concluído)' : ''}`}
+      title={`#${item.requisicao} - ${item.nomeDaPeca} [${normalizeSiteName(item.site)}] - Tempo: ${Math.round(totalMin)}min ${item.isConcluded ? '(Concluído)' : ''}`}
     >
       {item.setupMinutos > 0 && (
         <div 
@@ -365,34 +365,58 @@ export default function ProgrammingPage() {
     
     const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
     const novosPlanItems: PlanejamentoItem[] = [];
-    // Ponteiros independentes por recurso para garantir fluxo contínuo
-    const lanePointers: Record<string, number> = { 'TORNO_0': 0, 'CENTRO_0': 0, 'ADM_0': 0 }; 
+    
+    // Rastreamento de intervalos ocupados por raia para permitir backfilling
+    const laneBusy: Record<string, { start: number; end: number }[]> = {
+      'TORNO_0': [], 'CENTRO_0': [], 'ADM_0': []
+    };
+
+    const nextFree = (laneId: string, from: number) => {
+      let t = from;
+      const intervals = laneBusy[laneId] || [];
+      for (const iv of intervals) {
+        if (iv.end <= t + 0.1) continue;
+        if (iv.start > t + 0.1) return { start: t, limit: iv.start };
+        t = iv.end;
+      }
+      return { start: t, limit: Infinity };
+    };
+
+    const occupy = (laneId: string, start: number, end: number) => {
+      if (!laneBusy[laneId]) laneBusy[laneId] = [];
+      laneBusy[laneId].push({ start, end });
+      laneBusy[laneId].sort((a, b) => a.start - b.start);
+    };
 
     const concluidos = new Set(
         planejamentoData.filter(i => i.isConcluded)
             .map(i => `${i.jobId}|${i.techKey}|${i.dataExecucao}|${i.turno}`)
     );
 
-    const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog', stageSuffix: string) => {
+    const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
         let prodTime = Number(job[type]) || 0;
         let setupTime = (type === 'torno' || type === 'centro') ? (Number(job.setup) || 20) : 0;
         if (prodTime <= 0 && setupTime <= 0 && type !== 'prog') return minStartTime;
         if (type === 'prog' && prodTime <= 0) return minStartTime;
         
         const laneId = `${techKey}_0`;
-        let actualPointer = Math.max(lanePointers[laneId] || 0, minStartTime);
         let pendingSetup = setupTime;
         let pendingProd = prodTime;
         let doneProdTime = 0;
         const cycleTime = job.quantidade > 0 ? prodTime / job.quantidade : prodTime;
 
+        let cursor = minStartTime;
         let iterations = 0;
         while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 1000) {
             iterations++;
-            const dayIdx = Math.floor(actualPointer / (SHIFT_MIN * 3));
-            const startInDay = actualPointer % (SHIFT_MIN * 3);
+            const free = nextFree(laneId, cursor);
+            cursor = free.start;
+
+            const dayIdx = Math.floor(cursor / (SHIFT_MIN * 3));
+            const startInDay = cursor % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const startOffset = startInDay % SHIFT_MIN;
+            const shiftAbs = dayIdx * 3 * SHIFT_MIN + shiftIdx * SHIFT_MIN;
             
             const dayDate = addDays(baseDate, dayIdx);
             const dateStr = format(dayDate, 'yyyy-MM-dd');
@@ -405,31 +429,31 @@ export default function ProgrammingPage() {
             const isShiftDisabled = currentDisabled[shiftKey];
             const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
 
-            // Se o turno está desligado ou não tem técnico, pula para o próximo turno IMEDIATAMENTE
             if (isShiftDisabled || !techName) {
-                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
+                cursor = shiftAbs + SHIFT_MIN;
                 continue;
             }
 
             let winStart = startOffset;
-            // Ajusta o início da janela ignorando pausas (DDS/Café)
             for (const p of PAUSAS) { 
                 if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) {
                     winStart = p.start + p.duration;
                 }
             }
 
-            // Se o tempo restante no turno for insignificante, pula para o próximo
-            if (winStart >= SHIFT_MIN - 1) { 
-                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN); 
-                continue; 
+            const abs = shiftAbs + winStart;
+            const availInShift = SHIFT_MIN - winStart;
+            const availGlobal = Math.min(availInShift, free.limit - abs);
+
+            if (availGlobal < 1) {
+                cursor = Number.isFinite(free.limit) ? Math.max(free.limit, abs) : shiftAbs + SHIFT_MIN;
+                continue;
             }
 
-            const effectiveAvail = SHIFT_MIN - winStart;
-            let sInShift = pendingSetup > 0 ? Math.min(pendingSetup, effectiveAvail) : 0;
+            let sInShift = pendingSetup > 0 ? Math.min(pendingSetup, availGlobal) : 0;
             pendingSetup -= sInShift;
             
-            let pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
+            let pInShift = Math.min(availGlobal - sInShift, pendingProd);
             let qInShift = 0;
             
             if (pInShift > 0 && cycleTime > 0) {
@@ -438,12 +462,16 @@ export default function ProgrammingPage() {
                 qInShift = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7)) - before;
                 pendingProd -= pInShift;
             } else if (pInShift > 0 && pendingProd > 0 && cycleTime <= 0) {
-                pInShift = Math.min(effectiveAvail - sInShift, pendingProd);
+                pInShift = Math.min(availGlobal - sInShift, pendingProd);
                 pendingProd -= pInShift;
             }
 
             if (sInShift > 0 || pInShift > 0) {
-                const deterministicId = `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${type}-${stageSuffix}`;
+                const duration = sInShift + pInShift;
+                occupy(laneId, abs, abs + duration);
+                
+                // ID determinístico para preservar estado de conclusão
+                const deterministicId = `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${Math.round(winStart)}`;
                 const concludedKey = `${job.id}|${techKey}|${displayDateStr}|${shiftId}`;
 
                 novosPlanItems.push({ 
@@ -466,39 +494,27 @@ export default function ProgrammingPage() {
                     isConcluded: concluidos.has(concludedKey),
                     site: normalizeSiteName(job.site)
                 });
-            }
-            
-            // Avança o ponteiro exatamente para o fim da tarefa alocada neste turno
-            actualPointer = (dayIdx * 3 * SHIFT_MIN) + (shiftIdx * SHIFT_MIN) + winStart + sInShift + pInShift;
-            
-            // Se preencheu o turno até o limite, força o pulo para o próximo
-            if (winStart + sInShift + pInShift >= SHIFT_MIN - 0.1) {
-                actualPointer = (dayIdx * 3 * SHIFT_MIN) + ((shiftIdx + 1) * SHIFT_MIN);
+                
+                cursor = abs + duration;
+            } else {
+                cursor = shiftAbs + SHIFT_MIN;
             }
         }
-        
-        lanePointers[laneId] = actualPointer;
-        return actualPointer;
+        return cursor;
     };
 
-    // Flow Shop: Processa cada job em sequência total (E1 -> E2) para evitar ociosidade nas máquinas
+    // Flow Shop: Processa cada job em sequência (Prog -> E1 -> E2) para garantir preenchimento de lacunas
     novaFila.forEach(job => {
-        const progEnd = allocateTask(job, 'ADM', 0, 'prog', 'stage-prog');
+        const progEnd = allocateTask(job, 'ADM', 0, 'prog');
+        
         const e1 = String(job.etapa1 || '').toUpperCase();
         let e1End = progEnd;
-        
-        if (e1.includes('TORNO')) {
-            e1End = allocateTask(job, 'TORNO', progEnd, 'torno', 'stage-1');
-        } else if (e1.includes('CENTRO')) {
-            e1End = allocateTask(job, 'CENTRO', progEnd, 'centro', 'stage-1');
-        }
+        if (e1.includes('TORNO')) e1End = allocateTask(job, 'TORNO', progEnd, 'torno');
+        else if (e1.includes('CENTRO')) e1End = allocateTask(job, 'CENTRO', progEnd, 'centro');
         
         const e2 = String(job.etapa2 || '').toUpperCase();
-        if (e2.includes('TORNO')) {
-            allocateTask(job, 'TORNO', e1End, 'torno', 'stage-2');
-        } else if (e2.includes('CENTRO')) {
-            allocateTask(job, 'CENTRO', e1End, 'centro', 'stage-2');
-        }
+        if (e2.includes('TORNO')) allocateTask(job, 'TORNO', e1End, 'torno');
+        else if (e2.includes('CENTRO')) allocateTask(job, 'CENTRO', e1End, 'centro');
     });
 
     const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
