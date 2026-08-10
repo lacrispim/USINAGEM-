@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
@@ -69,6 +68,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 interface JobBase {
   id: string;
@@ -475,17 +476,18 @@ export default function ProgrammingPage() {
     }
   };
 
-  const handleReanchor = async () => {
-    if (!firestore) return;
-    const now = startOfDay(new Date());
-    setPlanStartDate(now);
+  const handleSetAnchorDate = async (date: Date | undefined) => {
+    if (!firestore || !date) return;
+    const selectedDate = startOfDay(date);
+    setPlanStartDate(selectedDate);
+    setCurrentDate(selectedDate);
     try {
       await setDoc(doc(firestore, 'programacaoState', 'config'), {
-        planStartDate: format(now, 'yyyy-MM-dd'),
+        planStartDate: format(selectedDate, 'yyyy-MM-dd'),
         updatedAt: serverTimestamp()
       }, { merge: true });
-      await recalculatePlan(fila, disabledShifts, techOverrides, now);
-      toast({ title: "Âncora Atualizada", description: "O cronograma agora começa a partir de hoje." });
+      await recalculatePlan(fila, disabledShifts, techOverrides, selectedDate);
+      toast({ title: "Âncora Atualizada", description: `O cronograma agora começa em ${format(selectedDate, 'dd/MM/yyyy')}.` });
     } catch (e) {
       toast({ title: "Erro", description: "Falha ao atualizar âncora.", variant: "destructive" });
     }
@@ -601,7 +603,7 @@ export default function ProgrammingPage() {
               prog: Number(findVal(row, ['Tempo Programação Minutos', 'Tempo de Planejamento Programação Minutos todas as peças solicitadas', 'prog', 'programação', 'Programação Minutos']) || 0),
               site: site,
               etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || ''),
-              etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2']) || ''),
+              etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2', 'Etapa']) || ''),
             };
         });
         const start = startOfDay(new Date());
@@ -854,9 +856,23 @@ export default function ProgrammingPage() {
               </AlertDialogContent>
             </AlertDialog>
 
-            <Button variant="outline" onClick={handleReanchor} className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none">
-              <Anchor className="h-4 w-4 mr-2" /> Reancorar Plano
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none">
+                  <Anchor className="h-4 w-4 mr-2" /> 
+                  {planStartDate ? `Início: ${format(planStartDate, 'dd/MM/yy')}` : "Definir Âncora"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={planStartDate || undefined}
+                  onSelect={handleSetAnchorDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild><Button variant="secondary" className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button></DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
