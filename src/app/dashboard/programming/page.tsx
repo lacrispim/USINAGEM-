@@ -366,7 +366,6 @@ export default function ProgrammingPage() {
     const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
     const novosPlanItems: PlanejamentoItem[] = [];
     
-    // Rastreamento de intervalos ocupados por raia para permitir backfilling
     const laneBusy: Record<string, { start: number; end: number }[]> = {
       'TORNO_0': [], 'CENTRO_0': [], 'ADM_0': []
     };
@@ -470,7 +469,6 @@ export default function ProgrammingPage() {
                 const duration = sInShift + pInShift;
                 occupy(laneId, abs, abs + duration);
                 
-                // ID determinístico para preservar estado de conclusão
                 const deterministicId = `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${Math.round(winStart)}`;
                 const concludedKey = `${job.id}|${techKey}|${displayDateStr}|${shiftId}`;
 
@@ -503,18 +501,40 @@ export default function ProgrammingPage() {
         return cursor;
     };
 
-    // Flow Shop: Processa cada job em sequência (Prog -> E1 -> E2) para garantir preenchimento de lacunas
-    novaFila.forEach(job => {
-        const progEnd = allocateTask(job, 'ADM', 0, 'prog');
-        
-        const e1 = String(job.etapa1 || '').toUpperCase();
-        let e1End = progEnd;
-        if (e1.includes('TORNO')) e1End = allocateTask(job, 'TORNO', progEnd, 'torno');
-        else if (e1.includes('CENTRO')) e1End = allocateTask(job, 'CENTRO', progEnd, 'centro');
-        
-        const e2 = String(job.etapa2 || '').toUpperCase();
-        if (e2.includes('TORNO')) allocateTask(job, 'TORNO', e1End, 'torno');
-        else if (e2.includes('CENTRO')) allocateTask(job, 'CENTRO', e1End, 'centro');
+    // NOVO MOTOR DE ALOCAÇÃO EM ONDAS
+    type OpDef = { job: JobBase; techKey: 'TORNO' | 'CENTRO'; type: 'torno' | 'centro'; order: number; };
+    const parseEtapa = (v?: string) => {
+        const s = String(v || '').toUpperCase();
+        if (s.includes('TORNO')) return { techKey: 'TORNO' as const, type: 'torno' as const };
+        if (s.includes('CENTRO')) return { techKey: 'CENTRO' as const, type: 'centro' as const };
+        return null;
+    };
+
+    const opsLivres: OpDef[] = [];
+    const opsPresas: OpDef[] = [];
+    const completion: Record<string, number> = {};
+
+    // 1. Onda: Programação (sempre independente das máquinas)
+    novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
+
+    // 2. Classificação de Dependência
+    novaFila.forEach((job, order) => {
+        const e1 = parseEtapa(job.etapa1);
+        const e2 = parseEtapa(job.etapa2);
+        const primeira = e1 ?? e2;
+        const segunda = e1 && e2 ? e2 : null;
+        if (primeira) opsLivres.push({ job, ...primeira, order });
+        if (segunda) opsPresas.push({ job, ...segunda, order });
+    });
+
+    // 3. Onda: Operações Livres (ocupam os espaços mais cedo possíveis)
+    opsLivres.sort((a, b) => a.order - b.order).forEach(op => {
+        completion[op.job.id] = allocateTask(op.job, op.techKey, 0, op.type);
+    });
+
+    // 4. Onda: Operações Presas (preenchem buracos respeitando a etapa anterior)
+    opsPresas.sort((a, b) => a.order - b.order).forEach(op => {
+        allocateTask(op.job, op.techKey, completion[op.job.id] ?? 0, op.type);
     });
 
     const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
@@ -696,7 +716,7 @@ export default function ProgrammingPage() {
       prog: Number(newItem.prog) || 0,
       site: normalizeSiteName(newItem.site),
       etapa1: newItem.etapa1 || '',
-      etapa2: newItem.etapa2 || ''
+      etapa2: newItem.etapa2 || []
     };
     const nf = [...fila, job]; setFila(nf); await recalculatePlan(nf); setIsAddDialogOpen(false);
     setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: '', etapa2: '' });
