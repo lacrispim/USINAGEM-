@@ -216,6 +216,7 @@ const LossHistoryTable = memo(({ records, isRestricted, onEdit, onDelete, onExpo
                             <TableHead>Data</TableHead>
                             <TableHead className="text-primary font-bold"><div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Apontamento</div></TableHead>
                             <TableHead>Fábrica</TableHead>
+                            <TableHead>Nº Forms</TableHead>
                             <TableHead>Motivo</TableHead>
                             <TableHead>Tempo Perdido</TableHead>
                             <TableHead>Observações</TableHead>
@@ -224,7 +225,7 @@ const LossHistoryTable = memo(({ records, isRestricted, onEdit, onDelete, onExpo
                     </TableHeader>
                     <TableBody>
                         {records.length === 0 ? (
-                            <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground italic">Nenhum registro de perda encontrado.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground italic">Nenhum registro de perda encontrado.</TableCell></TableRow>
                         ) : records.map((r: any) => {
                             const rDate = getRecordDate(r.date);
                             const rCreatedAt = getRecordDate(r.createdAt);
@@ -236,6 +237,7 @@ const LossHistoryTable = memo(({ records, isRestricted, onEdit, onDelete, onExpo
                                     {rCreatedAt ? format(rCreatedAt, 'dd/MM HH:mm') : '-'}
                                 </TableCell>
                                 <TableCell>{r.factory}</TableCell>
+                                <TableCell className="font-mono font-bold">{r.formsNumber ? `#${r.formsNumber}` : '-'}</TableCell>
                                 <TableCell><Badge className="bg-yellow-500 text-black">{r.lossReason}</Badge></TableCell>
                                 <TableCell className="text-red-500 font-bold">{r.timeLost} min</TableCell>
                                 <TableCell className="max-w-[150px] truncate text-[10px] text-muted-foreground italic">
@@ -322,7 +324,8 @@ export default function ProductionRegistryPage() {
       machine: '',
       operatorId: '',
       factory: '',
-      lossReason: ''
+      lossReason: '',
+      formsNumber: ''
     }
   });
 
@@ -652,9 +655,14 @@ export default function ProductionRegistryPage() {
                         <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Fábrica" /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
                     )} />
                 </div>
-                <FormField control={lossForm.control} name="machine" render={({field}) => (
-                    <FormItem><FormLabel>Máquina</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Escolha a Máquina" /></SelectTrigger></FormControl><SelectContent><SelectItem value="TORNO CNC CENTUR 30">TORNO CNC</SelectItem><SelectItem value="CENTRO DE USINAGEM D600">CENTRO</SelectItem></SelectContent></Select></FormItem>
-                )} />
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={lossForm.control} name="machine" render={({field}) => (
+                        <FormItem><FormLabel>Máquina</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue placeholder="Escolha a Máquina" /></SelectTrigger></FormControl><SelectContent><SelectItem value="TORNO CNC CENTUR 30">TORNO CNC</SelectItem><SelectItem value="CENTRO DE USINAGEM D600">CENTRO</SelectItem></SelectContent></Select></FormItem>
+                    )} />
+                    <FormField control={lossForm.control} name="formsNumber" render={({field}) => (
+                        <FormItem><FormLabel>Nº Forms</FormLabel><FormControl><Input placeholder="Ex: 815" {...field} /></FormControl></FormItem>
+                    )} />
+                </div>
                 <FormField control={lossForm.control} name="observations" render={({field}) => (
                     <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Descreva o motivo da parada..." className="min-h-[80px]" {...field} /></FormControl></FormItem>
                 )} />
@@ -728,6 +736,11 @@ export default function ProductionRegistryPage() {
                     )} />
                     <FormField control={editLossForm.control} name="factory" render={({field}) => (
                         <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
+                    )} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={editLossForm.control} name="formsNumber" render={({field}) => (
+                        <FormItem><FormLabel>Nº Forms</FormLabel><FormControl><Input placeholder="Ex: 815" {...field} /></FormControl></FormItem>
                     )} />
                 </div>
                 <FormField control={editLossForm.control} name="observations" render={({field}) => (
