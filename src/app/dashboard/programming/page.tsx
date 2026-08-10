@@ -240,6 +240,7 @@ export default function ProgrammingPage() {
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
+  const [isAnchorPopoverOpen, setIsAnchorPopoverOpen] = useState(false);
   const [activeSwap, setActiveSwap] = useState<{ day: string, shiftId: string, category: string, currentTech: string } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
 
@@ -268,9 +269,10 @@ export default function ProgrammingPage() {
       if (configDoc.planStartDate) {
         const parsed = parse(configDoc.planStartDate, 'yyyy-MM-dd', new Date());
         if (isValid(parsed)) {
-          setPlanStartDate(parsed);
+          const base = startOfDay(parsed);
+          setPlanStartDate(base);
           if (!viewInitializedRef.current) {
-            setCurrentDate(parsed);
+            setCurrentDate(base);
             viewInitializedRef.current = true;
           }
         }
@@ -481,6 +483,8 @@ export default function ProgrammingPage() {
     const selectedDate = startOfDay(date);
     setPlanStartDate(selectedDate);
     setCurrentDate(selectedDate);
+    setIsAnchorPopoverOpen(false);
+    
     try {
       await setDoc(doc(firestore, 'programacaoState', 'config'), {
         planStartDate: format(selectedDate, 'yyyy-MM-dd'),
@@ -856,7 +860,7 @@ export default function ProgrammingPage() {
               </AlertDialogContent>
             </AlertDialog>
 
-            <Popover>
+            <Popover open={isAnchorPopoverOpen} onOpenChange={setIsAnchorPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none">
                   <Anchor className="h-4 w-4 mr-2" /> 
