@@ -126,6 +126,7 @@ const ALL_TECHNICIANS = [
   "Marcos Barbosa"
 ];
 
+// Configuração atualizada: ADM apenas no 1T com William Martinucci
 const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Gustavo Gozzi'],
@@ -138,9 +139,7 @@ const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
     '3': ['Rodrigo Cantano']
   },
   'ADM': {
-    '1': ['William Martinucci'],
-    '2': ['Daniel Solivo'], 
-    '3': ['Rodrigo Cantano']
+    '1': ['William Martinucci']
   }
 };
 
@@ -409,7 +408,6 @@ export default function ProgrammingPage() {
 
         let cursor = minStartTime;
         let iterations = 0;
-        // Aumentado para 2000 para suportar pulos de domingo em planos longos
         while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 2000) {
             iterations++;
             const free = nextFree(laneId, cursor);
@@ -418,7 +416,6 @@ export default function ProgrammingPage() {
             const dayIdx = Math.floor(cursor / (SHIFT_MIN * 3));
             const dayDate = addDays(baseDate, dayIdx);
             
-            // PULA DOMINGO NO CÁLCULO
             if (isDomingo(dayDate)) {
               cursor = (dayIdx + 1) * 3 * SHIFT_MIN; 
               continue;
@@ -553,7 +550,6 @@ export default function ProgrammingPage() {
     }
   };
 
-  // Filtra dias visíveis pulando domingos
   const diasVisiveis = useMemo(() => {
     const dias: Date[] = [];
     let cursor = startOfDay(currentDate);
