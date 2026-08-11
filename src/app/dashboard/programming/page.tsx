@@ -14,6 +14,7 @@ import {
   ArrowUp,
   ArrowDown,
   FileUp,
+  FileDown,
   Coffee,
   Mic,
   Check,
@@ -645,6 +646,39 @@ export default function ProgrammingPage() {
     reader.readAsArrayBuffer(file);
   };
 
+  const handleExport = () => {
+    const exportData = fila.map((job, idx) => {
+      const stats = jobCompletionStats.get(job.id);
+      const isFullyConcluded = stats && stats.total > 0 && stats.total === stats.concluded;
+      const statusText = isFullyConcluded ? 'CONCLUÍDO' : (stats && stats.concluded > 0 ? 'EM ANDAMENTO' : 'PENDENTE');
+      const calculatedDate = jobStartDates.get(job.id);
+      
+      return {
+        'Posição': idx + 1,
+        'Status': statusText,
+        'Data Planejada': job.dataDesejada || (calculatedDate ? calculatedDate : 'PENDENTE'),
+        'Turno': job.turnoDesejado || 'AUTO',
+        'Fábrica (Site)': job.site,
+        'Etapa 1': job.etapa1,
+        'Etapa 2': job.etapa2,
+        'Requisição': job.requisicao,
+        'Peça': job.nomeDaPeca,
+        'Quantidade': job.quantidade,
+        'Tempo Torno (min)': job.torno,
+        'Tempo Centro (min)': job.centro,
+        'Tempo Setup (min)': job.setup,
+        'Tempo Prog (min)': job.prog
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Planejamento");
+    XLSX.writeFile(wb, `planejamento_usinagem_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    
+    toast({ title: "Sucesso", description: "Planilha exportada com sucesso." });
+  };
+
   const handleAddManual = async () => {
     if (!newItem.requisicao || !newItem.nomeDaPeca) { toast({ title: "Erro", description: "Preencha Requisição e Peça.", variant: "destructive" }); return; }
     const job: JobBase = {
@@ -704,7 +738,13 @@ export default function ProgrammingPage() {
             <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" title="Limpar Todo Planejamento"><Eraser className="h-5 w-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Deseja limpar todo o planejamento?</AlertDialogTitle><AlertDialogDescription>Esta ação removerá permanentemente todas as requisições da fila, o cronograma visual e todas as configurações de turnos.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleClearAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Limpar Tudo</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
             <Popover open={isAnchorPopoverOpen} onOpenChange={setIsAnchorPopoverOpen}><PopoverTrigger asChild><Button variant="outline" className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none"><Anchor className="h-4 w-4 mr-2" /> {planStartDate ? `Início: ${format(planStartDate, 'dd/MM/yy')}` : "Definir Âncora"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="end"><div className="px-3 pt-3 pb-1 border-b border-border/50"><p className="text-[10px] font-black uppercase tracking-widest">Início do plano</p><p className="text-[9px] text-muted-foreground">Define onde a programação começa a preencher os turnos.</p></div><Calendar mode="single" locale={ptBR} selected={planStartDate || undefined} onSelect={handleSetAnchorDate} disabled={isDomingo} initialFocus/></PopoverContent></Popover>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}><DialogTrigger asChild><Button variant="secondary" className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button></DialogTrigger><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Adicionar Requisição Manual</DialogTitle></DialogHeader><div className="grid gap-4 py-4"><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Requisição</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} /></div><div className="space-y-2"><Label>Nome da Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} /></div></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Etapa 1</Label><Input placeholder="TORNO ou CENTRO" value={newItem.etapa1} onChange={e => setNewItem({...newItem, etapa1: e.target.value.toUpperCase()})} /></div><div className="space-y-2"><Label>Etapa 2</Label><Input placeholder="TORNO ou CENTRO" value={newItem.etapa2} onChange={e => setNewItem({...newItem, etapa2: e.target.value.toUpperCase()})} /></div></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Turno Desejado</Label><Select value={newItem.turnoDesejado || "AUTO"} onValueChange={v => setNewItem({...newItem, turnoDesejado: v === "AUTO" ? "" : v})}><SelectTrigger><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></div></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div><div className="space-y-2"><Label>Setup (min)</Label><Input type="number" value={newItem.setup} onChange={e => setNewItem({...newItem, setup: Number(e.target.value)})} /></div></div><div className="grid grid-cols-3 gap-4"><div className="space-y-2"><Label>Torno (min)</Label><Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} /></div><div className="space-y-2"><Label>Centro (min)</Label><Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})} /></div><div className="space-y-2"><Label>Prog (min)</Label><Input type="number" value={newItem.prog} onChange={e => setNewItem({...newItem, prog: Number(e.target.value)})} /></div></div></div><DialogFooter><Button onClick={handleAddManual} className="w-full">Adicionar na Fila</Button></DialogFooter></DialogContent></Dialog>
-            <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" /><Button className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha</Button>
+            <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
+            <Button className="h-10 bg-primary text-primary-foreground font-black text-[10px] uppercase flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+              {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha
+            </Button>
+            <Button variant="outline" className="h-10 text-[10px] font-black uppercase flex-1 sm:flex-none" onClick={handleExport}>
+              <FileDown className="h-4 w-4 mr-2" /> Exportar Plano
+            </Button>
           </div>
         </div>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4"><div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1 w-full md:w-auto"><Filter className="h-3.5 w-3.5 text-muted-foreground ml-2" /><Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}><SelectTrigger className="h-9 w-[160px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0"><SelectValue placeholder="Fábrica" /></SelectTrigger><SelectContent><SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><div className="h-4 w-px bg-border/50" /><Cpu className="h-3.5 w-3.5 text-muted-foreground ml-2" /><Select value={selectedEquipmentFilter} onValueChange={setSelectedEquipmentFilter}><SelectTrigger className="h-9 w-[140px] text-[10px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0"><SelectValue placeholder="Equipamento" /></SelectTrigger><SelectContent><SelectItem value="all">TODOS</SelectItem><SelectItem value="TORNO">TORNO CNC</SelectItem><SelectItem value="CENTRO">CENTRO CNC</SelectItem><SelectItem value="ADM">PROGRAMAÇÃO</SelectItem></SelectContent></Select></div><div className="flex items-center bg-card/50 border rounded-lg p-1 w-full md:w-auto justify-center">{planStartDate && (<Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setCurrentDate(planStartDate)} title="Ir para o início do plano"><ChevronsLeft className="h-4 w-4" /></Button>)}<Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => stepDay(-1)}><ChevronLeft className="h-4 w-4" /></Button><Popover><PopoverTrigger asChild><Button variant="ghost" className="font-black px-4 text-[11px] min-w-[130px] justify-center text-primary"><CalendarDays className="h-3.5 w-3.5 opacity-60 mr-2" />{format(currentDate, 'dd/MM/yyyy')}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" locale={ptBR} selected={currentDate} onSelect={(d) => d && setCurrentDate(startOfDay(d))} disabled={isDomingo} initialFocus/></PopoverContent></Popover><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => stepDay(1)}><ChevronRight className="h-4 w-4" /></Button></div></div>
