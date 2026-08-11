@@ -85,6 +85,7 @@ interface JobBase {
   etapa1: string;
   etapa2: string;
   dataDesejada?: string; // Formato YYYY-MM-DD
+  turnoDesejado?: string; // '1', '2', '3' ou null
 }
 
 interface PlanejamentoItem {
@@ -297,7 +298,8 @@ export default function ProgrammingPage() {
     prog: 0,
     site: 'VALINHOS',
     etapa1: '',
-    etapa2: ''
+    etapa2: '',
+    turnoDesejado: ''
   });
 
   const { data: filaDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]));
@@ -432,7 +434,7 @@ export default function ProgrammingPage() {
 
         let cursor = minStartTime;
 
-        // Respeitar Data Desejada (Forçada pelo usuário) utilizando cálculo robusto de dias
+        // Respeitar Data Desejada (Forçada pelo usuário)
         if (job.dataDesejada) {
             const forcedDate = startOfDay(parse(job.dataDesejada, 'yyyy-MM-dd', new Date()));
             if (isValid(forcedDate)) {
@@ -443,13 +445,19 @@ export default function ProgrammingPage() {
         }
 
         let iterations = 0;
-        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 2000) {
+        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iterations < 3000) {
             iterations++;
             const free = nextFree(laneId, cursor);
             cursor = free.start;
             const dayIdx = Math.floor(cursor / (SHIFT_MIN * 3));
             const dayDate = addDays(baseDate, dayIdx);
-            if (isDomingo(dayDate)) { cursor = (dayIdx + 1) * 3 * SHIFT_MIN; continue; }
+            
+            // Pular Domingos
+            if (isDomingo(dayDate)) { 
+                cursor = (dayIdx + 1) * 3 * SHIFT_MIN; 
+                continue; 
+            }
+
             const startInDay = cursor % (SHIFT_MIN * 3);
             const shiftIdx = Math.floor(startInDay / SHIFT_MIN);
             const startOffset = startInDay % SHIFT_MIN;
@@ -457,11 +465,18 @@ export default function ProgrammingPage() {
             const dateStr = format(dayDate, 'yyyy-MM-dd');
             const displayDateStr = format(dayDate, 'dd/MM/yyyy');
             const shiftId = String(shiftIdx + 1);
+            
             const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
             const isShiftDisabled = currentDisabled[`${dateStr}_${shiftId}`];
             const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
 
-            if (isShiftDisabled || !techName) { cursor = shiftAbs + SHIFT_MIN; continue; }
+            // Restrição de Turno Desejado
+            const isWrongShift = job.turnoDesejado && job.turnoDesejado !== '' && shiftId !== job.turnoDesejado;
+
+            if (isShiftDisabled || !techName || isWrongShift) { 
+                cursor = shiftAbs + SHIFT_MIN; 
+                continue; 
+            }
 
             let winStart = startOffset;
             for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) winStart = p.start + p.duration; }
@@ -628,6 +643,12 @@ export default function ProgrammingPage() {
         };
         const novaFila: JobBase[] = json.map((row, i) => {
             const rawSite = String(findVal(row, ['site', 'fabrica', 'Fábrica', 'unidade', 'unidade de negócio']) || 'VALINHOS');
+            const rawShift = String(findVal(row, ['turno', 'turno desejado', 'T', 'Shift']) || '');
+            let turnoDesejado = '';
+            if (rawShift.includes('1')) turnoDesejado = '1';
+            else if (rawShift.includes('2')) turnoDesejado = '2';
+            else if (rawShift.includes('3')) turnoDesejado = '3';
+
             return {
               id: `job-${i}-${Date.now()}`,
               requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
@@ -640,6 +661,7 @@ export default function ProgrammingPage() {
               site: normalizeSiteName(rawSite),
               etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || ''),
               etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2', 'Etapa']) || ''),
+              turnoDesejado
             };
         });
         const start = nextWorkday(planStartDate ?? startOfDay(new Date()));
@@ -658,10 +680,10 @@ export default function ProgrammingPage() {
       requisicao: newItem.requisicao || 'S/N', nomeDaPeca: newItem.nomeDaPeca || 'SEM NOME',
       quantidade: Number(newItem.quantidade) || 1, setup: Number(newItem.setup) || 20, torno: Number(newItem.torno) || 0,
       centro: Number(newItem.centro) || 0, prog: Number(newItem.prog) || 0, site: normalizeSiteName(newItem.site),
-      etapa1: newItem.etapa1 || '', etapa2: newItem.etapa2 || ''
+      etapa1: newItem.etapa1 || '', etapa2: newItem.etapa2 || '', turnoDesejado: newItem.turnoDesejado || ''
     };
     const nf = [...fila, job]; setFila(nf); await recalculatePlan(nf); setIsAddDialogOpen(false);
-    setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: '', etapa2: '' });
+    setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: '', etapa2: '', turnoDesejado: '' });
   };
 
   const handleDeleteManual = async (id: string) => { const nf = fila.filter(j => j.id !== id); setFila(nf); await recalculatePlan(nf); };
@@ -674,6 +696,7 @@ export default function ProgrammingPage() {
               <TableHead className="w-20 text-center">AÇÕES</TableHead>
               <TableHead>STATUS</TableHead>
               <TableHead className="w-32">DATA EXECUÇÃO</TableHead>
+              <TableHead className="w-24">TURNO</TableHead>
               <TableHead>FÁBRICA / SITE</TableHead>
               <TableHead>FLUXO (E1 → E2)</TableHead>
               <TableHead>REQ.</TableHead>
@@ -685,7 +708,7 @@ export default function ProgrammingPage() {
       </TableHeader>
       <TableBody>
         {jobs.length === 0 ? (
-          <TableRow><TableCell colSpan={11} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada nesta categoria</TableCell></TableRow>
+          <TableRow><TableCell colSpan={12} className="text-center py-10 text-muted-foreground font-mono text-xs uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada nesta categoria</TableCell></TableRow>
         ) : jobs.map((job, localIdx) => {
           const globalIdx = indexById.get(job.id) ?? 0;
           const displayIdx = isGlobal ? globalIdx + 1 : localIdx + 1;
@@ -733,6 +756,19 @@ export default function ProgrammingPage() {
                     calculatedDate={calculatedDate} 
                     onUpdate={(newDate) => updateJobField(job.id, 'dataDesejada', newDate)} 
                   />
+              </TableCell>
+              <TableCell>
+                  <Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}>
+                      <SelectTrigger className={cn("h-7 text-[10px] font-black uppercase", job.turnoDesejado ? "border-primary text-primary" : "border-border text-muted-foreground/60")}>
+                          <SelectValue placeholder="AUTO" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="AUTO" className="text-[10px] font-black">AUTO</SelectItem>
+                          <SelectItem value="1" className="text-[10px] font-black">1T</SelectItem>
+                          <SelectItem value="2" className="text-[10px] font-black">2T</SelectItem>
+                          <SelectItem value="3" className="text-[10px] font-black">3T</SelectItem>
+                      </SelectContent>
+                  </Select>
               </TableCell>
               <TableCell>
                   <Select value={normalizedSite} onValueChange={(v) => updateJobField(job.id, 'site', v)}>
@@ -794,7 +830,10 @@ export default function ProgrammingPage() {
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Requisição</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} /></div><div className="space-y-2"><Label>Nome da Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} /></div></div>
                   <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Etapa 1</Label><Input placeholder="TORNO ou CENTRO" value={newItem.etapa1} onChange={e => setNewItem({...newItem, etapa1: e.target.value.toUpperCase()})} /></div><div className="space-y-2"><Label>Etapa 2</Label><Input placeholder="TORNO ou CENTRO" value={newItem.etapa2} onChange={e => setNewItem({...newItem, etapa2: e.target.value.toUpperCase()})} /></div></div>
-                  <div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2"><Label>Turno Desejado</Label><Select value={newItem.turnoDesejado || "AUTO"} onValueChange={v => setNewItem({...newItem, turnoDesejado: v === "AUTO" ? "" : v})}><SelectTrigger><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></div>
+                  </div>
                   <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div><div className="space-y-2"><Label>Setup (min)</Label><Input type="number" value={newItem.setup} onChange={e => setNewItem({...newItem, setup: Number(e.target.value)})} /></div></div>
                   <div className="grid grid-cols-3 gap-4"><div className="space-y-2"><Label>Torno (min)</Label><Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} /></div><div className="space-y-2"><Label>Centro (min)</Label><Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})} /></div><div className="space-y-2"><Label>Prog (min)</Label><Input type="number" value={newItem.prog} onChange={e => setNewItem({...newItem, prog: Number(e.target.value)})} /></div></div>
                 </div>
