@@ -31,7 +31,7 @@ import {
   Clock,
   CheckCircle2
 } from 'lucide-react';
-import { format, addDays, startOfDay, parse, isValid, getDay } from 'date-fns';
+import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -47,7 +47,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/alert-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -127,7 +127,6 @@ const ALL_TECHNICIANS = [
   "Marcos Barbosa"
 ];
 
-// Configuração William Martinucci apenas no 1T ADM
 const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'TORNO': {
     '1': ['Gustavo Gozzi'],
@@ -433,11 +432,11 @@ export default function ProgrammingPage() {
 
         let cursor = minStartTime;
 
-        // Respeitar Data Desejada (Forçada pelo usuário)
+        // Respeitar Data Desejada (Forçada pelo usuário) utilizando cálculo robusto de dias
         if (job.dataDesejada) {
-            const forcedDate = parse(job.dataDesejada, 'yyyy-MM-dd', new Date());
+            const forcedDate = startOfDay(parse(job.dataDesejada, 'yyyy-MM-dd', new Date()));
             if (isValid(forcedDate)) {
-                const diffDays = Math.floor((forcedDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
+                const diffDays = differenceInCalendarDays(forcedDate, baseDate);
                 const forcedMinMinutes = diffDays * 3 * SHIFT_MIN;
                 cursor = Math.max(cursor, forcedMinMinutes);
             }
@@ -870,4 +869,3 @@ export default function ProgrammingPage() {
     </div>
   );
 }
-
