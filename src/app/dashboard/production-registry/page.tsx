@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -135,7 +134,7 @@ const ProductionHistoryTable = memo(({ records, isRestricted, onEdit, onDelete, 
                 <div className="space-y-1">
                     <CardTitle className="flex items-center gap-2">
                         Histórico de Produção
-                        {isRestricted && <Badge variant="secondary" className="text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"><Zap className="h-2 w-2" /> Auto (15 dias)</Badge>}
+                        {isRestricted && <Badge variant="secondary" className="text-[10px] font-black uppercase bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"><Zap className="h-3 w-3" /> Auto (15 dias)</Badge>}
                     </CardTitle>
                     <CardDescription>Registros filtrados.</CardDescription>
                 </div>
@@ -145,43 +144,43 @@ const ProductionHistoryTable = memo(({ records, isRestricted, onEdit, onDelete, 
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Técnico</TableHead>
-                            <TableHead>Data</TableHead>
-                            <TableHead className="text-primary font-bold"><div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Apontamento</div></TableHead>
-                            <TableHead>Fábrica</TableHead>
-                            <TableHead>Nº Forms</TableHead>
-                            <TableHead>Atividade</TableHead>
-                            <TableHead>Produzido</TableHead>
-                            <TableHead>Tempo</TableHead>
-                            <TableHead>Observações</TableHead>
-                            <TableHead>Ações</TableHead>
+                            <TableHead className="text-xs">Técnico</TableHead>
+                            <TableHead className="text-xs">Data</TableHead>
+                            <TableHead className="text-primary font-bold text-xs"><div className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> Apontamento</div></TableHead>
+                            <TableHead className="text-xs">Fábrica</TableHead>
+                            <TableHead className="text-xs">Nº Forms</TableHead>
+                            <TableHead className="text-xs">Atividade</TableHead>
+                            <TableHead className="text-xs">Produzido</TableHead>
+                            <TableHead className="text-xs">Tempo</TableHead>
+                            <TableHead className="text-xs">Observações</TableHead>
+                            <TableHead className="text-xs">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {records.length === 0 ? (
-                            <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground italic">Nenhum registro encontrado para este período.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground italic text-sm">Nenhum registro encontrado para este período.</TableCell></TableRow>
                         ) : records.map((r: any) => {
                             const rDate = getRecordDate(r.date);
                             const rCreatedAt = getRecordDate(r.createdAt);
                             return (
                             <TableRow key={r.id}>
-                                <TableCell>{r.operatorId}</TableCell>
-                                <TableCell>{rDate ? format(rDate, 'dd/MM/yyyy') : r.date}</TableCell>
-                                <TableCell className="text-primary font-mono text-[11px] font-bold">
+                                <TableCell className="text-sm">{r.operatorId}</TableCell>
+                                <TableCell className="text-sm">{rDate ? format(rDate, 'dd/MM/yyyy') : r.date}</TableCell>
+                                <TableCell className="text-primary font-mono text-[12px] font-bold">
                                     {rCreatedAt ? format(rCreatedAt, 'dd/MM HH:mm') : '-'}
                                 </TableCell>
-                                <TableCell>{r.factory}</TableCell>
-                                <TableCell className="font-mono font-bold">#{r.formsNumber}</TableCell>
-                                <TableCell><Badge variant="outline">{r.activityType}</Badge></TableCell>
-                                <TableCell>{r.quantityProduced} pç</TableCell>
-                                <TableCell>{r.machiningTime} min</TableCell>
-                                <TableCell className="max-w-[150px] truncate text-[10px] text-muted-foreground italic">
+                                <TableCell className="text-sm">{r.factory}</TableCell>
+                                <TableCell className="font-mono font-bold text-sm">#{r.formsNumber}</TableCell>
+                                <TableCell><Badge variant="outline" className="text-[10px]">{r.activityType}</Badge></TableCell>
+                                <TableCell className="text-sm">{r.quantityProduced} pç</TableCell>
+                                <TableCell className="text-sm">{r.machiningTime} min</TableCell>
+                                <TableCell className="max-w-[200px] truncate text-[11px] text-muted-foreground italic">
                                     {r.observations || '-'}
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-1">
-                                    <Button variant="ghost" size="icon" onClick={() => onEdit('production', r)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
-                                    <Button variant="ghost" size="icon" onClick={() => onDelete('productionRecords', r.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit('production', r)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete('productionRecords', r.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                                   </div>
                                 </TableCell>
                             </TableRow>
@@ -202,7 +201,7 @@ const LossHistoryTable = memo(({ records, isRestricted, onEdit, onDelete, onExpo
                 <div className="space-y-1">
                     <CardTitle className="flex items-center gap-2">
                         Histórico de Perdas
-                        {isRestricted && <Badge variant="secondary" className="text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"><Zap className="h-2 w-2" /> Auto (15 dias)</Badge>}
+                        {isRestricted && <Badge variant="secondary" className="text-[10px] font-black uppercase bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"><Zap className="h-3 w-3" /> Auto (15 dias)</Badge>}
                     </CardTitle>
                     <CardDescription>Paradas e inatividades registradas.</CardDescription>
                 </div>
@@ -212,41 +211,41 @@ const LossHistoryTable = memo(({ records, isRestricted, onEdit, onDelete, onExpo
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Técnico</TableHead>
-                            <TableHead>Data</TableHead>
-                            <TableHead className="text-primary font-bold"><div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Apontamento</div></TableHead>
-                            <TableHead>Fábrica</TableHead>
-                            <TableHead>Nº Forms</TableHead>
-                            <TableHead>Motivo</TableHead>
-                            <TableHead>Tempo Perdido</TableHead>
-                            <TableHead>Observações</TableHead>
-                            <TableHead>Ações</TableHead>
+                            <TableHead className="text-xs">Técnico</TableHead>
+                            <TableHead className="text-xs">Data</TableHead>
+                            <TableHead className="text-primary font-bold text-xs"><div className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> Apontamento</div></TableHead>
+                            <TableHead className="text-xs">Fábrica</TableHead>
+                            <TableHead className="text-xs">Nº Forms</TableHead>
+                            <TableHead className="text-xs">Motivo</TableHead>
+                            <TableHead className="text-xs">Tempo Perdido</TableHead>
+                            <TableHead className="text-xs">Observações</TableHead>
+                            <TableHead className="text-xs">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {records.length === 0 ? (
-                            <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground italic">Nenhum registro de perda encontrado.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground italic text-sm">Nenhum registro de perda encontrado.</TableCell></TableRow>
                         ) : records.map((r: any) => {
                             const rDate = getRecordDate(r.date);
                             const rCreatedAt = getRecordDate(r.createdAt);
                             return (
                             <TableRow key={r.id}>
-                                <TableCell>{r.operatorId}</TableCell>
-                                <TableCell>{rDate ? format(rDate, 'dd/MM/yyyy') : r.date}</TableCell>
-                                <TableCell className="text-primary font-mono text-[11px] font-bold">
+                                <TableCell className="text-sm">{r.operatorId}</TableCell>
+                                <TableCell className="text-sm">{rDate ? format(rDate, 'dd/MM/yyyy') : r.date}</TableCell>
+                                <TableCell className="text-primary font-mono text-[12px] font-bold">
                                     {rCreatedAt ? format(rCreatedAt, 'dd/MM HH:mm') : '-'}
                                 </TableCell>
-                                <TableCell>{r.factory}</TableCell>
-                                <TableCell className="font-mono font-bold">{r.formsNumber ? `#${r.formsNumber}` : '-'}</TableCell>
-                                <TableCell><Badge className="bg-yellow-500 text-black">{r.lossReason}</Badge></TableCell>
-                                <TableCell className="text-red-500 font-bold">{r.timeLost} min</TableCell>
-                                <TableCell className="max-w-[150px] truncate text-[10px] text-muted-foreground italic">
+                                <TableCell className="text-sm">{r.factory}</TableCell>
+                                <TableCell className="font-mono font-bold text-sm">{r.formsNumber ? `#${r.formsNumber}` : '-'}</TableCell>
+                                <TableCell><Badge className="bg-yellow-500 text-black text-[10px]">{r.lossReason}</Badge></TableCell>
+                                <TableCell className="text-red-500 font-bold text-sm">{r.timeLost} min</TableCell>
+                                <TableCell className="max-w-[200px] truncate text-[11px] text-muted-foreground italic">
                                     {r.observations || '-'}
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-1">
-                                    <Button variant="ghost" size="icon" onClick={() => onEdit('loss', r)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
-                                    <Button variant="ghost" size="icon" onClick={() => onDelete('lossRecords', r.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit('loss', r)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete('lossRecords', r.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                                   </div>
                                 </TableCell>
                             </TableRow>
@@ -674,116 +673,35 @@ export default function ProductionRegistryPage() {
         </Card>
       </div>
 
-      <Dialog open={editingRecord !== null} onOpenChange={(open) => !open && setEditingRecord(null)}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Editar Registro</DialogTitle>
-            <DialogDescription>Altere as informações abaixo e salve para atualizar o banco de dados.</DialogDescription>
-          </DialogHeader>
-          {editingRecord?.type === 'production' && (
-            <Form {...editProductionForm}>
-              <form onSubmit={editProductionForm.handleSubmit(onUpdateProduction)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={editProductionForm.control} name="operatorId" render={({field}) => (
-                    <FormItem><FormLabel>Operador</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>
-                  )} />
-                  <FormField control={editProductionForm.control} name="date" render={({field}) => (
-                    <FormItem><FormLabel>Data</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                  )} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={editProductionForm.control} name="factory" render={({field}) => (
-                    <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
-                  )} />
-                  <FormField control={editProductionForm.control} name="formsNumber" render={({field}) => (
-                    <FormItem><FormLabel>Nº Forms</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                  )} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <FormField control={editProductionForm.control} name="quantityProduced" render={({field}) => (
-                        <FormItem><FormLabel>Qtd Produzida</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                    )} />
-                    <FormField control={editProductionForm.control} name="machiningTime" render={({field}) => (
-                        <FormItem><FormLabel>Tempo (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                    )} />
-                </div>
-                <FormField control={editProductionForm.control} name="observations" render={({field}) => (
-                    <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea className="min-h-[80px]" {...field} /></FormControl></FormItem>
-                )} />
-                <DialogFooter>
-                  <Button type="submit">Salvar Alterações</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          )}
-          {editingRecord?.type === 'loss' && (
-            <Form {...editLossForm}>
-              <form onSubmit={editLossForm.handleSubmit(onUpdateLoss)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={editLossForm.control} name="operatorId" render={({field}) => (
-                    <FormItem><FormLabel>Operador</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>
-                  )} />
-                  <FormField control={editLossForm.control} name="date" render={({field}) => (
-                    <FormItem><FormLabel>Data</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                  )} />
-                </div>
-                <FormField control={editLossForm.control} name="lossReason" render={({field}) => (
-                    <FormItem><FormLabel>Motivo</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{lossReasonDetails.map(r => <SelectItem key={r.value} value={r.value}>{r.value}</SelectItem>)}</SelectContent></Select></FormItem>
-                )} />
-                <div className="grid grid-cols-2 gap-4">
-                    <FormField control={editLossForm.control} name="timeLost" render={({field}) => (
-                        <FormItem><FormLabel>Tempo (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                    )} />
-                    <FormField control={editLossForm.control} name="factory" render={({field}) => (
-                        <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
-                    )} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <FormField control={editLossForm.control} name="formsNumber" render={({field}) => (
-                        <FormItem><FormLabel>Nº Forms</FormLabel><FormControl><Input placeholder="Ex: 815" {...field} /></FormControl></FormItem>
-                    )} />
-                </div>
-                <FormField control={editLossForm.control} name="observations" render={({field}) => (
-                    <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea className="min-h-[80px]" {...field} /></FormControl></FormItem>
-                )} />
-                <DialogFooter>
-                  <Button type="submit">Salvar Alterações</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          )}
-        </DialogContent>
-      </Dialog>
-
       <div className="mt-8 flex flex-wrap items-end gap-3 bg-card p-4 rounded-lg border shadow-sm">
-        <div className="grid w-full sm:max-w-[180px] gap-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground">Categorias / Perdas</Label>
+        <div className="grid w-full sm:max-w-[200px] gap-1.5">
+            <Label className="text-[11px] font-black uppercase text-muted-foreground">Categorias / Perdas</Label>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="h-9 text-xs font-bold"><div className='flex items-center gap-2'><Filter className="h-3.5 w-3.5" /><SelectValue placeholder="Todas" /></div></SelectTrigger>
+                <SelectTrigger className="h-10 text-xs font-bold"><div className='flex items-center gap-2'><Filter className="h-4 w-4" /><SelectValue placeholder="Todas" /></div></SelectTrigger>
                 <SelectContent><SelectItem value="all">Todas</SelectItem><SelectItem value="PRODUCAO">Usinagem</SelectItem>{lossReasonDetails.map(r => <SelectItem key={r.value} value={r.value}>{r.value}</SelectItem>)}</SelectContent>
             </Select>
         </div>
-        <div className="grid w-full sm:max-w-[150px] gap-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground">Nº Forms</Label>
-            <div className="relative"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9 h-9 text-xs" value={formsFilter} onChange={e => setFormsFilter(e.target.value)} placeholder="815..." /></div>
-        </div>
-        <div className="grid w-full sm:max-w-[120px] gap-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground">Mês</Label>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}><SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Mês Atual</SelectItem>{months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent></Select>
-        </div>
         <div className="grid w-full sm:max-w-[160px] gap-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground">Dia</Label>
-            <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("h-9 text-xs font-bold justify-start", !selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-3.5 w-3.5" />{selectedDate ? format(selectedDate, "dd/MM/yyyy") : "Dia"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus /></PopoverContent></Popover>
+            <Label className="text-[11px] font-black uppercase text-muted-foreground">Nº Forms</Label>
+            <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9 h-10 text-xs" value={formsFilter} onChange={e => setFormsFilter(e.target.value)} placeholder="815..." /></div>
+        </div>
+        <div className="grid w-full sm:max-w-[140px] gap-1.5">
+            <Label className="text-[11px] font-black uppercase text-muted-foreground">Mês</Label>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}><SelectTrigger className="h-10 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Mês Atual</SelectItem>{months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent></Select>
         </div>
         <div className="grid w-full sm:max-w-[180px] gap-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground">Fábrica</Label>
-            <Select value={selectedFactory} onValueChange={setSelectedFactory}><SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as Fábricas</SelectItem>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select>
+            <Label className="text-[11px] font-black uppercase text-muted-foreground">Dia</Label>
+            <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("h-10 text-xs font-bold justify-start", !selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "dd/MM/yyyy") : "Dia"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus /></PopoverContent></Popover>
         </div>
-        <div className="grid w-full sm:max-w-[180px] gap-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground">Técnico</Label>
-            <Select value={selectedOperator} onValueChange={setSelectedOperator}><SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos os Técnicos</SelectItem>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select>
+        <div className="grid w-full sm:max-w-[200px] gap-1.5">
+            <Label className="text-[11px] font-black uppercase text-muted-foreground">Fábrica</Label>
+            <Select value={selectedFactory} onValueChange={setSelectedFactory}><SelectTrigger className="h-10 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todas as Fábricas</SelectItem>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select>
         </div>
-        <Button variant="ghost" onClick={() => { setSelectedDate(undefined); setSelectedOperator('all'); setSelectedFactory('all'); setFormsFilter(''); setSelectedCategory('all'); setSelectedMonth('all'); }} className="h-9 text-xs text-destructive">Limpar</Button>
+        <div className="grid w-full sm:max-w-[200px] gap-1.5">
+            <Label className="text-[11px] font-black uppercase text-muted-foreground">Técnico</Label>
+            <Select value={selectedOperator} onValueChange={setSelectedOperator}><SelectTrigger className="h-10 text-xs font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos os Técnicos</SelectItem>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select>
+        </div>
+        <Button variant="ghost" onClick={() => { setSelectedDate(undefined); setSelectedOperator('all'); setSelectedFactory('all'); setFormsFilter(''); setSelectedCategory('all'); setSelectedMonth('all'); }} className="h-10 text-xs text-destructive">Limpar</Button>
       </div>
 
       <div className="space-y-6">
