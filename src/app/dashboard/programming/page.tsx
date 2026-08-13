@@ -62,7 +62,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -94,6 +94,8 @@ interface JobBase {
   etapa2: string;
   dataDesejada?: string; 
   turnoDesejado?: string; 
+  ordemTorno?: number; // Prioridade independente no Torno
+  ordemCentro?: number; // Prioridade independente no Centro
 }
 
 interface PlanejamentoItem {
@@ -334,8 +336,18 @@ export default function ProgrammingPage() {
 
   const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
 
-  const filteredTornoJobs = useMemo(() => fila.filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO'), [fila]);
-  const filteredCentroJobs = useMemo(() => fila.filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO'), [fila]);
+  // Filtra e ordena as peças do Torno e Centro de forma independente
+  const filteredTornoJobs = useMemo(() => {
+      return fila
+        .filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO')
+        .sort((a, b) => (a.ordemTorno || 9999) - (b.ordemTorno || 9999));
+  }, [fila]);
+
+  const filteredCentroJobs = useMemo(() => {
+      return fila
+        .filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO')
+        .sort((a, b) => (a.ordemCentro || 9999) - (b.ordemCentro || 9999));
+  }, [fila]);
 
   const jobCompletionStats = useMemo(() => {
     const map = new Map<string, { total: number, concluded: number }>();
@@ -506,7 +518,6 @@ export default function ProgrammingPage() {
         return cursor;
     };
 
-    type OpDef = { job: JobBase; techKey: 'TORNO' | 'CENTRO'; type: 'torno' | 'centro'; order: number; };
     const parseEtapa = (v?: string) => {
         const s = String(v || '').toUpperCase();
         if (s.includes('TORNO')) return { techKey: 'TORNO' as const, type: 'torno' as const };
@@ -514,22 +525,36 @@ export default function ProgrammingPage() {
         return null;
     };
 
-    const opsLivres: OpDef[] = [];
-    const opsPresas: OpDef[] = [];
-    const completion: Record<string, number> = {};
+    const finishTimes: Record<string, number> = {};
 
+    // 1. Programação (ADM)
     novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
-    novaFila.forEach((job, order) => {
+
+    // 2. Torno - Processa seguindo a OrdemTorno
+    const tornoJobs = [...novaFila]
+        .filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO')
+        .sort((a, b) => (a.ordemTorno || 999) - (b.ordemTorno || 999));
+    
+    tornoJobs.forEach(job => {
         const e1 = parseEtapa(job.etapa1);
         const e2 = parseEtapa(job.etapa2);
-        const primeira = e1 ?? e2;
-        const segunda = e1 && e2 ? e2 : null;
-        if (primeira) opsLivres.push({ job, ...primeira, order });
-        if (segunda) opsPresas.push({ job, ...segunda, order });
+        const isFirst = e1?.techKey === 'TORNO';
+        const minStart = isFirst ? 0 : (finishTimes[job.id] || 0);
+        finishTimes[job.id] = allocateTask(job, 'TORNO', minStart, 'torno');
     });
 
-    opsLivres.sort((a, b) => a.order - b.order).forEach(op => completion[op.job.id] = allocateTask(op.job, op.techKey, 0, op.type));
-    opsPresas.sort((a, b) => a.order - b.order).forEach(op => allocateTask(op.job, op.techKey, completion[op.job.id] ?? 0, op.type));
+    // 3. Centro - Processa seguindo a OrdemCentro
+    const centroJobs = [...novaFila]
+        .filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO')
+        .sort((a, b) => (a.ordemCentro || 999) - (b.ordemCentro || 999));
+
+    centroJobs.forEach(job => {
+        const e1 = parseEtapa(job.etapa1);
+        const e2 = parseEtapa(job.etapa2);
+        const isFirst = e1?.techKey === 'CENTRO';
+        const minStart = isFirst ? 0 : (finishTimes[job.id] || 0);
+        finishTimes[job.id] = allocateTask(job, 'CENTRO', minStart, 'centro');
+    });
 
     const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
     try {
@@ -599,25 +624,41 @@ export default function ProgrammingPage() {
     setFila(newFila); await recalculatePlan(newFila);
   }, [fila, disabledShifts, techOverrides, planStartDate, planejamentoData]);
 
-  const moveJobToPosition = useCallback(async (currentIdx: number, newPos: number, filteredList?: JobBase[]) => {
-    const targetIdx = Math.max(0, Math.min(fila.length - 1, newPos - 1));
-    if (!filteredList) {
-        if (currentIdx === targetIdx) return;
-        const newFila = [...fila];
+  const moveJobToPosition = useCallback(async (currentIdx: number, newPos: number, type: 'GERAL' | 'TORNO' | 'CENTRO' = 'GERAL') => {
+    const newFila = [...fila];
+    const itemToMove = newFila[currentIdx];
+
+    if (type === 'GERAL') {
+        const targetIdx = Math.max(0, Math.min(newFila.length - 1, newPos - 1));
         const [movedItem] = newFila.splice(currentIdx, 1);
         newFila.splice(targetIdx, 0, movedItem);
-        setFila(newFila); await recalculatePlan(newFila);
-    } else {
-        const itemToMove = fila[currentIdx];
-        const targetItemInFiltered = filteredList[Math.min(newPos - 1, filteredList.length - 1)];
-        const targetGlobalIdx = fila.findIndex(j => j.id === targetItemInFiltered.id);
-        if (currentIdx === targetGlobalIdx) return;
-        const newFila = [...fila];
-        const [movedItem] = newFila.splice(currentIdx, 1);
-        newFila.splice(targetGlobalIdx, 0, movedItem);
-        setFila(newFila); await recalculatePlan(newFila);
+    } else if (type === 'TORNO') {
+        const list = newFila.filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO').sort((a, b) => (a.ordemTorno || 999) - (b.ordemTorno || 999));
+        const targetIdx = Math.max(0, Math.min(list.length - 1, newPos - 1));
+        const filteredIdx = list.findIndex(j => j.id === itemToMove.id);
+        const [movedItem] = list.splice(filteredIdx, 1);
+        list.splice(targetIdx, 0, movedItem);
+        // Re-atribui ordens independentes
+        list.forEach((job, i) => {
+            const originalJob = newFila.find(nf => nf.id === job.id);
+            if (originalJob) originalJob.ordemTorno = i + 1;
+        });
+    } else if (type === 'CENTRO') {
+        const list = newFila.filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO').sort((a, b) => (a.ordemCentro || 999) - (b.ordemCentro || 999));
+        const targetIdx = Math.max(0, Math.min(list.length - 1, newPos - 1));
+        const filteredIdx = list.findIndex(j => j.id === itemToMove.id);
+        const [movedItem] = list.splice(filteredIdx, 1);
+        list.splice(targetIdx, 0, movedItem);
+        // Re-atribui ordens independentes
+        list.forEach((job, i) => {
+            const originalJob = newFila.find(nf => nf.id === job.id);
+            if (originalJob) originalJob.ordemCentro = i + 1;
+        });
     }
-  }, [fila, disabledShifts, techOverrides, planStartDate, planejamentoData]);
+    
+    setFila(newFila); 
+    await recalculatePlan(newFila);
+  }, [fila, disabledShifts, techOverrides, planStartDate]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file || !firestore) return;
@@ -645,7 +686,8 @@ export default function ProgrammingPage() {
               torno: Number(findVal(row, ['Tempo de Planejamento Torno Minutos todas as peças solicitadas', 'torno', 'torno minutos', 'torno min']) || 0),
               centro: Number(findVal(row, ['Tempo de Planejamento Centro Minutos todas as peças solicitadas', 'centro', 'centro minutos', 'centro min']) || 0),
               prog: Number(findVal(row, ['Tempo Programação Minutos', 'Tempo de Planejamento Programação Minutos todas as peças solicitadas', 'prog', 'programação', 'Programação Minutos']) || 0),
-              site: normalizeSiteName(rawSite), etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || 'TORNO'), etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2', 'Etapa']) || ''), turnoDesejado
+              site: normalizeSiteName(rawSite), etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || 'TORNO'), etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2', 'Etapa']) || ''), 
+              turnoDesejado, ordemTorno: i + 1, ordemCentro: i + 1
             };
         });
         const start = nextWorkday(planStartDate ?? startOfDay(new Date()));
@@ -665,7 +707,9 @@ export default function ProgrammingPage() {
       const calculatedDate = jobStartDates.get(job.id);
       
       return {
-        'Posição': idx + 1,
+        'Posição Geral': idx + 1,
+        'Posição Torno': job.ordemTorno || '-',
+        'Posição Centro': job.ordemCentro || '-',
         'Status': statusText,
         'Data Planejada': job.dataDesejada || (calculatedDate ? calculatedDate : 'PENDENTE'),
         'Turno': job.turnoDesejado || 'AUTO',
@@ -692,12 +736,14 @@ export default function ProgrammingPage() {
 
   const handleAddManual = async () => {
     if (!newItem.requisicao || !newItem.nomeDaPeca) { toast({ title: "Erro", description: "Preencha Requisição e Peça.", variant: "destructive" }); return; }
+    const nextOrder = fila.length + 1;
     const job: JobBase = {
       id: `job-m-${Date.now()}`,
       requisicao: newItem.requisicao || 'S/N', nomeDaPeca: newItem.nomeDaPeca || 'SEM NOME',
       quantidade: Number(newItem.quantidade) || 1, setup: Number(newItem.setup) || 20, torno: Number(newItem.torno) || 0,
       centro: Number(newItem.centro) || 0, prog: Number(newItem.prog) || 0, site: normalizeSiteName(newItem.site),
-      etapa1: newItem.etapa1 || 'TORNO', etapa2: newItem.etapa2 || '', turnoDesejado: newItem.turnoDesejado || ''
+      etapa1: newItem.etapa1 || 'TORNO', etapa2: newItem.etapa2 || '', turnoDesejado: newItem.turnoDesejado || '',
+      ordemTorno: nextOrder, ordemCentro: nextOrder
     };
     const nf = [...fila, job]; setFila(nf); await recalculatePlan(nf); setIsAddDialogOpen(false);
     setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: 'TORNO', etapa2: '', turnoDesejado: '' });
@@ -713,7 +759,12 @@ export default function ProgrammingPage() {
           <TableRow><TableCell colSpan={11} className="text-center py-10 text-muted-foreground font-mono text-sm uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada</TableCell></TableRow>
         ) : jobs.map((job, localIdx) => {
           const globalIdx = indexById.get(job.id) ?? 0;
-          const displayIdx = localIdx + 1;
+          
+          // POS exibe o rank específico da aba
+          let displayPos = localIdx + 1;
+          if (type === 'TORNO') displayPos = job.ordemTorno || localIdx + 1;
+          else if (type === 'CENTRO') displayPos = job.ordemCentro || localIdx + 1;
+
           const stats = jobCompletionStats.get(job.id);
           const isFullyConcluded = stats && stats.total > 0 && stats.total === stats.concluded;
           const isPartiallyConcluded = stats && stats.concluded > 0 && stats.concluded < stats.total;
@@ -724,8 +775,26 @@ export default function ProgrammingPage() {
 
           return (
             <TableRow key={job.id} className={cn("hover:bg-muted/5 transition-colors", isFullyConcluded && "bg-green-500/5 opacity-80")}>
-              <TableCell className="text-center px-4"><Input type="number" defaultValue={displayIdx} key={`${job.id}-${displayIdx}-${type}`} className="h-9 w-14 text-center text-sm font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all" onFocus={(e) => e.target.select()} onBlur={(e) => { const newPos = parseInt(e.target.value); if (isNaN(newPos) || newPos < 1) { e.target.value = String(displayIdx); return; } if (newPos !== displayIdx) moveJobToPosition(globalIdx, newPos, type === 'GERAL' ? undefined : jobs); }}/></TableCell>
-              <TableCell className="text-center"><div className="flex flex-col items-center gap-1"><Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, localIdx, type === 'GERAL' ? undefined : jobs)} disabled={localIdx === 0}><ArrowUp className="h-3 w-3" /></Button><Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, localIdx + 2, type === 'GERAL' ? undefined : jobs)} disabled={localIdx === jobs.length - 1}><ArrowDown className="h-3 w-3" /></Button></div></TableCell>
+              <TableCell className="text-center px-4">
+                <Input 
+                  type="number" 
+                  defaultValue={displayPos} 
+                  key={`${job.id}-${displayPos}-${type}`} 
+                  className="h-9 w-14 text-center text-sm font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all" 
+                  onFocus={(e) => e.target.select()} 
+                  onBlur={(e) => { 
+                    const newPos = parseInt(e.target.value); 
+                    if (isNaN(newPos) || newPos < 1) { e.target.value = String(displayPos); return; } 
+                    if (newPos !== displayPos) moveJobToPosition(globalIdx, newPos, type); 
+                  }}
+                />
+              </TableCell>
+              <TableCell className="text-center">
+                <div className="flex flex-col items-center gap-1">
+                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, displayPos - 1, type)} disabled={localIdx === 0}><ArrowUp className="h-3 w-3" /></Button>
+                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, displayPos + 1, type)} disabled={localIdx === jobs.length - 1}><ArrowDown className="h-3 w-3" /></Button>
+                </div>
+              </TableCell>
               <TableCell>{isFullyConcluded ? (<div className="flex items-center gap-1.5 text-green-500 font-black text-[11px] uppercase"><CheckCircle2 className="h-3.5 w-3.5" />FEITO</div>) : isPartiallyConcluded ? (<div className="flex items-center gap-1.5 text-yellow-500 font-black text-[11px] uppercase"><Clock className="h-3.5 w-3.5" />{Math.round((stats.concluded / stats.total) * 100)}%</div>) : (<div className="text-muted-foreground/40 font-black text-[11px] uppercase">PEND</div>)}</TableCell>
               <TableCell><JobExecutionCell job={job} calculatedDate={calculatedDate} onUpdate={(newDate) => updateJobField(job.id, 'dataDesejada', newDate)}/></TableCell>
               <TableCell><Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}><SelectTrigger className={cn("h-9 text-[11px] font-black uppercase", job.turnoDesejado ? "border-primary text-primary" : "border-border text-muted-foreground/60")}><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO" className="text-xs font-black">AUTO</SelectItem><SelectItem value="1" className="text-xs font-black">1T</SelectItem><SelectItem value="2" className="text-xs font-black">2T</SelectItem><SelectItem value="3" className="text-xs font-black">3T</SelectItem></SelectContent></Select></TableCell>
