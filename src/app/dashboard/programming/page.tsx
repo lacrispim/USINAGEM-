@@ -60,7 +60,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Label } from "@/label";
 import {
   Select,
   SelectContent,
@@ -155,6 +155,16 @@ const normalizeSiteName = (site: string | undefined): string => {
   const s = String(site).toUpperCase().trim();
   if (s.includes('VALINHOS')) return 'VALINHOS';
   return s;
+};
+
+// Função de normalização robusta para comparação de técnicos
+const normalizeTechName = (name: any): string => {
+  if (!name) return '';
+  return String(name)
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 };
 
 function getShiftFromDate(d: Date): string {
@@ -420,7 +430,7 @@ export default function ProgrammingPage() {
   const prodRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]);
   const { data: productionRecords } = useCollection(prodRecordsQuery);
   
-  const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]);
+  const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
   const { data: lossRecords } = useCollection(lossRecordsQuery);
 
   useEffect(() => {
@@ -537,9 +547,9 @@ export default function ProgrammingPage() {
     const laneBusy: Record<string, { start: number; end: number }[]> = { 'TORNO_0': [], 'CENTRO_0': [], 'ADM_0': [] };
 
     // 1. Mapear a escala de técnicos planejada para atribuição correta das perdas
-    // Estendemos a janela para 60 dias para garantir processamento de apontamentos futuros/testes
-    const techScheduleMap = new Map<string, string>(); // "dateStr|techName" -> shiftId
-    for (let dIdx = 0; dIdx < 60; dIdx++) {
+    // Aumentamos para 90 dias para garantir que testes em datas futuras (2026) funcionem
+    const techScheduleMap = new Map<string, string>(); // "dateStr|normalizedTechName" -> shiftId
+    for (let dIdx = 0; dIdx < 90; dIdx++) {
       const d = addDays(baseDate, dIdx);
       if (isDomingo(d)) continue;
       const dStr = format(d, 'yyyy-MM-dd');
@@ -548,7 +558,7 @@ export default function ProgrammingPage() {
           const overrideKey = `${dStr}_${tk}_${sId}`;
           const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
           if (techName) {
-            techScheduleMap.set(`${dStr}|${techName}`, sId);
+            techScheduleMap.set(`${dStr}|${normalizeTechName(techName)}`, sId);
           }
         });
       });
@@ -559,18 +569,18 @@ export default function ProgrammingPage() {
         if (!loss.operatorId || !loss.timeLost) return;
         const d = loss.date?.toDate ? loss.date.toDate() : new Date(loss.date);
         const dateStr = format(d, 'yyyy-MM-dd');
+        const normOp = normalizeTechName(loss.operatorId);
         
-        // Atribuição prioritária: Se o técnico está escalado em algum turno neste dia, a perda vai para esse turno.
-        // Isso atende ao pedido de "atribuição pelo técnico e não pelo horário de apontamento".
-        let shiftId = techScheduleMap.get(`${dateStr}|${loss.operatorId}`);
+        // Atribuição prioritária: Pela escala planejada
+        let shiftId = techScheduleMap.get(`${dateStr}|${normOp}`);
         
         if (!shiftId) {
-            // Fallback apenas se o técnico não estiver escalado (ex: trabalho extra em dia de folga)
+            // Fallback: Pelo horário de criação se não estiver explicitamente escalado
             const createdAt = loss.createdAt?.toDate ? loss.createdAt.toDate() : d;
             shiftId = getShiftFromDate(createdAt);
         }
 
-        const key = `${dateStr}_${shiftId}_${loss.operatorId}`;
+        const key = `${dateStr}_${shiftId}_${normOp}`;
         const existing = techLossSummary.get(key) || { total: 0, descriptions: '' };
         const reason = loss.lossReason || 'Outros';
         const detail = `• ${reason}: ${loss.timeLost} min`;
@@ -594,7 +604,7 @@ export default function ProgrammingPage() {
       laneBusy[laneId].sort((a, b) => a.start - b.start);
     };
 
-    for (let dIdx = 0; dIdx < 45; dIdx++) {
+    for (let dIdx = 0; dIdx < 90; dIdx++) {
         const d = addDays(baseDate, dIdx);
         if (isDomingo(d)) continue;
         const dStr = format(d, 'yyyy-MM-dd');
@@ -608,7 +618,7 @@ export default function ProgrammingPage() {
                 const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
                 if (!techName) return;
 
-                const lossData = techLossSummary.get(`${dStr}_${sId}_${techName}`);
+                const lossData = techLossSummary.get(`${dStr}_${sId}_${normalizeTechName(techName)}`);
                 const lossMin = lossData?.total || 0;
                 if (lossMin > 0) {
                     occupy(laneId, shiftAbs, shiftAbs + lossMin);
