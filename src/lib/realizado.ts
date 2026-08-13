@@ -1,6 +1,6 @@
 'use client';
 
-import { format } from 'date-fns';
+import { format, parse, isAfter, isBefore, addMinutes, subMinutes } from 'date-fns';
 
 export interface ComparacaoItem {
   id: string;
@@ -26,10 +26,38 @@ export interface ComparacaoItem {
   suspeitaDuplicidade: boolean;
 }
 
+// Mapeamento para ajudar a encontrar a tecnologia do técnico se a máquina não for informada
+const TECH_BY_OPERATOR: Record<string, 'TORNO' | 'CENTRO' | 'ADM'> = {
+  "Alisson França": "TORNO",
+  "Gustavo Gozzi": "TORNO",
+  "Jair Melo": "TORNO",
+  "Daniel Solivo": "CENTRO",
+  "Nathan Xavier": "CENTRO",
+  "Rodrigo Cantano": "CENTRO",
+  "William Martinucci": "ADM",
+  "Marcos Barbosa": "TORNO" // Folgista costuma atuar mais no Torno, mas é flexível
+};
+
+function normalizeName(name: any): string {
+  if (!name) return '';
+  return String(name)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
 function getShiftFromDate(d: Date): string {
   const h = d.getHours();
-  if (h >= 6 && h < 13) return '1';
-  if (h >= 13 && h < 20) return '2';
+  const m = d.getMinutes();
+  const totalMinutes = h * 60 + m;
+
+  // 1T: 06:00 (360m) - 13:00 (780m)
+  // 2T: 13:00 (780m) - 20:00 (1200m)
+  // 3T: 20:00 (1200m) - 03:00 (180m do dia seguinte)
+
+  if (totalMinutes >= 360 && totalMinutes < 785) return '1'; // Tolerância de 5min após as 13h
+  if (totalMinutes >= 785 && totalMinutes < 1205) return '2'; // Tolerância de 5min após as 20h
   return '3';
 }
 
@@ -46,16 +74,24 @@ export function cruzarComPlano(
     if (!p.formsNumber || !p.operatorId || !p.date) return;
     const d = p.date.toDate ? p.date.toDate() : new Date(p.date);
     const dStr = format(d, 'dd/MM/yyyy');
-    const key = `${dStr}|${p.operatorId}|${p.formsNumber}`;
+    
+    // Normalizamos o nome do técnico para a chave
+    const techNorm = normalizeName(p.operatorId);
+    const formsNorm = String(p.formsNumber).replace('#', '').trim();
+    
+    const key = `${dStr}|${techNorm}|${formsNorm}`;
     if (!prodGroup[key]) prodGroup[key] = [];
     prodGroup[key].push(p);
   });
 
   const matchedKeys = new Set<string>();
 
-  // 1. Processar itens do Plano (Gera barras alinhadas ou "semApontamento")
+  // 1. Processar itens do Plano
   plano.forEach(pItem => {
-    const key = `${pItem.dataExecucao}|${pItem.tecnico}|${pItem.requisicao}`;
+    const techNorm = normalizeName(pItem.tecnico);
+    const formsNorm = String(pItem.requisicao).replace('#', '').trim();
+    const key = `${pItem.dataExecucao}|${techNorm}|${formsNorm}`;
+    
     const records = prodGroup[key] || [];
     
     const tempoPlanejado = (pItem.tempoMinutos || 0) + (pItem.setupMinutos || 0);
@@ -108,7 +144,7 @@ export function cruzarComPlano(
   Object.keys(prodGroup).forEach(key => {
     if (matchedKeys.has(key)) return;
     const records = prodGroup[key];
-    const [dStr, opId, forms] = key.split('|');
+    const [dStr, techNorm, forms] = key.split('|');
     
     let tempoRealizado = 0;
     let tempoUsinagem = 0;
@@ -123,17 +159,25 @@ export function cruzarComPlano(
       pecasRealizadas += Number(r.quantityProduced) || 0;
     });
 
-    let techKey = 'ADM';
-    if (records[0].machine?.includes('TORNO')) techKey = 'TORNO';
-    if (records[0].machine?.includes('CENTRO')) techKey = 'CENTRO';
+    // Identifica a tecnologia (TechKey)
+    let techKey: 'TORNO' | 'CENTRO' | 'ADM' = 'ADM';
+    const firstMachine = String(records[0].machine || '').toUpperCase();
+    if (firstMachine.includes('TORNO')) techKey = 'TORNO';
+    else if (firstMachine.includes('CENTRO')) techKey = 'CENTRO';
+    else {
+      // Se não informou máquina, tenta descobrir pelo nome do técnico original (não o normalizado)
+      const originalTechName = records[0].operatorId;
+      techKey = TECH_BY_OPERATOR[originalTechName] || 'ADM';
+    }
 
+    // Identifica o turno
     const createdAt = records[0].createdAt?.toDate ? records[0].createdAt.toDate() : new Date();
     const turno = getShiftFromDate(createdAt);
 
     result.push({
       id: `extra-${key}`,
       requisicao: forms,
-      tecnico: opId,
+      tecnico: records[0].operatorId, // Mantemos o nome original para exibição
       dataStr: dStr,
       turno,
       techKey,
