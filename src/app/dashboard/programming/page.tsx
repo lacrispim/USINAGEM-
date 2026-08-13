@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
@@ -19,11 +18,8 @@ import {
   Coffee,
   Mic,
   Check,
-  Power,
-  PowerOff,
   Plus,
   Trash2,
-  MapPin,
   UserRoundPen,
   Filter,
   Cpu,
@@ -31,9 +27,8 @@ import {
   Anchor,
   Clock,
   CheckCircle2,
-  AlertTriangle,
-  History,
-  Settings2
+  Power,
+  PowerOff
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -46,7 +41,6 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -62,7 +56,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/alert-dialog";
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -94,8 +88,8 @@ interface JobBase {
   etapa2: string;
   dataDesejada?: string; 
   turnoDesejado?: string; 
-  ordemTorno?: number; // Prioridade independente no Torno
-  ordemCentro?: number; // Prioridade independente no Centro
+  ordemTorno?: number;
+  ordemCentro?: number;
 }
 
 interface PlanejamentoItem {
@@ -228,9 +222,9 @@ const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
     semApontamento: 'bg-transparent'
   };
 
-  const deviation = item.tempoRealizado - item.tempoPlanejado;
-  const isPending = item.status === 'semApontamento';
   const hasPlan = item.tempoPlanejado > 0;
+  const isPending = item.status === 'semApontamento';
+  const deviation = hasPlan ? (item.tempoRealizado - item.tempoPlanejado) : 0;
   
   const devText = (!hasPlan || isPending) ? '-' : (deviation === 0 ? 'OK' : (deviation > 0 ? `+${deviation}m` : `${deviation}m`));
 
@@ -336,7 +330,6 @@ export default function ProgrammingPage() {
 
   const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
 
-  // Filtra e ordena as peças do Torno e Centro de forma independente
   const filteredTornoJobs = useMemo(() => {
       return fila
         .filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO')
@@ -527,10 +520,8 @@ export default function ProgrammingPage() {
 
     const finishTimes: Record<string, number> = {};
 
-    // 1. Programação (ADM)
     novaFila.forEach(job => allocateTask(job, 'ADM', 0, 'prog'));
 
-    // 2. Torno - Processa seguindo a OrdemTorno
     const tornoJobs = [...novaFila]
         .filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO')
         .sort((a, b) => (a.ordemTorno || 999) - (b.ordemTorno || 999));
@@ -543,7 +534,6 @@ export default function ProgrammingPage() {
         finishTimes[job.id] = allocateTask(job, 'TORNO', minStart, 'torno');
     });
 
-    // 3. Centro - Processa seguindo a OrdemCentro
     const centroJobs = [...novaFila]
         .filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO')
         .sort((a, b) => (a.ordemCentro || 999) - (b.ordemCentro || 999));
@@ -633,23 +623,21 @@ export default function ProgrammingPage() {
         const [movedItem] = newFila.splice(currentIdx, 1);
         newFila.splice(targetIdx, 0, movedItem);
     } else if (type === 'TORNO') {
-        const list = newFila.filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO').sort((a, b) => (a.ordemTorno || 999) - (b.ordemTorno || 999));
+        const list = newFila.filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO').sort((a, b) => (a.ordemTorno || 9999) - (b.ordemTorno || 9999));
         const targetIdx = Math.max(0, Math.min(list.length - 1, newPos - 1));
         const filteredIdx = list.findIndex(j => j.id === itemToMove.id);
         const [movedItem] = list.splice(filteredIdx, 1);
         list.splice(targetIdx, 0, movedItem);
-        // Re-atribui ordens independentes
         list.forEach((job, i) => {
             const originalJob = newFila.find(nf => nf.id === job.id);
             if (originalJob) originalJob.ordemTorno = i + 1;
         });
     } else if (type === 'CENTRO') {
-        const list = newFila.filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO').sort((a, b) => (a.ordemCentro || 999) - (b.ordemCentro || 999));
+        const list = newFila.filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO').sort((a, b) => (a.ordemCentro || 9999) - (b.ordemCentro || 9999));
         const targetIdx = Math.max(0, Math.min(list.length - 1, newPos - 1));
         const filteredIdx = list.findIndex(j => j.id === itemToMove.id);
         const [movedItem] = list.splice(filteredIdx, 1);
         list.splice(targetIdx, 0, movedItem);
-        // Re-atribui ordens independentes
         list.forEach((job, i) => {
             const originalJob = newFila.find(nf => nf.id === job.id);
             if (originalJob) originalJob.ordemCentro = i + 1;
@@ -760,7 +748,6 @@ export default function ProgrammingPage() {
         ) : jobs.map((job, localIdx) => {
           const globalIdx = indexById.get(job.id) ?? 0;
           
-          // POS exibe o rank específico da aba
           let displayPos = localIdx + 1;
           if (type === 'TORNO') displayPos = job.ordemTorno || localIdx + 1;
           else if (type === 'CENTRO') displayPos = job.ordemCentro || localIdx + 1;
@@ -842,9 +829,56 @@ export default function ProgrammingPage() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div><h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none">Planejamento CNC</h1></div>
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
-            <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" title="Limpar Todo Planejamento"><Eraser className="h-5 w-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Deseja limpar todo o planejamento?</AlertDialogTitle><AlertDialogDescription>Esta ação removerá permanentemente todas as requisições da fila, o cronograma visual e todas as configurações de turnos.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleClearAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Limpar Tudo</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" title="Limpar Todo Planejamento">
+                  <Eraser className="h-5 w-5" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Deseja limpar todo o planejamento?</AlertDialogTitle>
+                  <AlertDialogDescription>Esta ação removerá permanentemente todas as requisições da fila, o cronograma visual e todas as configurações de turnos.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Limpar Tudo</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Popover open={isAnchorPopoverOpen} onOpenChange={setIsAnchorPopoverOpen}><PopoverTrigger asChild><Button variant="outline" className="h-10 text-xs font-black uppercase flex-1 sm:flex-none"><Anchor className="h-4 w-4 mr-2" /> {planStartDate ? `Início: ${format(planStartDate, 'dd/MM/yy')}` : "Definir Âncora"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="end"><div className="px-3 pt-3 pb-1 border-b border-border/50"><p className="text-[10px] font-black uppercase tracking-widest">Início do plano</p><p className="text-[9px] text-muted-foreground">Define onde a programação começa a preencher os turnos.</p></div><Calendar mode="single" locale={ptBR} selected={planStartDate || undefined} onSelect={handleSetAnchorDate} disabled={isDomingo} initialFocus/></PopoverContent></Popover>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}><DialogTrigger asChild><Button variant="secondary" className="h-10 text-xs font-black uppercase flex-1 sm:flex-none"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button></DialogTrigger><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Adicionar Requisição Manual</DialogTitle></DialogHeader><div className="grid gap-4 py-4"><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Requisição</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} /></div><div className="space-y-2"><Label>Nome da Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} /></div></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Máquina Principal</Label><Select value={newItem.etapa1} onValueChange={v => setNewItem({...newItem, etapa1: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TORNO">TORNO CNC</SelectItem><SelectItem value="CENTRO">CENTRO CNC</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div><div className="space-y-2"><Label>Turno Desejado</Label><Select value={newItem.turnoDesejado || "AUTO"} onValueChange={v => setNewItem({...newItem, turnoDesejado: v === "AUTO" ? "" : v})}><SelectTrigger><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></div></div><div className="grid grid-cols-3 gap-4"><div className="space-y-2"><Label>Torno (min)</Label><Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} /></div><div className="space-y-2"><Label>Centro (min)</Label><Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})} /></div><div className="space-y-2"><Label>Setup (min)</Label><Input type="number" value={newItem.setup} onChange={e => setNewItem({...newItem, setup: Number(e.target.value)})} /></div></div></div><DialogFooter><Button onClick={handleAddManual} className="w-full">Adicionar na Fila</Button></DialogFooter></DialogContent></Dialog>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="secondary" className="h-10 text-xs font-black uppercase flex-1 sm:flex-none">
+                  <Plus className="h-4 w-4 mr-2" /> Nova Requisição
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Adicionar Requisição Manual</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Requisição</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} /></div>
+                    <div className="space-y-2"><Label>Nome da Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Máquina Principal</Label><Select value={newItem.etapa1} onValueChange={v => setNewItem({...newItem, etapa1: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TORNO">TORNO CNC</SelectItem><SelectItem value="CENTRO">CENTRO CNC</SelectItem></SelectContent></Select></div>
+                    <div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div>
+                    <div className="space-y-2"><Label>Turno Desejado</Label><Select value={newItem.turnoDesejado || "AUTO"} onValueChange={v => setNewItem({...newItem, turnoDesejado: v === "AUTO" ? "" : v})}><SelectTrigger><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2"><Label>Torno (min)</Label><Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} /></div>
+                    <div className="space-y-2"><Label>Centro (min)</Label><Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})} /></div>
+                    <div className="space-y-2"><Label>Setup (min)</Label><Input type="number" value={newItem.setup} onChange={e => setNewItem({...newItem, setup: Number(e.target.value)})} /></div>
+                  </div>
+                </div>
+                <DialogFooter><Button onClick={handleAddManual} className="w-full">Adicionar na Fila</Button></DialogFooter>
+              </DialogContent>
+            </Dialog>
             <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
             <Button className="h-10 bg-primary text-primary-foreground font-black text-xs uppercase flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
               {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha
@@ -888,7 +922,6 @@ export default function ProgrammingPage() {
                                                               <div className="text-sm font-black truncate">{tech}</div>
                                                           </div>
                                                           <div className="space-y-4 w-full">
-                                                              {/* PLANEJADO GANTT */}
                                                               <div className="space-y-1">
                                                                   <div className="flex items-center justify-between"><span className="text-[9px] font-black uppercase text-muted-foreground/40 tracking-widest">Planejado</span></div>
                                                                   <div className="relative h-[48px] border border-border/50 rounded bg-black/20 overflow-hidden">
@@ -897,7 +930,6 @@ export default function ProgrammingPage() {
                                                                   </div>
                                                               </div>
 
-                                                              {/* REALIZADO SCORECARD (TABULAR) */}
                                                               <div className="bg-black/5 rounded-sm border border-border/20 overflow-hidden shadow-inner">
                                                                   <div className="grid grid-cols-[80px_100px_100px_100px_1fr_80px] bg-muted/20 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/10">
                                                                       <div>Forms</div>
