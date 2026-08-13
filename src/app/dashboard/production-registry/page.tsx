@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -97,7 +98,6 @@ const productionFormSchema = z.object({
   activityType: z.string().optional(),
   machine: z.string().optional(),
   quantityProduced: z.coerce.number().optional(),
-  operationsNumber: z.string().optional(),
   machiningTime: z.coerce.number().optional(),
   status: z.string().optional(),
   observations: z.string().optional(),
@@ -721,6 +721,103 @@ export default function ProductionRegistryPage() {
             onExport={exportToExcel}
           />
       </div>
+
+      {/* --- DIALOG DE EDIÇÃO --- */}
+      <Dialog open={editingRecord !== null} onOpenChange={(open) => !open && setEditingRecord(null)}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Editar Registro de {editingRecord?.type === 'production' ? 'Produção' : 'Perda'}</DialogTitle>
+            <DialogDescription>Altere as informações do apontamento e clique em salvar.</DialogDescription>
+          </DialogHeader>
+
+          {editingRecord?.type === 'production' && (
+            <Form {...editProductionForm}>
+              <form onSubmit={editProductionForm.handleSubmit(onUpdateProduction)} className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={editProductionForm.control} name="operatorId" render={({field}) => (
+                    <FormItem><FormLabel>Operador</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>
+                  )} />
+                  <FormField control={editProductionForm.control} name="date" render={({field}) => (
+                    <FormItem><FormLabel>Data</FormLabel><FormControl><Input placeholder="dd/MM/yyyy" {...field} /></FormControl></FormItem>
+                  )} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={editProductionForm.control} name="factory" render={({field}) => (
+                    <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
+                  )} />
+                  <FormField control={editProductionForm.control} name="formsNumber" render={({field}) => (
+                    <FormItem><FormLabel>Nº Forms</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  )} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={editProductionForm.control} name="machine" render={({field}) => (
+                        <FormItem><FormLabel>Máquina</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="TORNO CNC CENTUR 30">TORNO CNC</SelectItem><SelectItem value="CENTRO DE USINAGEM D600">CENTRO</SelectItem></SelectContent></Select></FormItem>
+                    )} />
+                    <FormField control={editProductionForm.control} name="activityType" render={({field}) => (
+                        <FormItem><FormLabel>Tipo</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="USINAGEM">USINAGEM</SelectItem><SelectItem value="PROGRAMACAO">PROGRAMAÇÃO</SelectItem><SelectItem value="PRIMEIRA PEÇA">PRIMEIRA PEÇA</SelectItem></SelectContent></Select></FormItem>
+                    )} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={editProductionForm.control} name="quantityProduced" render={({field}) => (
+                        <FormItem><FormLabel>Qtd Produzida</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                    )} />
+                    <FormField control={editProductionForm.control} name="machiningTime" render={({field}) => (
+                        <FormItem><FormLabel>Tempo (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                    )} />
+                </div>
+                <FormField control={editProductionForm.control} name="observations" render={({field}) => (
+                    <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea className="min-h-[80px]" {...field} /></FormControl></FormItem>
+                )} />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setEditingRecord(null)}>Cancelar</Button>
+                  <Button type="submit">Salvar Alterações</Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          )}
+
+          {editingRecord?.type === 'loss' && (
+            <Form {...editLossForm}>
+              <form onSubmit={editLossForm.handleSubmit(onUpdateLoss)} className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={editLossForm.control} name="operatorId" render={({field}) => (
+                    <FormItem><FormLabel>Operador</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}</SelectContent></Select></FormItem>
+                  )} />
+                  <FormField control={editLossForm.control} name="date" render={({field}) => (
+                    <FormItem><FormLabel>Data</FormLabel><FormControl><Input placeholder="dd/MM/yyyy" {...field} /></FormControl></FormItem>
+                  )} />
+                </div>
+                <FormField control={editLossForm.control} name="lossReason" render={({field}) => (
+                    <FormItem><FormLabel>Motivo da Parada</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{lossReasonDetails.map(r => <SelectItem key={r.value} value={r.value}>{r.value}</SelectItem>)}</SelectContent></Select></FormItem>
+                )} />
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={editLossForm.control} name="timeLost" render={({field}) => (
+                        <FormItem><FormLabel>Tempo Perdido (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                    )} />
+                    <FormField control={editLossForm.control} name="factory" render={({field}) => (
+                        <FormItem><FormLabel>Fábrica</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{factoryList.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></FormItem>
+                    )} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={editLossForm.control} name="machine" render={({field}) => (
+                      <FormItem><FormLabel>Máquina</FormLabel><Select onValueChange={field.onChange} value={field.value || ""}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="TORNO CNC CENTUR 30">TORNO CNC</SelectItem><SelectItem value="CENTRO DE USINAGEM D600">CENTRO</SelectItem></SelectContent></Select></FormItem>
+                  )} />
+                  <FormField control={editLossForm.control} name="formsNumber" render={({field}) => (
+                      <FormItem><FormLabel>Nº Forms</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                  )} />
+                </div>
+                <FormField control={editLossForm.control} name="observations" render={({field}) => (
+                    <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea className="min-h-[80px]" {...field} /></FormControl></FormItem>
+                )} />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setEditingRecord(null)}>Cancelar</Button>
+                  <Button type="submit">Salvar Alterações</Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
