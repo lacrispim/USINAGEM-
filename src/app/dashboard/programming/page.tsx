@@ -208,47 +208,55 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
 });
 TimelineBar.displayName = 'TimelineBar';
 
-const ActualBadge = React.memo(({ item }: { item: ComparacaoItem }) => {
+const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
   const colors = {
-    dentro: 'bg-emerald-600',
-    estourou: 'bg-rose-600',
-    adiantado: 'bg-sky-600',
-    semPlano: 'bg-amber-600',
-    semApontamento: 'border-2 border-dashed border-muted-foreground/30 bg-transparent text-muted-foreground/50'
+    dentro: 'text-emerald-500',
+    estourou: 'text-rose-500',
+    adiantado: 'text-sky-500',
+    semPlano: 'text-amber-500',
+    semApontamento: 'text-muted-foreground/30'
+  };
+
+  const bgColors = {
+    dentro: 'bg-emerald-500/5',
+    estourou: 'bg-rose-500/5',
+    adiantado: 'bg-sky-500/5',
+    semPlano: 'bg-amber-500/5',
+    semApontamento: 'bg-transparent'
   };
 
   const deviation = item.tempoRealizado - item.tempoPlanejado;
-  const devText = deviation === 0 ? '' : (deviation > 0 ? `+${deviation}m` : `${deviation}m`);
-
-  if (item.status === 'semApontamento') {
-    return (
-      <div className={cn("px-2 py-1 rounded-[2px] border text-[10px] font-black uppercase flex items-center gap-1", colors.semApontamento)}>
-        <History className="h-3 w-3 opacity-30" /> #{item.requisicao} (sem apont.)
-      </div>
-    );
-  }
+  const isPending = item.status === 'semApontamento';
+  const devText = isPending ? '-' : (deviation === 0 ? 'OK' : (deviation > 0 ? `+${deviation}m` : `${deviation}m`));
 
   return (
-    <div 
-      className={cn(
-        "px-2 py-1.5 rounded-[3px] flex items-center gap-2 shadow-sm border border-black/20 text-white shrink-0", 
-        colors[item.status],
-        item.suspeitaDuplicidade && "ring-2 ring-white/40 ring-offset-1 ring-offset-background"
-      )}
-      title={`REQ: ${item.requisicao} | Planejado: ${item.tempoPlanejado}m | Real: ${item.tempoRealizado}m`}
-    >
-      <span className="text-[11px] font-black">#{item.requisicao}</span>
-      <div className="h-3 w-px bg-white/20" />
-      <span className="text-[10px] font-bold tabular-nums">{item.tempoRealizado} min</span>
-      <span className="text-[10px] font-medium opacity-80">{item.pecasRealizadas} pç</span>
-      {devText && (
-        <span className="text-[9px] bg-black/20 px-1 rounded-sm font-black tabular-nums">{devText}</span>
-      )}
-      {item.status === 'semPlano' && <AlertTriangle className="h-3 w-3 text-white" />}
+    <div className={cn(
+      "grid grid-cols-[80px_100px_100px_100px_1fr_80px] items-center px-3 py-1.5 text-[11px] font-bold border-l-4 transition-colors",
+      bgColors[item.status],
+      item.status === 'dentro' ? "border-emerald-500" :
+      item.status === 'estourou' ? "border-rose-500" :
+      item.status === 'adiantado' ? "border-sky-500" :
+      item.status === 'semPlano' ? "border-amber-500" : "border-transparent",
+      item.suspeitaDuplicidade && "bg-yellow-500/10"
+    )}>
+      <div className="font-mono">#{item.requisicao}</div>
+      <div className="text-muted-foreground/50 font-medium">{item.tempoPlanejado} min</div>
+      <div className={cn("font-black", colors[item.status])}>{isPending ? '---' : `${item.tempoRealizado} min`}</div>
+      <div className={cn("font-black tabular-nums", colors[item.status])}>{devText}</div>
+      <div className="flex items-center gap-2">
+          {item.status === 'semPlano' && (
+            <Badge variant="outline" className="h-4 text-[8px] border-amber-500/30 text-amber-500 py-0 uppercase font-black">Extra</Badge>
+          )}
+          {item.suspeitaDuplicidade && (
+            <Badge variant="outline" className="h-4 text-[8px] border-yellow-500/30 text-yellow-500 py-0 uppercase font-black">Duplicado?</Badge>
+          )}
+          {isPending && <span className="text-[9px] uppercase opacity-30 italic font-black">Não Apontado</span>}
+      </div>
+      <div className="text-right tabular-nums font-black opacity-80">{isPending ? '-' : `${item.pecasRealizadas} pç`}</div>
     </div>
   );
 });
-ActualBadge.displayName = 'ActualBadge';
+ActualRow.displayName = 'ActualRow';
 
 const JobExecutionCell = ({ job, calculatedDate, onUpdate }: { job: JobBase, calculatedDate?: string, onUpdate: (date: string | null) => void }) => {
   const forcedDate = job.dataDesejada ? parse(job.dataDesejada, 'yyyy-MM-dd', new Date()) : null;
@@ -765,15 +773,34 @@ export default function ProgrammingPage() {
                                                           <div className="pr-4 truncate cursor-pointer group/tech pt-1" onClick={() => { setActiveSwap({ day: dateStr, shiftId: t.id, category: cat, currentTech: tech }); setIsSwapDialogOpen(true); }}>
                                                               <div className={cn("text-[11px] font-mono font-black uppercase flex items-center gap-1.5", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>{cat}<UserRoundPen className="h-3 w-3 opacity-0 group-hover/tech:opacity-100 transition-opacity" /></div>
                                                               <div className="text-sm font-black truncate">{tech}</div>
-                                                              <div className="mt-[34px] flex items-center justify-end"><span className="text-[9px] font-black text-muted-foreground/60 tracking-[0.2em] uppercase">Real</span></div>
                                                           </div>
-                                                          <div className="space-y-3 w-full">
-                                                              <div className="relative h-[48px] border border-border/50 rounded bg-black/20 overflow-hidden">
-                                                                  {PAUSAS.map(p => (<div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-3 w-3 text-yellow-500/30" /></div>))}
-                                                                  {itemsForLane.map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
+                                                          <div className="space-y-4 w-full">
+                                                              {/* PLANEJADO GANTT */}
+                                                              <div className="space-y-1">
+                                                                  <div className="flex items-center justify-between"><span className="text-[9px] font-black uppercase text-muted-foreground/40 tracking-widest">Planejado</span></div>
+                                                                  <div className="relative h-[48px] border border-border/50 rounded bg-black/20 overflow-hidden">
+                                                                      {PAUSAS.map(p => (<div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-3 w-3 text-yellow-500/30" /></div>))}
+                                                                      {itemsForLane.map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
+                                                                  </div>
                                                               </div>
-                                                              <div className="flex flex-wrap gap-2 min-h-[32px] items-center p-1 bg-black/5 rounded-sm border border-border/20">
-                                                                  {realItemsForLane.map(item => <ActualBadge key={item.id} item={item} />)}
+
+                                                              {/* REALIZADO SCORECARD (TABULAR) */}
+                                                              <div className="bg-black/5 rounded-sm border border-border/20 overflow-hidden shadow-inner">
+                                                                  <div className="grid grid-cols-[80px_100px_100px_100px_1fr_80px] bg-muted/20 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/10">
+                                                                      <div>Forms</div>
+                                                                      <div>Planejado</div>
+                                                                      <div>Realizado</div>
+                                                                      <div>Desvio</div>
+                                                                      <div className="text-center">Status / Info</div>
+                                                                      <div className="text-right">Peças</div>
+                                                                  </div>
+                                                                  <div className="divide-y divide-border/5 max-h-[300px] overflow-y-auto">
+                                                                      {realItemsForLane.length === 0 ? (
+                                                                        <div className="px-3 py-4 text-center text-[10px] text-muted-foreground/30 font-black uppercase tracking-widest italic">Aguardando apontamentos...</div>
+                                                                      ) : (
+                                                                        realItemsForLane.map(item => <ActualRow key={item.id} item={item} />)
+                                                                      )}
+                                                                  </div>
                                                               </div>
                                                           </div>
                                                       </div>
