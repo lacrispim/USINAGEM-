@@ -284,8 +284,14 @@ const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
       item.suspeitaDuplicidade && "bg-yellow-500/10 border-dashed"
     )}>
       <div className="font-mono">#{item.requisicao}</div>
-      <div className="text-muted-foreground/50 font-medium">{item.tempoPlanejado} min</div>
-      <div className={cn("font-black", colors[item.status])}>{isPending ? '---' : `${item.tempoRealizado} min`}</div>
+      <div className="flex flex-col">
+        <span className="text-muted-foreground/50 font-medium">{item.tempoPlanejado} min</span>
+        {item.tempoSetupPlanejado > 0 && <span className="text-[9px] text-muted-foreground/30 font-black">Plan Setup: {item.tempoSetupPlanejado}m</span>}
+      </div>
+      <div className="flex flex-col">
+        <span className={cn("font-black", colors[item.status])}>{isPending ? '---' : `${item.tempoRealizado} min`}</span>
+        {item.tempoSetupRealizado > 0 && <span className="text-[9px] text-primary/60 font-black">Real Setup: {item.tempoSetupRealizado}m</span>}
+      </div>
       <div className={cn("font-black tabular-nums", colors[item.status])}>{devText}</div>
       <div className="flex items-center gap-2">
           {item.status === 'semPlano' && (
@@ -411,6 +417,7 @@ export default function ProgrammingPage() {
   const jobCompletionStats = useMemo(() => {
     const map = new Map<string, { total: number, concluded: number }>();
     for (const item of planejamentoData) {
+      if (item.jobId === 'loss') continue;
       const stats = map.get(item.jobId) || { total: 0, concluded: 0 };
       stats.total++;
       if (item.isConcluded) stats.concluded++;
@@ -421,7 +428,10 @@ export default function ProgrammingPage() {
 
   const jobStartDates = useMemo(() => {
     const map = new Map<string, string>();
-    for (const item of planejamentoData) { if (!map.has(item.jobId)) map.set(item.jobId, item.dataExecucao); }
+    for (const item of planejamentoData) { 
+      if (item.jobId === 'loss') continue;
+      if (!map.has(item.jobId)) map.set(item.jobId, item.dataExecucao); 
+    }
     return map;
   }, [planejamentoData]);
 
@@ -451,9 +461,9 @@ export default function ProgrammingPage() {
   }, [filteredPlanejamento]);
 
   const realItems = useMemo(() => {
-    if (!planejamentoData || !productionRecords) return [];
-    return cruzarComPlano(planejamentoData, productionRecords, TOLERANCIA_ADERENCIA);
-  }, [planejamentoData, productionRecords]);
+    if (!planejamentoData || !productionRecords || !lossRecords) return [];
+    return cruzarComPlano(planejamentoData, productionRecords, lossRecords, TOLERANCIA_ADERENCIA);
+  }, [planejamentoData, productionRecords, lossRecords]);
 
   const realIndex = useMemo(() => {
     const map = new Map<string, ComparacaoItem[]>();
