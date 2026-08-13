@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
@@ -30,7 +31,8 @@ import {
   Anchor,
   Clock,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  History
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -159,9 +161,9 @@ const Ruler = React.memo(() => {
   const marks = [];
   for (let m = 0; m <= SHIFT_MIN; m += 60) {
     const pc = (m / SHIFT_MIN) * 100;
-    marks.push(<div key={m} className="absolute top-0 h-full flex flex-col items-center" style={{ left: `${pc}%` }}><div className={cn("w-px bg-border", m % 120 === 0 ? "h-[10px] bg-muted-foreground" : "h-[6px]")} />{m % 60 === 0 && <span className="text-[11px] font-mono font-bold text-muted-foreground leading-none mt-1">{m / 60}h</span>}</div>);
+    marks.push(<div key={m} className="absolute top-0 h-full flex flex-col items-center" style={{ left: `${pc}%` }}><div className={cn("w-px bg-border", m % 120 === 0 ? "h-[12px] bg-muted-foreground" : "h-[8px]")} />{m % 60 === 0 && <span className="text-[12px] font-mono font-black text-muted-foreground leading-none mt-1">{m / 60}h</span>}</div>);
   }
-  return <div className="relative h-[22px] border-b border-border/50 mb-1">{marks}</div>;
+  return <div className="relative h-[24px] border-b border-border/50 mb-1">{marks}</div>;
 });
 Ruler.displayName = 'Ruler';
 
@@ -189,16 +191,16 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
           className="h-full shrink-0 border-r border-black/20 flex items-center justify-center" 
           style={{ width: `${setupPc}%`, background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #101820 5px 10px)' }}
         >
-           <span className="text-[8px] font-black text-white bg-black/50 px-0.5 rounded-sm">S</span>
+           <span className="text-[10px] font-black text-white bg-black/50 px-0.5 rounded-sm">S</span>
         </div>
       )}
       <div className="flex-1 flex items-center gap-2 px-2 min-w-0 text-white overflow-hidden relative">
-        <span className="font-mono text-[12px] font-black shrink-0">#{item.requisicao}</span>
+        <span className="font-mono text-[13px] font-black shrink-0">#{item.requisicao}</span>
         <div className="flex items-center gap-1 shrink-0">
-          {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[10px] font-bold">{item.quantidadeNoBloco}pç</span>}
-          <span className="bg-black/40 px-1 rounded-[1px] text-[10px] font-black text-yellow-400 border border-yellow-400/20">{Math.round(totalMin)}m</span>
+          {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[11px] font-bold">{item.quantidadeNoBloco}pç</span>}
+          <span className="bg-black/40 px-1 rounded-[1px] text-[11px] font-black text-yellow-400 border border-yellow-400/20">{Math.round(totalMin)}m</span>
         </div>
-        <span className="text-[10px] opacity-90 truncate uppercase font-black leading-none">{item.nomeDaPeca}</span>
+        <span className="text-[11px] opacity-90 truncate uppercase font-black leading-none">{item.nomeDaPeca}</span>
         {item.isConcluded && <div className="absolute right-1 top-1/2 -translate-y-1/2"><Check className="h-4 w-4 text-green-400 stroke-[4px]" /></div>}
       </div>
     </div>
@@ -206,17 +208,13 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
 });
 TimelineBar.displayName = 'TimelineBar';
 
-const ActualBar = React.memo(({ item }: { item: ComparacaoItem }) => {
-  const widthPc = Math.max((item.tempoRealizado / SHIFT_MIN) * 100, 1);
-  const leftPc = (item.startOffsetMin / SHIFT_MIN) * 100;
-  const setupPc = item.tempoRealizado > 0 ? (item.tempoPrimeiraPeca / item.tempoRealizado) * 100 : 0;
-  
+const ActualBadge = React.memo(({ item }: { item: ComparacaoItem }) => {
   const colors = {
     dentro: 'bg-emerald-600',
     estourou: 'bg-rose-600',
     adiantado: 'bg-sky-600',
     semPlano: 'bg-amber-600',
-    semApontamento: 'border-2 border-dashed border-muted-foreground/30 bg-transparent'
+    semApontamento: 'border-2 border-dashed border-muted-foreground/30 bg-transparent text-muted-foreground/50'
   };
 
   const deviation = item.tempoRealizado - item.tempoPlanejado;
@@ -224,11 +222,8 @@ const ActualBar = React.memo(({ item }: { item: ComparacaoItem }) => {
 
   if (item.status === 'semApontamento') {
     return (
-      <div 
-        className="absolute top-0 bottom-0 rounded-[1px] border border-muted-foreground/30 flex items-center justify-center overflow-hidden z-[4]"
-        style={{ left: `${leftPc}%`, width: `${widthPc}%` }}
-      >
-        <span className="text-[8px] text-muted-foreground/50 uppercase font-black tracking-tighter">sem apontamento</span>
+      <div className={cn("px-2 py-1 rounded-[2px] border text-[10px] font-black uppercase flex items-center gap-1", colors.semApontamento)}>
+        <History className="h-3 w-3 opacity-30" /> #{item.requisicao} (sem apont.)
       </div>
     );
   }
@@ -236,33 +231,24 @@ const ActualBar = React.memo(({ item }: { item: ComparacaoItem }) => {
   return (
     <div 
       className={cn(
-        "absolute top-0 bottom-0 rounded-[1px] overflow-hidden flex shadow-sm z-[5] border border-black/20", 
+        "px-2 py-1.5 rounded-[3px] flex items-center gap-2 shadow-sm border border-black/20 text-white shrink-0", 
         colors[item.status],
-        item.suspeitaDuplicidade && "border-2 border-dashed border-white/60"
-      )} 
-      style={{ left: `${leftPc}%`, width: `${widthPc}%` }}
-      title={`REQ: ${item.requisicao} | Realizado: ${item.tempoRealizado}m | Desvio: ${devText}`}
-    >
-      {item.tempoPrimeiraPeca > 0 && (
-        <div 
-          className="h-full shrink-0 border-r border-black/10" 
-          style={{ width: `${setupPc}%`, background: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.2) 0 3px, transparent 3px 6px)' }}
-        />
+        item.suspeitaDuplicidade && "ring-2 ring-white/40 ring-offset-1 ring-offset-background"
       )}
-      <div className="flex-1 flex items-center gap-1.5 px-1.5 min-w-0 text-white overflow-hidden relative">
-        <span className="text-[10px] font-black shrink-0">#{item.requisicao}</span>
-        <span className="text-[9px] opacity-90 font-black truncate">
-            {item.pecasRealizadas}/{item.pecasPlanejadas} pç
-        </span>
-        <span className="text-[9px] ml-auto font-black tabular-nums bg-black/20 px-1 rounded-sm">
-            {devText}
-        </span>
-        {item.status === 'semPlano' && <AlertTriangle className="h-3 w-3 text-white shrink-0 ml-0.5" />}
-      </div>
+      title={`REQ: ${item.requisicao} | Planejado: ${item.tempoPlanejado}m | Real: ${item.tempoRealizado}m`}
+    >
+      <span className="text-[11px] font-black">#{item.requisicao}</span>
+      <div className="h-3 w-px bg-white/20" />
+      <span className="text-[10px] font-bold tabular-nums">{item.tempoRealizado} min</span>
+      <span className="text-[10px] font-medium opacity-80">{item.pecasRealizadas} pç</span>
+      {devText && (
+        <span className="text-[9px] bg-black/20 px-1 rounded-sm font-black tabular-nums">{devText}</span>
+      )}
+      {item.status === 'semPlano' && <AlertTriangle className="h-3 w-3 text-white" />}
     </div>
   );
 });
-ActualBar.displayName = 'ActualBar';
+ActualBadge.displayName = 'ActualBadge';
 
 const JobExecutionCell = ({ job, calculatedDate, onUpdate }: { job: JobBase, calculatedDate?: string, onUpdate: (date: string | null) => void }) => {
   const forcedDate = job.dataDesejada ? parse(job.dataDesejada, 'yyyy-MM-dd', new Date()) : null;
@@ -270,7 +256,7 @@ const JobExecutionCell = ({ job, calculatedDate, onUpdate }: { job: JobBase, cal
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className={cn(
-          "h-9 w-full justify-start text-[11px] font-black uppercase border border-dashed",
+          "h-9 w-full justify-start text-[12px] font-black uppercase border border-dashed",
           job.dataDesejada ? "border-primary text-primary" : "border-border text-muted-foreground/60"
         )}>
           <CalendarDays className="h-4 w-4 mr-1.5 opacity-50" />
@@ -712,15 +698,15 @@ export default function ProgrammingPage() {
             <TableRow key={job.id} className={cn("hover:bg-muted/5 transition-colors", isFullyConcluded && "bg-green-500/5 opacity-80")}>
               <TableCell className="text-center px-4"><Input type="number" defaultValue={displayIdx} key={`${job.id}-${displayIdx}`} className="h-10 w-14 text-center text-sm font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all" onFocus={(e) => e.target.select()} onBlur={(e) => { const newPos = parseInt(e.target.value); if (isNaN(newPos) || newPos < 1) { e.target.value = String(displayIdx); return; } if (isGlobal) { if (newPos !== globalIdx + 1) moveJobToPosition(globalIdx, newPos); } else { if (newPos !== localIdx + 1) { const targetItem = jobs[Math.min(newPos - 1, jobs.length - 1)]; const targetGlobalIdx = indexById.get(targetItem.id) ?? 0; moveJobToPosition(globalIdx, targetGlobalIdx + 1); } } }}/></TableCell>
               <TableCell className="text-center"><div className="flex flex-col items-center gap-1"><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => { if (isGlobal) moveJobToPosition(globalIdx, globalIdx); else if (localIdx > 0) { const targetGlobal = indexById.get(jobs[localIdx - 1].id) ?? 0; moveJobToPosition(globalIdx, targetGlobal + 1); } }} disabled={isGlobal ? globalIdx === 0 : localIdx === 0}><ArrowUp className="h-4 w-4" /></Button><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => { if (isGlobal) moveJobToPosition(globalIdx, globalIdx + 2); else if (localIdx < jobs.length - 1) { const targetGlobal = indexById.get(jobs[localIdx + 1].id) ?? 0; moveJobToPosition(globalIdx, targetGlobal + 1); } }} disabled={isGlobal ? globalIdx === fila.length - 1 : localIdx === jobs.length - 1}><ArrowDown className="h-4 w-4" /></Button></div></TableCell>
-              <TableCell>{isFullyConcluded ? (<div className="flex items-center gap-1.5 text-green-500 font-black text-[11px] uppercase"><CheckCircle2 className="h-4 w-4" />CONCLUÍDO</div>) : isPartiallyConcluded ? (<div className="flex items-center gap-1.5 text-yellow-500 font-black text-[11px] uppercase"><Clock className="h-4 w-4" />{Math.round((stats.concluded / stats.total) * 100)}%</div>) : (<div className="text-muted-foreground/40 font-black text-[11px] uppercase">PENDENTE</div>)}</TableCell>
+              <TableCell>{isFullyConcluded ? (<div className="flex items-center gap-1.5 text-green-500 font-black text-[12px] uppercase"><CheckCircle2 className="h-4 w-4" />CONCLUÍDO</div>) : isPartiallyConcluded ? (<div className="flex items-center gap-1.5 text-yellow-500 font-black text-[12px] uppercase"><Clock className="h-4 w-4" />{Math.round((stats.concluded / stats.total) * 100)}%</div>) : (<div className="text-muted-foreground/40 font-black text-[12px] uppercase">PENDENTE</div>)}</TableCell>
               <TableCell><JobExecutionCell job={job} calculatedDate={calculatedDate} onUpdate={(newDate) => updateJobField(job.id, 'dataDesejada', newDate)}/></TableCell>
               <TableCell><Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}><SelectTrigger className={cn("h-9 text-xs font-black uppercase", job.turnoDesejado ? "border-primary text-primary" : "border-border text-muted-foreground/60")}><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO" className="text-xs font-black">AUTO</SelectItem><SelectItem value="1" className="text-xs font-black">1T</SelectItem><SelectItem value="2" className="text-xs font-black">2T</SelectItem><SelectItem value="3" className="text-xs font-black">3T</SelectItem></SelectContent></Select></TableCell>
               <TableCell><Select value={normalizedSite} onValueChange={(v) => updateJobField(job.id, 'site', v)}><SelectTrigger className="h-9 text-xs font-black uppercase border-primary/20 bg-background/50"><MapPin className="h-4 w-4 text-primary mr-1" /><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f} className="text-xs font-bold">{f}</SelectItem>)}</SelectContent></Select></TableCell>
-              <TableCell><div className="flex items-center gap-1.5"><Input className="h-8 w-20 text-[11px] font-black uppercase p-1.5 bg-background/50 border-primary/20" defaultValue={job.etapa1} onBlur={(e) => updateJobField(job.id, 'etapa1', e.target.value.toUpperCase())}/><span className="text-xs opacity-30">→</span><Input className="h-8 w-20 text-[11px] font-black uppercase p-1.5 bg-background/50 border-primary/20" defaultValue={job.etapa2} onBlur={(e) => updateJobField(job.id, 'etapa2', e.target.value.toUpperCase())}/></div></TableCell>
+              <TableCell><div className="flex items-center gap-1.5"><Input className="h-8 w-20 text-[12px] font-black uppercase p-1.5 bg-background/50 border-primary/20" defaultValue={job.etapa1} onBlur={(e) => updateJobField(job.id, 'etapa1', e.target.value.toUpperCase())}/><span className="text-xs opacity-30">→</span><Input className="h-8 w-20 text-[12px] font-black uppercase p-1.5 bg-background/50 border-primary/20" defaultValue={job.etapa2} onBlur={(e) => updateJobField(job.id, 'etapa2', e.target.value.toUpperCase())}/></div></TableCell>
               <TableCell><Input className="h-8 w-24 font-mono font-bold text-xs p-1.5 bg-background/50 border-primary/20" defaultValue={job.requisicao} onBlur={(e) => updateJobField(job.id, 'requisicao', e.target.value)}/></TableCell>
               <TableCell><Input className="h-8 w-full min-w-[200px] uppercase text-xs font-medium p-1.5 bg-background/50 border-primary/20" defaultValue={job.nomeDaPeca} onBlur={(e) => updateJobField(job.id, 'nomeDaPeca', e.target.value.toUpperCase())}/></TableCell>
               <TableCell className="text-right"><Input type="number" className="h-8 w-16 text-right text-xs font-black p-1.5 bg-background/50 border-primary/20" defaultValue={job.quantidade} onBlur={(e) => updateJobField(job.id, 'quantidade', Number(e.target.value))}/></TableCell>
-              <TableCell className="text-right"><div className="flex flex-col items-end gap-1.5"><div className="flex items-center gap-1.5"><span className="text-[10px] font-bold text-muted-foreground">T:</span><Input type="number" className="h-7 w-14 text-right text-[11px] p-1.5 bg-background/50 border-primary/10" defaultValue={job.torno} onBlur={(e) => updateJobField(job.id, 'torno', Number(e.target.value))}/><span className="text-[10px] font-bold text-muted-foreground">C:</span><Input type="number" className="h-7 w-14 text-right text-[11px] p-1.5 bg-background/50 border-primary/10" defaultValue={job.centro} onBlur={(e) => updateJobField(job.id, 'centro', Number(e.target.value))}/><span className="text-[10px] font-bold text-muted-foreground">S:</span><Input type="number" className="h-7 w-12 text-right text-[11px] p-1.5 bg-background/50 border-primary/10" defaultValue={job.setup} onBlur={(e) => updateJobField(job.id, 'setup', Number(e.target.value))}/></div></div></TableCell>
+              <TableCell className="text-right"><div className="flex flex-col items-end gap-1.5"><div className="flex items-center gap-1.5"><span className="text-[11px] font-bold text-muted-foreground">T:</span><Input type="number" className="h-7 w-14 text-right text-[11px] p-1.5 bg-background/50 border-primary/10" defaultValue={job.torno} onBlur={(e) => updateJobField(job.id, 'torno', Number(e.target.value))}/><span className="text-[11px] font-bold text-muted-foreground">C:</span><Input type="number" className="h-7 w-14 text-right text-[11px] p-1.5 bg-background/50 border-primary/10" defaultValue={job.centro} onBlur={(e) => updateJobField(job.id, 'centro', Number(e.target.value))}/><span className="text-[11px] font-bold text-muted-foreground">S:</span><Input type="number" className="h-7 w-12 text-right text-[11px] p-1.5 bg-background/50 border-primary/10" defaultValue={job.setup} onBlur={(e) => updateJobField(job.id, 'setup', Number(e.target.value))}/></div></div></TableCell>
               <TableCell><Button variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => handleDeleteManual(job.id)}><Trash2 className="h-5 w-5" /></Button></TableCell>
             </TableRow>
           );
@@ -775,19 +761,19 @@ export default function ProgrammingPage() {
                                                     const itemsForLane = planIndex.get(`${displayDate}|${t.id}|${cat}`) || [];
                                                     const realItemsForLane = realIndex.get(`${displayDate}|${t.id}|${cat}`) || [];
                                                     return (
-                                                      <div key={`${cat}-${t.id}`} className="grid grid-cols-[165px_1fr] items-start mb-8">
+                                                      <div key={`${cat}-${t.id}`} className="grid grid-cols-[165px_1fr] items-start mb-10">
                                                           <div className="pr-4 truncate cursor-pointer group/tech pt-1" onClick={() => { setActiveSwap({ day: dateStr, shiftId: t.id, category: cat, currentTech: tech }); setIsSwapDialogOpen(true); }}>
-                                                              <div className={cn("text-[10px] font-mono font-black uppercase flex items-center gap-1.5", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>{cat}<UserRoundPen className="h-3 w-3 opacity-0 group-hover/tech:opacity-100 transition-opacity" /></div>
-                                                              <div className="text-xs font-bold truncate">{tech}</div>
-                                                              <div className="mt-[32px] flex items-center justify-end"><span className="text-[8px] font-black text-muted-foreground/50 tracking-[0.2em] uppercase">Real</span></div>
+                                                              <div className={cn("text-[11px] font-mono font-black uppercase flex items-center gap-1.5", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>{cat}<UserRoundPen className="h-3 w-3 opacity-0 group-hover/tech:opacity-100 transition-opacity" /></div>
+                                                              <div className="text-sm font-black truncate">{tech}</div>
+                                                              <div className="mt-[34px] flex items-center justify-end"><span className="text-[9px] font-black text-muted-foreground/60 tracking-[0.2em] uppercase">Real</span></div>
                                                           </div>
-                                                          <div className="space-y-2 w-full">
-                                                              <div className="relative h-[44px] border border-border/50 rounded bg-black/20 overflow-hidden">
+                                                          <div className="space-y-3 w-full">
+                                                              <div className="relative h-[48px] border border-border/50 rounded bg-black/20 overflow-hidden">
                                                                   {PAUSAS.map(p => (<div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-3 w-3 text-yellow-500/30" /></div>))}
                                                                   {itemsForLane.map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
                                                               </div>
-                                                              <div className="relative h-[26px] border border-border/30 rounded-sm bg-black/5 overflow-hidden">
-                                                                  {realItemsForLane.map(item => <ActualBar key={item.id} item={item} />)}
+                                                              <div className="flex flex-wrap gap-2 min-h-[32px] items-center p-1 bg-black/5 rounded-sm border border-border/20">
+                                                                  {realItemsForLane.map(item => <ActualBadge key={item.id} item={item} />)}
                                                               </div>
                                                           </div>
                                                       </div>
@@ -805,10 +791,10 @@ export default function ProgrammingPage() {
         })}
       </div>
       <Card className="shadow-lg border-border">
-        <CardHeader className="bg-muted/5 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"><div className="space-y-1"><CardTitle className="text-2xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle><div className="flex items-center gap-2">{selectedSiteFilter !== 'all' && (<Badge className="bg-primary text-primary-foreground font-black text-[11px]">{selectedSiteFilter}</Badge>)}{(selectedSiteFilter !== 'all' || requisitionFilter) && (<Button variant="ghost" size="sm" onClick={() => { setSelectedSiteFilter('all'); setRequisitionFilter(''); }} className="h-7 px-2 text-[11px] font-black uppercase text-destructive hover:bg-destructive/10">Limpar Filtros</Button>)}</div></div><div className="flex items-center gap-2 bg-background border rounded-md px-3 h-11 w-full sm:w-[320px] shadow-sm"><Search className="h-5 w-5 text-muted-foreground shrink-0" /><Input placeholder="PESQUISAR REQ. OU PEÇA..." value={requisitionFilter} onChange={(e) => setRequisitionFilter(e.target.value)} className="h-full w-full text-xs font-black uppercase border-0 bg-transparent shadow-none focus-visible:ring-0 p-0"/>{requisitionFilter && (<Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-transparent" onClick={() => setRequisitionFilter('')}><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>)}</div></CardHeader>
+        <CardHeader className="bg-muted/5 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"><div className="space-y-1"><CardTitle className="text-2xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle><div className="flex items-center gap-2">{selectedSiteFilter !== 'all' && (<Badge className="bg-primary text-primary-foreground font-black text-[12px]">{selectedSiteFilter}</Badge>)}{(selectedSiteFilter !== 'all' || requisitionFilter) && (<Button variant="ghost" size="sm" onClick={() => { setSelectedSiteFilter('all'); setRequisitionFilter(''); }} className="h-7 px-2 text-[12px] font-black uppercase text-destructive hover:bg-destructive/10">Limpar Filtros</Button>)}</div></div><div className="flex items-center gap-2 bg-background border rounded-md px-3 h-11 w-full sm:w-[320px] shadow-sm"><Search className="h-5 w-5 text-muted-foreground shrink-0" /><Input placeholder="PESQUISAR REQ. OU PEÇA..." value={requisitionFilter} onChange={(e) => setRequisitionFilter(e.target.value)} className="h-full w-full text-xs font-black uppercase border-0 bg-transparent shadow-none focus-visible:ring-0 p-0"/>{requisitionFilter && (<Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-transparent" onClick={() => setRequisitionFilter('')}><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>)}</div></CardHeader>
         <CardContent className="p-0">
           <Tabs defaultValue="all" className="w-full">
-            <div className="px-6 py-2 bg-muted/5 border-b"><TabsList className="grid grid-cols-3 w-full max-w-md h-10"><TabsTrigger value="all" className="text-[11px] font-black uppercase">GERAL</TabsTrigger><TabsTrigger value="etapa1" className="text-[11px] font-black uppercase">ETAPA 1</TabsTrigger><TabsTrigger value="etapa2" className="text-[11px] font-black uppercase">ETAPA 2</TabsTrigger></TabsList></div>
+            <div className="px-6 py-2 bg-muted/5 border-b"><TabsList className="grid grid-cols-3 w-full max-w-md h-10"><TabsTrigger value="all" className="text-[12px] font-black uppercase">GERAL</TabsTrigger><TabsTrigger value="etapa1" className="text-[12px] font-black uppercase">ETAPA 1</TabsTrigger><TabsTrigger value="etapa2" className="text-[12px] font-black uppercase">ETAPA 2</TabsTrigger></TabsList></div>
             <TabsContent value="all" className="m-0">{renderFilaTable(filteredFila, true)}</TabsContent>
             <TabsContent value="etapa1" className="m-0">{renderFilaTable(filteredFila.filter(j => j.etapa1 && j.etapa1 !== ''), false)}</TabsContent>
             <TabsContent value="etapa2" className="m-0">{renderFilaTable(filteredFila.filter(j => j.etapa2 && j.etapa2 !== ''), false)}</TabsContent>
