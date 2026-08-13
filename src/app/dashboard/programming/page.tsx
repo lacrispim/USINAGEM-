@@ -28,7 +28,8 @@ import {
   Clock,
   CheckCircle2,
   Power,
-  PowerOff
+  PowerOff,
+  AlertCircle
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -69,6 +70,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { cruzarComPlano, ComparacaoItem } from '@/lib/realizado';
 
@@ -156,7 +158,7 @@ const normalizeSiteName = (site: string | undefined): string => {
 
 const Ruler = React.memo(() => {
   const marks = [];
-  for (let m = 0; m <= SHIFT_MIN; m += 60) {
+  for (const m of Array.from({ length: 8 }, (_, i) => i * 60)) {
     const pc = (m / SHIFT_MIN) * 100;
     marks.push(<div key={m} className="absolute top-0 h-full flex flex-col items-center" style={{ left: `${pc}%` }}><div className={cn("w-px bg-border", m % 120 === 0 ? "h-[12px] bg-muted-foreground" : "h-[8px]")} />{m % 60 === 0 && <span className="text-[12px] font-mono font-black text-muted-foreground leading-none mt-1">{m / 60}h</span>}</div>);
   }
@@ -192,10 +194,10 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
         </div>
       )}
       <div className="flex-1 flex items-center gap-2 px-2 min-w-0 text-white overflow-hidden relative">
-        <span className="font-mono text-[13px] font-black shrink-0">#{item.requisicao}</span>
+        <span className="font-mono text-[14px] font-black shrink-0">#{item.requisicao}</span>
         <div className="flex items-center gap-1 shrink-0">
-          {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[11px] font-bold">{item.quantidadeNoBloco}pç</span>}
-          <span className="bg-black/40 px-1 rounded-[1px] text-[11px] font-black text-yellow-400 border border-yellow-400/20">{Math.round(totalMin)}m</span>
+          {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[12px] font-bold">{item.quantidadeNoBloco}pç</span>}
+          <span className="bg-black/40 px-1 rounded-[1px] text-[12px] font-black text-yellow-400 border border-yellow-400/20">{Math.round(totalMin)}m</span>
         </div>
         <span className="text-[11px] opacity-90 truncate uppercase font-black leading-none">{item.nomeDaPeca}</span>
         {item.isConcluded && <div className="absolute right-1 top-1/2 -translate-y-1/2"><Check className="h-4 w-4 text-green-400 stroke-[4px]" /></div>}
@@ -236,7 +238,7 @@ const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
       item.status === 'estourou' ? "border-rose-500" :
       item.status === 'adiantado' ? "border-sky-500" :
       item.status === 'semPlano' ? "border-amber-500" : "border-transparent",
-      item.suspeitaDuplicidade && "bg-yellow-500/10"
+      item.suspeitaDuplicidade && "bg-yellow-500/10 border-dashed"
     )}>
       <div className="font-mono">#{item.requisicao}</div>
       <div className="text-muted-foreground/50 font-medium">{item.tempoPlanejado} min</div>
@@ -247,7 +249,19 @@ const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
             <Badge variant="outline" className="h-4 text-[8px] border-amber-500/30 text-amber-500 py-0 uppercase font-black">Extra</Badge>
           )}
           {item.suspeitaDuplicidade && (
-            <Badge variant="outline" className="h-4 text-[8px] border-yellow-500/30 text-yellow-500 py-0 uppercase font-black">Duplicado?</Badge>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="h-4 text-[8px] border-yellow-500/30 text-yellow-500 py-0 uppercase font-black cursor-help">
+                    <AlertCircle className="h-2 w-2 mr-1" /> Duplicado?
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[250px] p-2 text-[10px]">
+                  <p>Existem <strong>múltiplos apontamentos</strong> para este Forms, pelo mesmo técnico, neste dia.</p>
+                  <p className="mt-1 opacity-70">O sistema somou todos os registros, mas recomenda-se conferir se não houve erro de digitação.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
           {isPending && <span className="text-[9px] uppercase opacity-30 italic font-black">Não Apontado</span>}
       </div>
@@ -892,7 +906,7 @@ export default function ProgrammingPage() {
       </div>
       <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}><DialogContent className="sm:max-w-[350px]"><DialogHeader><DialogTitle>Substituir Técnico</DialogTitle></DialogHeader><div className="grid gap-2 py-4">{ALL_TECHNICIANS.map(tech => (<Button key={tech} variant={activeSwap?.currentTech === tech ? "default" : "outline"} className="justify-start h-11" onClick={() => handleTechSwap(tech)}><UserRoundPen className="h-4 w-4 mr-3 opacity-50" />{tech}{tech === "Marcos Barbosa" && <span className="ml-auto text-[8px] font-black uppercase bg-blue-500/20 px-1.5 rounded">Folgista</span>}</Button>))}</div></DialogContent></Dialog>
       <div className="space-y-8">
-        {diasVisiveis.map((day, d) => {
+        {diasVisiveis.map((day) => {
             const displayDate = format(day, 'dd/MM/yyyy');
             const dateStr = format(day, 'yyyy-MM-dd');
             return (
