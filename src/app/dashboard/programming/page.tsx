@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
@@ -155,6 +156,16 @@ const normalizeSiteName = (site: string | undefined): string => {
   if (s.includes('VALINHOS')) return 'VALINHOS';
   return s;
 };
+
+// Auxiliar para determinar turno com base na hora
+function getShiftFromDate(d: Date): string {
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const totalMinutes = h * 60 + m;
+  if (totalMinutes >= 360 && totalMinutes < 810) return '1'; 
+  if (totalMinutes >= 810 && totalMinutes < 1230) return '2';
+  return '3';
+}
 
 const Ruler = React.memo(() => {
   const marks = [];
@@ -324,6 +335,9 @@ export default function ProgrammingPage() {
   
   const prodRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]);
   const { data: productionRecords } = useCollection(prodRecordsQuery);
+  
+  const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]);
+  const { data: lossRecords } = useCollection(lossRecordsQuery);
 
   useEffect(() => {
     if (filaDoc) setFila(filaDoc.data || []);
@@ -341,6 +355,13 @@ export default function ProgrammingPage() {
     }
     if (planoDoc) setPlanejamentoData(planoDoc.data || []);
   }, [filaDoc, planoDoc, configDoc]);
+
+  // Recalcular plano se as perdas mudarem (transferência de carga)
+  useEffect(() => {
+    if (fila.length > 0 && lossRecords) {
+        recalculatePlan(fila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords);
+    }
+  }, [lossRecords]);
 
   const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
 
@@ -422,11 +443,23 @@ export default function ProgrammingPage() {
     try { await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(updatedPlano), updatedAt: serverTimestamp() }); } catch (e) { toast({ title: "Erro", description: "Falha ao salvar status.", variant: "destructive" }); }
   }, [firestore, toast, planejamentoData]);
 
-  const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor?: Date) => {
+  const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor?: Date, currentLosses: any[] = lossRecords || []) => {
     if (!firestore) return;
     const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
     const novosPlanItems: PlanejamentoItem[] = [];
     const laneBusy: Record<string, { start: number; end: number }[]> = { 'TORNO_0': [], 'CENTRO_0': [], 'ADM_0': [] };
+
+    // Mapear perdas por técnico/data/turno para reduzir capacidade
+    const techLossMap = new Map<string, number>();
+    currentLosses.forEach(loss => {
+        if (!loss.operatorId || !loss.timeLost) return;
+        const d = loss.date?.toDate ? loss.date.toDate() : new Date(loss.date);
+        const createdAt = loss.createdAt?.toDate ? loss.createdAt.toDate() : d;
+        const dateStr = format(d, 'yyyy-MM-dd');
+        const shiftId = getShiftFromDate(createdAt);
+        const key = `${dateStr}_${shiftId}_${loss.operatorId}`;
+        techLossMap.set(key, (techLossMap.get(key) || 0) + Number(loss.timeLost));
+    });
 
     const nextFree = (laneId: string, from: number) => {
       let t = from;
@@ -485,7 +518,14 @@ export default function ProgrammingPage() {
 
             if (isShiftDisabled || !techName || isWrongShift) { cursor = shiftAbs + SHIFT_MIN; continue; }
 
+            // Subtração de perdas (redução de capacidade real)
+            const lossMin = techLossMap.get(`${dateStr}_${shiftId}_${techName}`) || 0;
+            const effectiveShiftCap = SHIFT_MIN - lossMin;
+
             let winStart = startOffset;
+            // Se houver perdas, elas ocupam o início do tempo livre deste técnico no turno
+            winStart = Math.max(winStart, lossMin);
+
             for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) winStart = p.start + p.duration; }
             const abs = shiftAbs + winStart;
             const availInShift = SHIFT_MIN - winStart;
