@@ -1,6 +1,6 @@
 'use client';
 
-import { format, parse, isAfter, isBefore, addMinutes, subMinutes } from 'date-fns';
+import { format } from 'date-fns';
 
 export interface ComparacaoItem {
   id: string;
@@ -26,7 +26,8 @@ export interface ComparacaoItem {
   suspeitaDuplicidade: boolean;
 }
 
-// Mapeamento para ajudar a encontrar a tecnologia do técnico se a máquina não for informada
+// Mapeamento mestre de tecnologia por técnico
+// Isso garante que se o técnico esquecer de selecionar a máquina, o dado caia na raia correta dele
 const TECH_BY_OPERATOR: Record<string, 'TORNO' | 'CENTRO' | 'ADM'> = {
   "Alisson França": "TORNO",
   "Gustavo Gozzi": "TORNO",
@@ -35,7 +36,7 @@ const TECH_BY_OPERATOR: Record<string, 'TORNO' | 'CENTRO' | 'ADM'> = {
   "Nathan Xavier": "CENTRO",
   "Rodrigo Cantano": "CENTRO",
   "William Martinucci": "ADM",
-  "Marcos Barbosa": "TORNO" // Folgista costuma atuar mais no Torno, mas é flexível
+  "Marcos Barbosa": "TORNO"
 };
 
 function normalizeName(name: any): string {
@@ -52,12 +53,9 @@ function getShiftFromDate(d: Date): string {
   const m = d.getMinutes();
   const totalMinutes = h * 60 + m;
 
-  // 1T: 06:00 (360m) - 13:00 (780m)
-  // 2T: 13:00 (780m) - 20:00 (1200m)
-  // 3T: 20:00 (1200m) - 03:00 (180m do dia seguinte)
-
-  if (totalMinutes >= 360 && totalMinutes < 785) return '1'; // Tolerância de 5min após as 13h
-  if (totalMinutes >= 785 && totalMinutes < 1205) return '2'; // Tolerância de 5min após as 20h
+  // 1T: 06:00 - 13:00 (com tolerância estendida para apontamentos tardios)
+  if (totalMinutes >= 360 && totalMinutes < 810) return '1'; 
+  if (totalMinutes >= 810 && totalMinutes < 1230) return '2';
   return '3';
 }
 
@@ -68,14 +66,12 @@ export function cruzarComPlano(
 ): ComparacaoItem[] {
   const result: ComparacaoItem[] = [];
 
-  // Agrupar produção por (Data, Técnico, Forms)
+  // 1. Agrupar produção por (Data, Técnico, Forms)
   const prodGroup: Record<string, any[]> = {};
   producao.forEach(p => {
     if (!p.formsNumber || !p.operatorId || !p.date) return;
     const d = p.date.toDate ? p.date.toDate() : new Date(p.date);
     const dStr = format(d, 'dd/MM/yyyy');
-    
-    // Normalizamos o nome do técnico para a chave
     const techNorm = normalizeName(p.operatorId);
     const formsNorm = String(p.formsNumber).replace('#', '').trim();
     
@@ -84,9 +80,17 @@ export function cruzarComPlano(
     prodGroup[key].push(p);
   });
 
+  // 2. Mapear Turnos Planejados por Técnico/Data para ajudar na alocação de "Extras"
+  // Se o técnico Daniel está planejado no 1T hoje, qualquer extra dele hoje deve ir pro 1T
+  const techShiftMap: Record<string, string> = {};
+  plano.forEach(p => {
+    const key = `${p.dataExecucao}|${normalizeName(p.tecnico)}`;
+    if (!techShiftMap[key]) techShiftMap[key] = p.turno;
+  });
+
   const matchedKeys = new Set<string>();
 
-  // 1. Processar itens do Plano
+  // 3. Processar itens do Plano (O Plano é o "Dono" da Raia)
   plano.forEach(pItem => {
     const techNorm = normalizeName(pItem.tecnico);
     const formsNorm = String(pItem.requisicao).replace('#', '').trim();
@@ -126,7 +130,7 @@ export function cruzarComPlano(
       requisicao: pItem.requisicao,
       tecnico: pItem.tecnico,
       dataStr: pItem.dataExecucao,
-      turno: pItem.turno,
+      turno: pItem.turno, // Mantém o turno planejado, independente da hora do apontamento
       techKey: pItem.techKey,
       tempoPlanejado,
       pecasPlanejadas,
@@ -140,7 +144,7 @@ export function cruzarComPlano(
     });
   });
 
-  // 2. Processar registros de produção sem plano ("semPlano")
+  // 4. Processar registros de produção sem plano ("semPlano")
   Object.keys(prodGroup).forEach(key => {
     if (matchedKeys.has(key)) return;
     const records = prodGroup[key];
@@ -159,31 +163,36 @@ export function cruzarComPlano(
       pecasRealizadas += Number(r.quantityProduced) || 0;
     });
 
-    // Identifica a tecnologia (TechKey)
+    // Identifica a tecnologia (TechKey) - Prioriza a especialidade do técnico
     let techKey: 'TORNO' | 'CENTRO' | 'ADM' = 'ADM';
     const firstMachine = String(records[0].machine || '').toUpperCase();
     if (firstMachine.includes('TORNO')) techKey = 'TORNO';
     else if (firstMachine.includes('CENTRO')) techKey = 'CENTRO';
     else {
-      // Se não informou máquina, tenta descobrir pelo nome do técnico original (não o normalizado)
       const originalTechName = records[0].operatorId;
       techKey = TECH_BY_OPERATOR[originalTechName] || 'ADM';
     }
 
-    // Identifica o turno
-    const createdAt = records[0].createdAt?.toDate ? records[0].createdAt.toDate() : new Date();
-    const turno = getShiftFromDate(createdAt);
+    // Identifica o turno - Prioriza o turno que o técnico está trabalhando hoje
+    const shiftLookupKey = `${dStr}|${techNorm}`;
+    const assignedShift = techShiftMap[shiftLookupKey];
+    
+    let turno = assignedShift;
+    if (!turno) {
+      const createdAt = records[0].createdAt?.toDate ? records[0].createdAt.toDate() : new Date();
+      turno = getShiftFromDate(createdAt);
+    }
 
     result.push({
       id: `extra-${key}`,
       requisicao: forms,
-      tecnico: records[0].operatorId, // Mantemos o nome original para exibição
+      tecnico: records[0].operatorId,
       dataStr: dStr,
       turno,
       techKey,
       tempoPlanejado: 0,
       pecasPlanejadas: 0,
-      startOffsetMin: 420 - Math.min(tempoRealizado, 180), // Posiciona ao final do turno
+      startOffsetMin: 420 - Math.min(tempoRealizado, 180),
       tempoRealizado,
       pecasRealizadas,
       tempoPrimeiraPeca,
