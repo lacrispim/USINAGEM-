@@ -108,7 +108,7 @@ interface PlanejamentoItem {
   setupMinutos: number;
   turno: string;
   startOffsetMin: number; 
-  tipoAtividade: 'USINAGEM' | 'PROGRAMACAO' | 'PAUSA';
+  tipoAtividade: 'USINAGEM' | 'PROGRAMACAO' | 'PAUSA' | 'PERDA';
   techKey: 'TORNO' | 'CENTRO' | 'ADM';
   jobId: string;
   laneIndex: number;
@@ -185,34 +185,44 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
 
   const isTorno = item.techKey === 'TORNO';
   const isProg = item.techKey === 'ADM';
+  const isLoss = item.tipoAtividade === 'PERDA';
 
   return (
     <div 
-      onClick={() => onToggle(item.id)}
+      onClick={() => !isLoss && onToggle(item.id)}
       className={cn(
         "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm hover:scale-[1.01] transition-all z-[5] cursor-pointer group", 
-        isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]"),
-        item.isConcluded && "opacity-40 grayscale-[0.5] border-green-500 border-2"
+        isLoss ? "bg-red-600/60 border-red-500 bg-stripes-red" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
+        item.isConcluded && !isLoss && "opacity-40 grayscale-[0.5] border-green-500 border-2"
       )} 
       style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
     >
-      {item.setupMinutos > 0 && (
-        <div 
-          className="h-full shrink-0 border-r border-black/20 flex items-center justify-center" 
-          style={{ width: `${setupPc}%`, background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #101820 5px 10px)' }}
-        >
-           <span className="text-[10px] font-black text-white bg-black/50 px-0.5 rounded-sm">S</span>
+      {isLoss ? (
+        <div className="flex items-center gap-2 px-2 text-white overflow-hidden w-full whitespace-nowrap">
+             <AlertCircle className="h-4 w-4 shrink-0 text-red-200" />
+             <span className="font-black text-[12px] uppercase tracking-tight">PARADA: {Math.round(totalMin)} min</span>
         </div>
+      ) : (
+        <>
+          {item.setupMinutos > 0 && (
+            <div 
+              className="h-full shrink-0 border-r border-black/20 flex items-center justify-center" 
+              style={{ width: `${setupPc}%`, background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #101820 5px 10px)' }}
+            >
+               <span className="text-[10px] font-black text-white bg-black/50 px-0.5 rounded-sm">S</span>
+            </div>
+          )}
+          <div className="flex-1 flex items-center gap-2 px-2 min-w-0 text-white overflow-hidden relative">
+            <span className="font-mono text-[14px] font-black shrink-0">#{item.requisicao}</span>
+            <div className="flex items-center gap-1 shrink-0">
+              {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[12px] font-bold">{item.quantidadeNoBloco}pç</span>}
+              <span className="bg-black/40 px-1 rounded-[1px] text-[12px] font-black text-yellow-400 border border-yellow-400/20">{Math.round(totalMin)}m</span>
+            </div>
+            <span className="text-[11px] opacity-90 truncate uppercase font-black leading-none">{item.nomeDaPeca}</span>
+            {item.isConcluded && <div className="absolute right-1 top-1/2 -translate-y-1/2"><Check className="h-4 w-4 text-green-400 stroke-[4px]" /></div>}
+          </div>
+        </>
       )}
-      <div className="flex-1 flex items-center gap-2 px-2 min-w-0 text-white overflow-hidden relative">
-        <span className="font-mono text-[14px] font-black shrink-0">#{item.requisicao}</span>
-        <div className="flex items-center gap-1 shrink-0">
-          {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[12px] font-bold">{item.quantidadeNoBloco}pç</span>}
-          <span className="bg-black/40 px-1 rounded-[1px] text-[12px] font-black text-yellow-400 border border-yellow-400/20">{Math.round(totalMin)}m</span>
-        </div>
-        <span className="text-[11px] opacity-90 truncate uppercase font-black leading-none">{item.nomeDaPeca}</span>
-        {item.isConcluded && <div className="absolute right-1 top-1/2 -translate-y-1/2"><Check className="h-4 w-4 text-green-400 stroke-[4px]" /></div>}
-      </div>
     </div>
   );
 });
@@ -449,7 +459,7 @@ export default function ProgrammingPage() {
     const novosPlanItems: PlanejamentoItem[] = [];
     const laneBusy: Record<string, { start: number; end: number }[]> = { 'TORNO_0': [], 'CENTRO_0': [], 'ADM_0': [] };
 
-    // Mapear perdas por técnico/data/turno para reduzir capacidade
+    // Mapear perdas por técnico/data/turno para visualização e bloqueio
     const techLossMap = new Map<string, number>();
     currentLosses.forEach(loss => {
         if (!loss.operatorId || !loss.timeLost) return;
@@ -473,6 +483,49 @@ export default function ProgrammingPage() {
       laneBusy[laneId].push({ start, end });
       laneBusy[laneId].sort((a, b) => a.start - b.start);
     };
+
+    // Pre-ocupar perdas nas raias para que o trabalho comece após a parada
+    for (let dIdx = 0; dIdx < 45; dIdx++) {
+        const d = addDays(baseDate, dIdx);
+        if (isDomingo(d)) continue;
+        const dStr = format(d, 'yyyy-MM-dd');
+        const dDisplay = format(d, 'dd/MM/yyyy');
+
+        ['1', '2', '3'].forEach((sId, sIdx) => {
+            const shiftAbs = dIdx * 3 * SHIFT_MIN + sIdx * SHIFT_MIN;
+            ['TORNO', 'CENTRO', 'ADM'].forEach(tk => {
+                const laneId = `${tk}_0`;
+                const overrideKey = `${dStr}_${tk}_${sId}`;
+                const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
+                if (!techName) return;
+
+                const lossMin = techLossMap.get(`${dStr}_${sId}_${techName}`) || 0;
+                if (lossMin > 0) {
+                    occupy(laneId, shiftAbs, shiftAbs + lossMin);
+                    novosPlanItems.push({
+                        id: `loss-${techName}-${dStr}-${sId}`,
+                        dataExecucao: dDisplay,
+                        tecnico: techName,
+                        equipamento: 'PERDA',
+                        requisicao: 'PERDA',
+                        nomeDaPeca: 'PARADA REGISTRADA PELO TÉCNICO',
+                        quantidadeTotal: 0,
+                        quantidadeNoBloco: 0,
+                        tempoMinutos: lossMin,
+                        setupMinutos: 0,
+                        turno: sId,
+                        startOffsetMin: 0,
+                        tipoAtividade: 'PERDA',
+                        techKey: tk as any,
+                        jobId: 'loss',
+                        laneIndex: 0,
+                        isConcluded: true,
+                        site: 'SISTEMA'
+                    });
+                }
+            });
+        });
+    }
 
     const concluidos = new Set(planejamentoData.filter(i => i.isConcluded).map(i => `${i.jobId}|${i.techKey}|${i.dataExecucao}|${i.turno}`));
 
@@ -518,14 +571,7 @@ export default function ProgrammingPage() {
 
             if (isShiftDisabled || !techName || isWrongShift) { cursor = shiftAbs + SHIFT_MIN; continue; }
 
-            // Subtração de perdas (redução de capacidade real)
-            const lossMin = techLossMap.get(`${dateStr}_${shiftId}_${techName}`) || 0;
-            const effectiveShiftCap = SHIFT_MIN - lossMin;
-
             let winStart = startOffset;
-            // Se houver perdas, elas ocupam o início do tempo livre deste técnico no turno
-            winStart = Math.max(winStart, lossMin);
-
             for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) winStart = p.start + p.duration; }
             const abs = shiftAbs + winStart;
             const availInShift = SHIFT_MIN - winStart;
@@ -764,7 +810,7 @@ export default function ProgrammingPage() {
         'Tempo Torno (min)': job.torno,
         'Tempo Centro (min)': job.centro,
         'Tempo Setup (min)': job.setup,
-        'Tempo Prog (min)': job.prog
+        'Tempo Programação (min)': job.prog
       };
     });
 
@@ -1027,7 +1073,13 @@ export default function ProgrammingPage() {
           </Tabs>
         </CardContent>
       </Card>
-      <style jsx global>{`.bg-stripes { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 10px, transparent 10px, transparent 20px); }.custom-scrollbar::-webkit-scrollbar { height: 6px; }.custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }`}</style>
+      <style jsx global>{`
+        .bg-stripes { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 10px, transparent 10px, transparent 20px); }
+        .bg-stripes-red { background-image: repeating-linear-gradient(45deg, rgba(255, 0, 0, 0.2) 0px, rgba(255, 0, 0, 0.2) 10px, transparent 10px, transparent 20px); }
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+      `}</style>
     </div>
   );
 }
