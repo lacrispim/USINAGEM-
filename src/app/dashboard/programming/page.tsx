@@ -227,7 +227,10 @@ const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
 
   const deviation = item.tempoRealizado - item.tempoPlanejado;
   const isPending = item.status === 'semApontamento';
-  const devText = isPending ? '-' : (deviation === 0 ? 'OK' : (deviation > 0 ? `+${deviation}m` : `${deviation}m`));
+  const hasPlan = item.tempoPlanejado > 0;
+  
+  // Só mostramos o desvio se houver um tempo planejado original
+  const devText = (!hasPlan || isPending) ? '-' : (deviation === 0 ? 'OK' : (deviation > 0 ? `+${deviation}m` : `${deviation}m`));
 
   return (
     <div className={cn(
