@@ -190,9 +190,10 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
     <div 
       onClick={() => !isLoss && onToggle(item.id)}
       className={cn(
-        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm hover:scale-[1.01] transition-all z-[5] cursor-pointer group", 
+        "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm transition-all z-[5] cursor-pointer group", 
         isLoss ? "bg-red-600/60 border-red-500 bg-stripes-red" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
-        item.isConcluded && !isLoss && "opacity-40 grayscale-[0.5] border-green-500 border-2"
+        item.isConcluded && !isLoss && "opacity-40 grayscale-[0.5] border-green-500 border-2",
+        !isLoss && "hover:scale-[1.01] hover:brightness-110 hover:shadow-md"
       )} 
       style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
     >
@@ -205,48 +206,93 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
         <>
           {item.setupMinutos > 0 && (
             <div 
-              className="h-full shrink-0 border-r border-black/20 flex items-center justify-center" 
+              className="h-full shrink-0 border-r border-black/20 flex items-center justify-center relative z-10" 
               style={{ width: `${setupPc}%`, background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #101820 5px 10px)' }}
             >
-               <span className="text-[10px] font-black text-white bg-black/50 px-0.5 rounded-sm">S</span>
+               <span className="text-[10px] font-black text-white bg-black/70 px-1 rounded-sm shadow-sm">S</span>
             </div>
           )}
           <div className="flex-1 flex items-center gap-2 px-2 min-w-0 text-white overflow-hidden relative">
-            <span className="font-mono text-[14px] font-black shrink-0">#{item.requisicao}</span>
+            <span className="font-mono text-[14px] font-black shrink-0 drop-shadow-sm">#{item.requisicao}</span>
             <div className="flex items-center gap-1 shrink-0">
               {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[12px] font-bold">{item.quantidadeNoBloco}pç</span>}
-              <span className="bg-black/40 px-1 rounded-[1px] text-[12px] font-black text-yellow-400 border border-yellow-400/20">{Math.round(totalMin)}m</span>
+              {widthPc > 5 && <span className="bg-black/40 px-1 rounded-[1px] text-[12px] font-black text-yellow-400 border border-yellow-400/20">{Math.round(totalMin)}m</span>}
             </div>
-            <span className="text-[11px] opacity-90 truncate uppercase font-black leading-none">{item.nomeDaPeca}</span>
-            {item.isConcluded && <div className="absolute right-1 top-1/2 -translate-y-1/2"><Check className="h-4 w-4 text-green-400 stroke-[4px]" /></div>}
+            {widthPc > 15 && (
+                <span className="text-[11px] opacity-90 truncate uppercase font-black leading-none drop-shadow-sm">{item.nomeDaPeca}</span>
+            )}
+            {item.isConcluded && <div className="absolute right-1 top-1/2 -translate-y-1/2"><Check className="h-4 w-4 text-green-400 stroke-[4px] drop-shadow-md" /></div>}
           </div>
         </>
       )}
     </div>
   );
 
-  if (isLoss) {
-      return (
-        <TooltipProvider>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    {barContent}
-                </TooltipTrigger>
-                <TooltipContent className="bg-destructive text-destructive-foreground border-none shadow-xl p-3 max-w-[300px]">
-                    <div className="flex items-center gap-2 mb-2 border-b border-white/20 pb-1">
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="font-black uppercase text-[10px] tracking-widest">Detalhes das Perdas</span>
+  return (
+    <TooltipProvider delayDuration={100}>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                {barContent}
+            </TooltipTrigger>
+            <TooltipContent className={cn("z-[100] p-4 shadow-2xl min-w-[280px]", isLoss ? "bg-destructive text-destructive-foreground border-none" : "bg-card border")}>
+                {isLoss ? (
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 mb-2 border-b border-white/20 pb-1">
+                            <AlertCircle className="h-4 w-4" />
+                            <span className="font-black uppercase text-[10px] tracking-widest">Detalhes das Perdas</span>
+                        </div>
+                        <div className="whitespace-pre-line text-xs font-bold leading-relaxed opacity-90">
+                            {item.nomeDaPeca}
+                        </div>
+                        <div className="pt-1 text-[10px] font-black">TOTAL: {Math.round(totalMin)} min</div>
                     </div>
-                    <div className="whitespace-pre-line text-xs font-bold leading-relaxed opacity-90">
-                        {item.nomeDaPeca}
-                    </div>
-                </TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
-      );
-  }
+                ) : (
+                    <div className="space-y-3">
+                         <div className="flex items-center justify-between gap-4 border-b border-border pb-1">
+                            <div className="flex items-center gap-2">
+                                <span className="font-mono font-black text-primary text-sm">#{item.requisicao}</span>
+                                <Badge variant="secondary" className="h-5 text-[9px] font-black">{item.techKey}</Badge>
+                            </div>
+                            <span className={cn("text-[10px] font-black", item.isConcluded ? "text-green-500" : "text-amber-500")}>
+                                {item.isConcluded ? "CONCLUÍDO" : "PLANEJADO"}
+                            </span>
+                        </div>
+                        <p className="text-xs font-black uppercase leading-tight">{item.nomeDaPeca}</p>
+                        
+                        <div className="grid grid-cols-2 gap-3 pt-1">
+                            <div className="flex flex-col">
+                                <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Tempo Total</span>
+                                <span className="text-xs font-black">{Math.round(totalMin)} min</span>
+                            </div>
+                            {item.quantidadeNoBloco > 0 && (
+                                <div className="flex flex-col">
+                                    <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Qtd. Bloco</span>
+                                    <span className="text-xs font-black">{item.quantidadeNoBloco} de {item.quantidadeTotal} pç</span>
+                                </div>
+                            )}
+                            {item.setupMinutos > 0 && (
+                                <div className="flex flex-col">
+                                    <span className="text-[9px] text-yellow-500/80 uppercase font-black tracking-tighter">Setup Previsto</span>
+                                    <span className="text-xs font-black">{item.setupMinutos} min</span>
+                                </div>
+                            )}
+                            <div className="flex flex-col">
+                                <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Site</span>
+                                <span className="text-xs font-black">{item.site}</span>
+                            </div>
+                        </div>
 
-  return barContent;
+                        <div className="pt-2 mt-1 border-t border-border flex items-center justify-between text-[8px] text-muted-foreground uppercase font-bold italic">
+                            <span>{item.tecnico}</span>
+                            <span>{item.dataExecucao} · {item.turno}T</span>
+                        </div>
+                        <p className="text-[9px] text-center opacity-50 font-medium">Clique para marcar como concluído/pendente</p>
+                    </div>
+                )}
+            </TooltipContent>
+        </Tooltip>
+    </TooltipProvider>
+  );
 });
 TimelineBar.displayName = 'TimelineBar';
 
