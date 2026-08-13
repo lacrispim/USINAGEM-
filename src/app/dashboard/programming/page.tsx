@@ -60,7 +60,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/label";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -157,7 +157,6 @@ const normalizeSiteName = (site: string | undefined): string => {
   return s;
 };
 
-// Função de normalização robusta para comparação de técnicos
 const normalizeTechName = (name: any): string => {
   if (!name) return '';
   return String(name)
@@ -546,10 +545,8 @@ export default function ProgrammingPage() {
     const novosPlanItems: PlanejamentoItem[] = [];
     const laneBusy: Record<string, { start: number; end: number }[]> = { 'TORNO_0': [], 'CENTRO_0': [], 'ADM_0': [] };
 
-    // 1. Mapear a escala de técnicos planejada para atribuição correta das perdas
-    // Aumentamos para 90 dias para garantir que testes em datas futuras (2026) funcionem
-    const techScheduleMap = new Map<string, string>(); // "dateStr|normalizedTechName" -> shiftId
-    for (let dIdx = 0; dIdx < 90; dIdx++) {
+    const techScheduleMap = new Map<string, string>(); 
+    for (let dIdx = 0; dIdx < 365; dIdx++) {
       const d = addDays(baseDate, dIdx);
       if (isDomingo(d)) continue;
       const dStr = format(d, 'yyyy-MM-dd');
@@ -571,11 +568,9 @@ export default function ProgrammingPage() {
         const dateStr = format(d, 'yyyy-MM-dd');
         const normOp = normalizeTechName(loss.operatorId);
         
-        // Atribuição prioritária: Pela escala planejada
         let shiftId = techScheduleMap.get(`${dateStr}|${normOp}`);
         
         if (!shiftId) {
-            // Fallback: Pelo horário de criação se não estiver explicitamente escalado
             const createdAt = loss.createdAt?.toDate ? loss.createdAt.toDate() : d;
             shiftId = getShiftFromDate(createdAt);
         }
@@ -604,7 +599,7 @@ export default function ProgrammingPage() {
       laneBusy[laneId].sort((a, b) => a.start - b.start);
     };
 
-    for (let dIdx = 0; dIdx < 90; dIdx++) {
+    for (let dIdx = 0; dIdx < 365; dIdx++) {
         const d = addDays(baseDate, dIdx);
         if (isDomingo(d)) continue;
         const dStr = format(d, 'yyyy-MM-dd');
@@ -1164,7 +1159,7 @@ export default function ProgrammingPage() {
                                                                       )}
                                                                   </div>
                                                               </div>
-                           </div>
+                                                          </div>
                                                       </div>
                                                     );
                                                 })}
