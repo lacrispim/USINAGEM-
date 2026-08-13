@@ -536,15 +536,41 @@ export default function ProgrammingPage() {
     const novosPlanItems: PlanejamentoItem[] = [];
     const laneBusy: Record<string, { start: number; end: number }[]> = { 'TORNO_0': [], 'CENTRO_0': [], 'ADM_0': [] };
 
+    // 1. Mapear a escala de técnicos planejada para atribuição correta das perdas
+    // Estendemos a janela para 60 dias para garantir processamento de apontamentos futuros/testes
+    const techScheduleMap = new Map<string, string>(); // "dateStr|techName" -> shiftId
+    for (let dIdx = 0; dIdx < 60; dIdx++) {
+      const d = addDays(baseDate, dIdx);
+      if (isDomingo(d)) continue;
+      const dStr = format(d, 'yyyy-MM-dd');
+      ['1', '2', '3'].forEach(sId => {
+        ['TORNO', 'CENTRO', 'ADM'].forEach(tk => {
+          const overrideKey = `${dStr}_${tk}_${sId}`;
+          const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
+          if (techName) {
+            techScheduleMap.set(`${dStr}|${techName}`, sId);
+          }
+        });
+      });
+    }
+
     const techLossSummary = new Map<string, { total: number, descriptions: string }>();
     currentLosses.forEach(loss => {
         if (!loss.operatorId || !loss.timeLost) return;
         const d = loss.date?.toDate ? loss.date.toDate() : new Date(loss.date);
-        const createdAt = loss.createdAt?.toDate ? loss.createdAt.toDate() : d;
         const dateStr = format(d, 'yyyy-MM-dd');
-        const shiftId = getShiftFromDate(createdAt);
-        const key = `${dateStr}_${shiftId}_${loss.operatorId}`;
         
+        // Atribuição prioritária: Se o técnico está escalado em algum turno neste dia, a perda vai para esse turno.
+        // Isso atende ao pedido de "atribuição pelo técnico e não pelo horário de apontamento".
+        let shiftId = techScheduleMap.get(`${dateStr}|${loss.operatorId}`);
+        
+        if (!shiftId) {
+            // Fallback apenas se o técnico não estiver escalado (ex: trabalho extra em dia de folga)
+            const createdAt = loss.createdAt?.toDate ? loss.createdAt.toDate() : d;
+            shiftId = getShiftFromDate(createdAt);
+        }
+
+        const key = `${dateStr}_${shiftId}_${loss.operatorId}`;
         const existing = techLossSummary.get(key) || { total: 0, descriptions: '' };
         const reason = loss.lossReason || 'Outros';
         const detail = `• ${reason}: ${loss.timeLost} min`;
