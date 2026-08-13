@@ -738,10 +738,7 @@ export default function ProgrammingPage() {
   };
 
   const diasVisiveis = useMemo(() => {
-    const dias: Date[] = [];
-    let cursor = startOfDay(currentDate);
-    while (dias.length < 5) { if (!isDomingo(cursor)) dias.push(cursor); cursor = addDays(cursor, 1); }
-    return dias;
+    return [startOfDay(currentDate)];
   }, [currentDate]);
 
   const stepDay = (dir: 1 | -1) => setCurrentDate(p => { const n = addDays(p, dir); return isDomingo(n) ? addDays(n, dir) : n; });
