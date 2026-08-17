@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -75,10 +74,7 @@ const normalizeOperatorName = (name: any) => {
 const normalizeFactoryName = (name: any): string => {
   if (!name) return 'N/A';
   const n = String(name).toUpperCase().trim();
-  // Consolida Valinhos Dove e Sabonete em uma única unidade visual "VALINHOS"
-  if (n.includes('VALINHOS')) {
-    return 'VALINHOS';
-  }
+  if (n.includes('VALINHOS')) return 'VALINHOS';
   if (n.includes('VINHEDO')) return 'VINHEDO';
   if (n.includes('AGUAI') || n.includes('AGUAÍ')) return 'AGUAÍ';
   if (n.includes('POUSO ALEGRE')) return 'POUSO ALEGRE';
@@ -106,7 +102,6 @@ export default function RecordsPage() {
     setSelectedYear(String(new Date().getFullYear()));
   }, []);
 
-  // Buscamos o 'plano' (cronograma distribuído) em vez da 'fila' bruta
   const planoRef = useMemo(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]);
   const { data: planoDoc } = useDoc(planoRef);
 
@@ -140,28 +135,59 @@ export default function RecordsPage() {
   const { data: lossRecords, isLoading: loadingLoss } = useCollection(lossQuery);
 
   const filteredPlanejamentoData = useMemo(() => {
+    const williamOffDate = new Date(2026, 7, 16); // 16/08/2026 (Mês é 0-indexed)
+
     return planejamentoData.filter(record => {
-      // Filtragem por data baseada no campo dataExecucao do plano
-      if (record.dataExecucao && startDate && endDate) {
+      let planDate: Date | null = null;
+      if (record.dataExecucao) {
         try {
-          const planDate = parse(record.dataExecucao, 'dd/MM/yyyy', new Date());
-          if (!isWithinInterval(planDate, { start: startDate, end: endDate })) return false;
-        } catch (e) { return false; }
+          planDate = parse(record.dataExecucao, 'dd/MM/yyyy', new Date());
+        } catch (e) {}
+      }
+
+      if (planDate && startDate && endDate) {
+        if (!isWithinInterval(planDate, { start: startDate, end: endDate })) return false;
       }
       
       const name = normalizeOperatorName(record.tecnico || record.operatorId);
+      
+      // Regra de remoção William Martinucci a partir de 16/08/2026
+      if (planDate && planDate >= williamOffDate && name === 'William Martinucci') {
+        return false;
+      }
+
       return (!selectedOperator || selectedOperator === 'all' || name === selectedOperator);
     });
   }, [planejamentoData, selectedOperator, startDate, endDate]);
 
   const operatorFilteredProductionRecords = useMemo(() => {
     if (!productionRecords) return [];
-    return productionRecords.filter(r => !selectedOperator || selectedOperator === 'all' || normalizeOperatorName(r.operatorId) === selectedOperator);
+    const williamOffDate = new Date(2026, 7, 16);
+    
+    return productionRecords.filter(r => {
+      const name = normalizeOperatorName(r.operatorId);
+      const d = r.date?.toDate ? r.date.toDate() : new Date(r.date);
+      
+      // Regra de remoção William Martinucci a partir de 16/08/2026
+      if (d >= williamOffDate && name === 'William Martinucci') return false;
+      
+      return !selectedOperator || selectedOperator === 'all' || name === selectedOperator;
+    });
   }, [productionRecords, selectedOperator]);
 
   const operatorFilteredLossRecords = useMemo(() => {
     if (!lossRecords) return [];
-    return lossRecords.filter(r => !selectedOperator || selectedOperator === 'all' || normalizeOperatorName(r.operatorId) === selectedOperator);
+    const williamOffDate = new Date(2026, 7, 16);
+
+    return lossRecords.filter(r => {
+      const name = normalizeOperatorName(r.operatorId);
+      const d = r.date?.toDate ? r.date.toDate() : new Date(r.date);
+      
+      // Regra de remoção William Martinucci a partir de 16/08/2026
+      if (d >= williamOffDate && name === 'William Martinucci') return false;
+
+      return !selectedOperator || selectedOperator === 'all' || name === selectedOperator;
+    });
   }, [lossRecords, selectedOperator]);
 
   const plannedVsMachinedData = useMemo(() => {
@@ -177,46 +203,36 @@ export default function RecordsPage() {
       return dataMap[factory];
     };
 
-    // 1. Processar Horas Planejadas (do Cronograma Visual)
     filteredPlanejamentoData.forEach(record => {
       const factory = normalizeFactoryName(record.site || 'VALINHOS');
       const d = getOrCreate(factory);
-      
       const time = (Number(record.tempoMinutos || 0) + Number(record.setupMinutos || 0)) / 60;
       const type = String(record.tipoAtividade || 'USINAGEM').toUpperCase();
-      
-      // Categoriza por tipo para o Tooltip detalhado
       const planKey = `plan_${type.includes('PROGRAMACAO') ? 'PROGRAMACAO' : 'PRODUCAO'}`;
       d[planKey] = (d[planKey] || 0) + time;
       d.totalPlanejado += time;
     });
     
-    // 2. Processar Horas Realizadas (Apontamentos de Produção)
     operatorFilteredProductionRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const d = getOrCreate(factory);
         const hours = (Number(record.machiningTime) || 0) / 60;
-        
         const type = String(record.activityType || 'PRODUCAO').toUpperCase().includes('PROGRAMACAO') ? 'PROGRAMACAO' : 'PRODUCAO';
         const key = `real_${type}`;
         d[key] = (d[key] || 0) + hours;
         d.totalRealizado += hours;
     });
 
-    // 3. Processar Perdas (Apontamentos de Perdas)
     operatorFilteredLossRecords.forEach(record => {
         const factory = normalizeFactoryName(record.factory);
         const d = getOrCreate(factory);
         const hours = (Number(record.timeLost) || 0) / 60;
         const reason = String(record.lossReason || 'PERDA').toUpperCase();
-        
-        // Simplifica o motivo para o gráfico
         let catKey = 'PERDA';
         if (reason.includes('SETUP')) catKey = 'SETUP';
         else if (reason.includes('CAFÉ')) catKey = 'TEMPO DE CAFÉ';
         else if (reason.includes('LIMPEZA')) catKey = 'LIMPEZA PLANEJADA';
         else if (reason.includes('DDS') || reason.includes('ADM')) catKey = 'DDS, APONTAMENTO HORAS, ATIVIDADE ADM';
-        
         const key = `real_${catKey}`;
         d[key] = (d[key] || 0) + hours;
         d.totalRealizado += hours;
@@ -229,7 +245,6 @@ export default function RecordsPage() {
   }, [filteredPlanejamentoData, operatorFilteredProductionRecords, operatorFilteredLossRecords]);
 
   if (!isClient) return null;
-
   const isLoading = loadingProduction || loadingLoss || !isClient;
 
   return (
@@ -253,6 +268,7 @@ export default function RecordsPage() {
                   <SelectContent>
                       <SelectItem value="2024">2024</SelectItem>
                       <SelectItem value="2025">2025</SelectItem>
+                      <SelectItem value="2026">2026</SelectItem>
                   </SelectContent>
               </Select>
           </div>
@@ -296,7 +312,9 @@ export default function RecordsPage() {
                   </SelectTrigger>
                   <SelectContent>
                       <SelectItem value="all">Todos os Técnicos</SelectItem>
-                      {operatorList.map(op => <SelectItem key={op} value={op}>{op}</SelectItem>)}
+                      {operatorList.map(op => (
+                         <SelectItem key={op} value={op}>{op}</SelectItem>
+                      ))}
                   </SelectContent>
               </Select>
           </div>

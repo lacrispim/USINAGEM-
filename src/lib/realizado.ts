@@ -1,6 +1,6 @@
 'use client';
 
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 
 export interface ComparacaoItem {
   id: string;
@@ -65,12 +65,17 @@ export function cruzarComPlano(
   tolerancia: number
 ): ComparacaoItem[] {
   const result: ComparacaoItem[] = [];
+  const williamOffDate = new Date(2026, 7, 16);
 
   // 1. Agrupar produção por (Data, Técnico, Forms)
   const prodGroup: Record<string, any[]> = {};
   producao.forEach(p => {
     if (!p.formsNumber || !p.operatorId || !p.date) return;
     const d = p.date.toDate ? p.date.toDate() : new Date(p.date);
+    
+    // Regra de remoção William Martinucci a partir de 16/08/2026
+    if (d >= williamOffDate && normalizeName(p.operatorId) === 'william martinucci') return;
+
     const dStr = format(d, 'dd/MM/yyyy');
     const techNorm = normalizeName(p.operatorId);
     const formsNorm = String(p.formsNumber).replace('#', '').trim();
@@ -88,6 +93,9 @@ export function cruzarComPlano(
     if (!reason.includes('SETUP')) return;
 
     const d = l.date.toDate ? l.date.toDate() : new Date(l.date);
+    // Regra de remoção William Martinucci a partir de 16/08/2026
+    if (d >= williamOffDate && normalizeName(l.operatorId) === 'william martinucci') return;
+
     const dStr = format(d, 'dd/MM/yyyy');
     const techNorm = normalizeName(l.operatorId);
     const formsNorm = String(l.formsNumber).replace('#', '').trim();
@@ -107,11 +115,17 @@ export function cruzarComPlano(
 
   // 4. Processar itens do Plano
   plano.forEach(pItem => {
-    if (pItem.jobId === 'loss') return; // Pula as barras de perdas gerais do Gantt
+    if (pItem.jobId === 'loss') return; 
 
     const techNorm = normalizeName(pItem.tecnico);
     const formsNorm = String(pItem.requisicao).replace('#', '').trim();
     const key = `${pItem.dataExecucao}|${techNorm}|${formsNorm}`;
+
+    // Regra de remoção William Martinucci a partir de 16/08/2026 no PLANO
+    try {
+        const planDate = parse(pItem.dataExecucao, 'dd/MM/yyyy', new Date());
+        if (planDate >= williamOffDate && techNorm === 'william martinucci') return;
+    } catch (e) {}
     
     const records = prodGroup[key] || [];
     const setupRealizado = setupLossGroup[key] || 0;
@@ -166,7 +180,7 @@ export function cruzarComPlano(
     });
   });
 
-  // 5. Processar registros sem plano
+  // 5. Processar registros sem plano (Extras)
   Object.keys(prodGroup).forEach(key => {
     if (matchedKeys.has(key)) return;
     const records = prodGroup[key];
