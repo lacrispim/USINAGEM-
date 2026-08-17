@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
@@ -400,15 +399,15 @@ export default function ProgrammingPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const viewInitializedRef = useRef(false);
+  const isInitialLoadRef = useRef(true);
   
   const [fila, setFila] = useState<JobBase[]>([]);
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [disabledShifts, setDisabledShifts] = useState<Record<string, boolean>>({});
   const [techOverrides, setTechOverrides] = useState<Record<string, string>>({});
-  // Inicializa na data atual (hoje)
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
   const [planStartDate, setPlanStartDate] = useState<Date | null>(null);
+  const [configLoaded, setConfigLoaded] = useState(false);
   
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
   const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<string>('all');
@@ -425,7 +424,7 @@ export default function ProgrammingPage() {
 
   const { data: filaDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]));
   const { data: planoDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]));
-  const { data: configDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'config') : null, [firestore]));
+  const { data: configDoc, isLoading: loadingConfig } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'config') : null, [firestore]));
   
   const prodRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]);
   const { data: productionRecords } = useCollection(prodRecordsQuery);
@@ -435,29 +434,33 @@ export default function ProgrammingPage() {
 
   useEffect(() => {
     if (filaDoc) setFila(filaDoc.data || []);
+    
     if (configDoc) {
       setDisabledShifts(configDoc.disabledShifts || {});
       setTechOverrides(configDoc.techOverrides || {});
       if (configDoc.planStartDate) {
         const parsed = parse(configDoc.planStartDate, 'yyyy-MM-dd', new Date());
         if (isValid(parsed)) {
-          const base = startOfDay(parsed);
-          setPlanStartDate(base);
-          // Removido o setCurrentDate(base) para que a página sempre abra em "hoje"
-          if (!viewInitializedRef.current) { 
-            viewInitializedRef.current = true; 
-          }
+          setPlanStartDate(startOfDay(parsed));
         }
       }
+      setConfigLoaded(true);
+    } else if (!loadingConfig) {
+      setConfigLoaded(true);
     }
+    
     if (planoDoc) setPlanejamentoData(planoDoc.data || []);
-  }, [filaDoc, planoDoc, configDoc]);
+  }, [filaDoc, planoDoc, configDoc, loadingConfig]);
 
+  // Recalcula apenas quando tudo estiver pronto e houver mudança real
   useEffect(() => {
-    if (fila.length > 0 && lossRecords) {
-        recalculatePlan(fila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords);
+    if (configLoaded && fila.length > 0 && lossRecords && planStartDate) {
+        // Se for a primeira carga, não salva imediatamente para evitar conflitos de cache
+        const shouldSave = !isInitialLoadRef.current;
+        recalculatePlan(fila, disabledShifts, techOverrides, planStartDate, lossRecords, shouldSave);
+        if (isInitialLoadRef.current) isInitialLoadRef.current = false;
     }
-  }, [lossRecords]);
+  }, [configLoaded, fila.length, lossRecords, planStartDate]);
 
   const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
 
@@ -543,7 +546,7 @@ export default function ProgrammingPage() {
     try { await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(updatedPlano), updatedAt: serverTimestamp() }); } catch (e) { toast({ title: "Erro", description: "Falha ao salvar status.", variant: "destructive" }); }
   }, [firestore, toast, planejamentoData]);
 
-  const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor?: Date, currentLosses: any[] = lossRecords || []) => {
+  const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor?: Date, currentLosses: any[] = lossRecords || [], shouldSaveToDb = true) => {
     if (!firestore) return;
     const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
     const novosPlanItems: PlanejamentoItem[] = [];
@@ -780,11 +783,15 @@ export default function ProgrammingPage() {
         finishTimes[job.id] = allocateTask(job, 'CENTRO', minStart, 'centro');
     });
 
-    const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
-    try {
-        await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
-        await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
-    } catch (error) { toast({ title: "Erro de Salvamento", description: "Falha ao gravar cronograma.", variant: "destructive" }); }
+    setPlanejamentoData(novosPlanItems);
+
+    if (shouldSaveToDb) {
+      const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
+      try {
+          await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
+          await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
+      } catch (error) { toast({ title: "Erro de Salvamento", description: "Falha ao gravar cronograma.", variant: "destructive" }); }
+    }
   };
 
   const diasVisiveis = useMemo(() => {
@@ -799,7 +806,7 @@ export default function ProgrammingPage() {
     setPlanStartDate(selectedDate); setIsAnchorPopoverOpen(false);
     try {
       await setDoc(doc(firestore, 'programacaoState', 'config'), { planStartDate: format(selectedDate, 'yyyy-MM-dd'), updatedAt: serverTimestamp() }, { merge: true });
-      await recalculatePlan(fila, disabledShifts, techOverrides, selectedDate);
+      await recalculatePlan(fila, disabledShifts, techOverrides, selectedDate, lossRecords || [], true);
       toast({ title: "Âncora Atualizada", description: `Início em ${format(selectedDate, 'dd/MM/yyyy')}.` });
     } catch (e) { toast({ title: "Erro", description: "Falha ao atualizar âncora.", variant: "destructive" }); }
   };
@@ -822,7 +829,7 @@ export default function ProgrammingPage() {
     setDisabledShifts(newDisabled);
     try {
       await setDoc(doc(firestore, 'programacaoState', 'config'), { disabledShifts: newDisabled, techOverrides, updatedAt: serverTimestamp() }, { merge: true });
-      recalculatePlan(fila, newDisabled, techOverrides);
+      recalculatePlan(fila, newDisabled, techOverrides, planStartDate || undefined, lossRecords || [], true);
     } catch (e) { toast({ title: "Erro", description: "Falha ao salvar configuração.", variant: "destructive" }); }
   };
 
@@ -834,7 +841,7 @@ export default function ProgrammingPage() {
     setTechOverrides(newOverrides); setIsSwapDialogOpen(false);
     try {
       await setDoc(doc(firestore, 'programacaoState', 'config'), { techOverrides: newOverrides, disabledShifts, updatedAt: serverTimestamp() }, { merge: true });
-      recalculatePlan(fila, disabledShifts, newOverrides);
+      recalculatePlan(fila, disabledShifts, newOverrides, planStartDate || undefined, lossRecords || [], true);
     } catch (e) { toast({ title: "Erro", description: "Falha ao salvar troca.", variant: "destructive" }); }
   };
 
@@ -842,8 +849,9 @@ export default function ProgrammingPage() {
     const currentJob = fila.find(j => j.id === id);
     if (!currentJob || currentJob[field] === value) return;
     const newFila = fila.map(j => j.id === id ? { ...j, [field]: value } : j);
-    setFila(newFila); await recalculatePlan(newFila);
-  }, [fila, disabledShifts, techOverrides, planStartDate, planejamentoData]);
+    setFila(newFila); 
+    if (configLoaded) await recalculatePlan(newFila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true);
+  }, [fila, disabledShifts, techOverrides, planStartDate, lossRecords, configLoaded]);
 
   const moveJobToPosition = useCallback(async (currentIdx: number, newPos: number, type: 'GERAL' | 'TORNO' | 'CENTRO' = 'GERAL') => {
     const newFila = [...fila];
@@ -876,8 +884,8 @@ export default function ProgrammingPage() {
     }
     
     setFila(newFila); 
-    await recalculatePlan(newFila);
-  }, [fila, disabledShifts, techOverrides, planStartDate]);
+    if (configLoaded) await recalculatePlan(newFila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true);
+  }, [fila, disabledShifts, techOverrides, planStartDate, lossRecords, configLoaded]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file || !firestore) return;
@@ -912,7 +920,7 @@ export default function ProgrammingPage() {
         const start = nextWorkday(planStartDate ?? startOfDay(new Date()));
         setPlanStartDate(start);
         await setDoc(doc(firestore, 'programacaoState', 'config'), { planStartDate: format(start, 'yyyy-MM-dd'), updatedAt: serverTimestamp() }, { merge: true });
-        await recalculatePlan(novaFila, disabledShifts, techOverrides, start);
+        await recalculatePlan(novaFila, disabledShifts, techOverrides, start, lossRecords || [], true);
       } catch (err) { toast({ title: "Erro", description: "Falha na planilha.", variant: "destructive" }); } finally { setIsImporting(false); e.target.value = ''; }
     };
     reader.readAsArrayBuffer(file);
@@ -964,11 +972,11 @@ export default function ProgrammingPage() {
       etapa1: newItem.etapa1 || 'TORNO', etapa2: newItem.etapa2 || '', turnoDesejado: newItem.turnoDesejado || '',
       ordemTorno: nextOrder, ordemCentro: nextOrder
     };
-    const nf = [...fila, job]; setFila(nf); await recalculatePlan(nf); setIsAddDialogOpen(false);
+    const nf = [...fila, job]; setFila(nf); await recalculatePlan(nf, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true); setIsAddDialogOpen(false);
     setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: 'TORNO', etapa2: '', turnoDesejado: '' });
   };
 
-  const handleDeleteManual = async (id: string) => { const nf = fila.filter(j => j.id !== id); setFila(nf); await recalculatePlan(nf); };
+  const handleDeleteManual = async (id: string) => { const nf = fila.filter(j => j.id !== id); setFila(nf); await recalculatePlan(nf, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true); };
 
   const renderFilaTable = (jobs: JobBase[], type: 'GERAL' | 'TORNO' | 'CENTRO' = 'GERAL') => (
     <Table>
@@ -1099,7 +1107,7 @@ export default function ProgrammingPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div>
-                    <div className="space-y-2"><Label>Turno Desejado</Label><Select value={newItem.turnoDesejado || "AUTO"} onValueChange={v => updateJobField(newItem.id!, 'turnoDesejado', v === "AUTO" ? "" : v)}><SelectTrigger><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></div>
+                    <div className="space-y-2"><Label>Turno Desejado</Label><Select value={newItem.turnoDesejado || "AUTO"} onValueChange={v => setNewItem({...newItem, turnoDesejado: v === "AUTO" ? "" : v})}><SelectTrigger><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></div>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2"><Label>Torno (min)</Label><Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} /></div>
@@ -1201,7 +1209,7 @@ export default function ProgrammingPage() {
                                                                       )}
                                                                   </div>
                                                               </div>
-                           </div>
+                                                          </div>
                                                       </div>
                                                     );
                                                 })}
