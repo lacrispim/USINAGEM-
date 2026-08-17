@@ -553,7 +553,13 @@ export default function ProgrammingPage() {
       ['1', '2', '3'].forEach(sId => {
         ['TORNO', 'CENTRO', 'ADM'].forEach(tk => {
           const overrideKey = `${dStr}_${tk}_${sId}`;
-          const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
+          let techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
+          
+          // Regra de remoção William Martinucci a partir de 16/08/2026
+          if (dStr >= '2026-08-16' && techName === 'William Martinucci') {
+            techName = undefined;
+          }
+
           if (techName) {
             techScheduleMap.set(`${dStr}|${normalizeTechName(techName)}`, sId);
           }
@@ -610,7 +616,13 @@ export default function ProgrammingPage() {
             ['TORNO', 'CENTRO', 'ADM'].forEach(tk => {
                 const laneId = `${tk}_0`;
                 const overrideKey = `${dStr}_${tk}_${sId}`;
-                const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
+                let techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
+                
+                // Regra de remoção William Martinucci a partir de 16/08/2026
+                if (dStr >= '2026-08-16' && techName === 'William Martinucci') {
+                  techName = undefined;
+                }
+
                 if (!techName) return;
 
                 const lossData = techLossSummary.get(`${dStr}_${sId}_${normalizeTechName(techName)}`);
@@ -681,7 +693,13 @@ export default function ProgrammingPage() {
             
             const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
             const isShiftDisabled = currentDisabled[`${dateStr}_${shiftId}`];
-            const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
+            let techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
+            
+            // Regra de remoção William Martinucci a partir de 16/08/2026
+            if (dateStr >= '2026-08-16' && techName === 'William Martinucci') {
+              techName = undefined;
+            }
+
             const isWrongShift = job.turnoDesejado && job.turnoDesejado !== '' && shiftId !== job.turnoDesejado;
 
             if (isShiftDisabled || !techName || isWrongShift) { cursor = shiftAbs + SHIFT_MIN; continue; }
@@ -1102,7 +1120,25 @@ export default function ProgrammingPage() {
         </div>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4"><div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1.5 w-full md:w-auto"><Filter className="h-4 w-4 text-muted-foreground ml-2" /><Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}><SelectTrigger className="h-9 w-[180px] text-[12px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0"><SelectValue placeholder="Fábrica" /></SelectTrigger><SelectContent><SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><div className="h-5 w-px bg-border/50" /><Cpu className="h-4 w-4 text-muted-foreground ml-2" /><Select value={selectedEquipmentFilter} onValueChange={setSelectedEquipmentFilter}><SelectTrigger className="h-9 w-[160px] text-[12px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0"><SelectValue placeholder="Equipamento" /></SelectTrigger><SelectContent><SelectItem value="all">TODOS</SelectItem><SelectItem value="TORNO">TORNO CNC</SelectItem><SelectItem value="CENTRO">CENTRO CNC</SelectItem><SelectItem value="ADM">PROGRAMAÇÃO</SelectItem></SelectContent></Select></div><div className="flex items-center bg-card/50 border rounded-lg p-1.5 w-full md:w-auto justify-center">{planStartDate && (<Button variant="ghost" size="icon" className="h-9 w-9 text-primary" onClick={() => setCurrentDate(planStartDate)} title="Ir para o início do plano"><ChevronsLeft className="h-5 w-5" /></Button>)}<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => stepDay(-1)}><ChevronLeft className="h-5 w-5" /></Button><Popover><PopoverTrigger asChild><Button variant="ghost" className="font-black px-4 text-[12px] min-w-[140px] justify-center text-primary"><CalendarDays className="h-4 w-4 opacity-70 mr-2" />{format(currentDate, 'dd/MM/yyyy')}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" locale={ptBR} selected={currentDate} onSelect={(d) => d && setCurrentDate(startOfDay(d))} disabled={isDomingo} initialFocus/></PopoverContent></Popover><Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => stepDay(1)}><ChevronRight className="h-5 w-5" /></Button></div></div>
       </div>
-      <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}><DialogContent className="sm:max-w-[350px]"><DialogHeader><DialogTitle>Substituir Técnico</DialogTitle></DialogHeader><div className="grid gap-2 py-4">{ALL_TECHNICIANS.map(tech => (<Button key={tech} variant={activeSwap?.currentTech === tech ? "default" : "outline"} className="justify-start h-11" onClick={() => handleTechSwap(tech)}><UserRoundPen className="h-4 w-4 mr-3 opacity-50" />{tech}{tech === "Marcos Barbosa" && <span className="ml-auto text-[10px] font-black uppercase bg-blue-500/20 px-1.5 rounded">Folgista</span>}</Button>))}</div></DialogContent></Dialog>
+      <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}>
+        <DialogContent className="sm:max-w-[350px]">
+          <DialogHeader><DialogTitle>Substituir Técnico</DialogTitle></DialogHeader>
+          <div className="grid gap-2 py-4">
+            {ALL_TECHNICIANS.filter(tech => {
+              const dStr = activeSwap?.day || '';
+              // Regra de remoção William Martinucci a partir de 16/08/2026
+              if (dStr >= '2026-08-16' && tech === 'William Martinucci') return false;
+              return true;
+            }).map(tech => (
+              <Button key={tech} variant={activeSwap?.currentTech === tech ? "default" : "outline"} className="justify-start h-11" onClick={() => handleTechSwap(tech)}>
+                <UserRoundPen className="h-4 w-4 mr-3 opacity-50" />
+                {tech}
+                {tech === "Marcos Barbosa" && <span className="ml-auto text-[10px] font-black uppercase bg-blue-500/20 px-1.5 rounded">Folgista</span>}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="space-y-8">
         {diasVisiveis.map((day) => {
             const displayDate = format(day, 'dd/MM/yyyy');
@@ -1123,8 +1159,15 @@ export default function ProgrammingPage() {
                                                 <Ruler />
                                                 {['TORNO', 'CENTRO', 'ADM'].filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat).map(cat => {
                                                     const overrideKey = `${dateStr}_${cat}_${t.id}`;
-                                                    const tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
+                                                    let tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
+                                                    
+                                                    // Regra de remoção William Martinucci a partir de 16/08/2026
+                                                    if (dateStr >= '2026-08-16' && tech === 'William Martinucci') {
+                                                      tech = undefined;
+                                                    }
+
                                                     if (!tech) return null;
+
                                                     const itemsForLane = planIndex.get(`${displayDate}|${t.id}|${cat}`) || [];
                                                     const realItemsForLane = realIndex.get(`${displayDate}|${t.id}|${cat}`) || [];
                                                     return (
