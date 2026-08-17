@@ -406,7 +406,8 @@ export default function ProgrammingPage() {
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [disabledShifts, setDisabledShifts] = useState<Record<string, boolean>>({});
   const [techOverrides, setTechOverrides] = useState<Record<string, string>>({});
-  const [currentDate, setCurrentDate] = useState(new Date());
+  // Inicializa na data atual (hoje)
+  const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
   const [planStartDate, setPlanStartDate] = useState<Date | null>(null);
   
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
@@ -442,7 +443,10 @@ export default function ProgrammingPage() {
         if (isValid(parsed)) {
           const base = startOfDay(parsed);
           setPlanStartDate(base);
-          if (!viewInitializedRef.current) { setCurrentDate(base); viewInitializedRef.current = true; }
+          // Removido o setCurrentDate(base) para que a página sempre abra em "hoje"
+          if (!viewInitializedRef.current) { 
+            viewInitializedRef.current = true; 
+          }
         }
       }
     }
@@ -555,7 +559,6 @@ export default function ProgrammingPage() {
           const overrideKey = `${dStr}_${tk}_${sId}`;
           let techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
           
-          // Regra de remoção William Martinucci a partir de 16/08/2026
           if (dStr >= '2026-08-16' && techName === 'William Martinucci') {
             techName = undefined;
           }
@@ -618,7 +621,6 @@ export default function ProgrammingPage() {
                 const overrideKey = `${dStr}_${tk}_${sId}`;
                 let techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
                 
-                // Regra de remoção William Martinucci a partir de 16/08/2026
                 if (dStr >= '2026-08-16' && techName === 'William Martinucci') {
                   techName = undefined;
                 }
@@ -695,7 +697,6 @@ export default function ProgrammingPage() {
             const isShiftDisabled = currentDisabled[`${dateStr}_${shiftId}`];
             let techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
             
-            // Regra de remoção William Martinucci a partir de 16/08/2026
             if (dateStr >= '2026-08-16' && techName === 'William Martinucci') {
               techName = undefined;
             }
@@ -795,7 +796,7 @@ export default function ProgrammingPage() {
   const handleSetAnchorDate = async (date: Date | undefined) => {
     if (!firestore || !date) return;
     const selectedDate = nextWorkday(startOfDay(date));
-    setPlanStartDate(selectedDate); setCurrentDate(selectedDate); setIsAnchorPopoverOpen(false);
+    setPlanStartDate(selectedDate); setIsAnchorPopoverOpen(false);
     try {
       await setDoc(doc(firestore, 'programacaoState', 'config'), { planStartDate: format(selectedDate, 'yyyy-MM-dd'), updatedAt: serverTimestamp() }, { merge: true });
       await recalculatePlan(fila, disabledShifts, techOverrides, selectedDate);
@@ -909,7 +910,7 @@ export default function ProgrammingPage() {
             };
         });
         const start = nextWorkday(planStartDate ?? startOfDay(new Date()));
-        setPlanStartDate(start); setCurrentDate(start);
+        setPlanStartDate(start);
         await setDoc(doc(firestore, 'programacaoState', 'config'), { planStartDate: format(start, 'yyyy-MM-dd'), updatedAt: serverTimestamp() }, { merge: true });
         await recalculatePlan(novaFila, disabledShifts, techOverrides, start);
       } catch (err) { toast({ title: "Erro", description: "Falha na planilha.", variant: "destructive" }); } finally { setIsImporting(false); e.target.value = ''; }
@@ -1126,7 +1127,6 @@ export default function ProgrammingPage() {
           <div className="grid gap-2 py-4">
             {ALL_TECHNICIANS.filter(tech => {
               const dStr = activeSwap?.day || '';
-              // Regra de remoção William Martinucci a partir de 16/08/2026
               if (dStr >= '2026-08-16' && tech === 'William Martinucci') return false;
               return true;
             }).map(tech => (
@@ -1161,7 +1161,6 @@ export default function ProgrammingPage() {
                                                     const overrideKey = `${dateStr}_${cat}_${t.id}`;
                                                     let tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
                                                     
-                                                    // Regra de remoção William Martinucci a partir de 16/08/2026
                                                     if (dateStr >= '2026-08-16' && tech === 'William Martinucci') {
                                                       tech = undefined;
                                                     }
@@ -1202,7 +1201,7 @@ export default function ProgrammingPage() {
                                                                       )}
                                                                   </div>
                                                               </div>
-                                                          </div>
+                           </div>
                                                       </div>
                                                     );
                                                 })}
