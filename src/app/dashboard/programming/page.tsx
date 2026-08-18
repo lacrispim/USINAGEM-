@@ -22,8 +22,7 @@ import {
   Clock,
   AlertCircle,
   Power,
-  PowerOff,
-  Calendar as CalendarIcon
+  PowerOff
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
