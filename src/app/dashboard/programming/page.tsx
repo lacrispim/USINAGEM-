@@ -432,8 +432,15 @@ export default function ProgrammingPage() {
   const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
   const { data: lossRecords } = useCollection(lossRecordsQuery);
 
+  // Sync fila from database, but only if it's actually different to avoid overwriting optimistic updates
   useEffect(() => {
-    if (filaDoc) setFila(filaDoc.data || []);
+    if (filaDoc && filaDoc.data) {
+        const remoteDataStr = JSON.stringify(filaDoc.data);
+        const localDataStr = JSON.stringify(fila);
+        if (remoteDataStr !== localDataStr) {
+            setFila(filaDoc.data);
+        }
+    }
     
     if (configDoc) {
       setDisabledShifts(configDoc.disabledShifts || {});
@@ -449,107 +456,16 @@ export default function ProgrammingPage() {
       setConfigLoaded(true);
     }
     
-    if (planoDoc) setPlanejamentoData(planoDoc.data || []);
+    if (planoDoc && planoDoc.data) {
+      const remotePlanoStr = JSON.stringify(planoDoc.data);
+      const localPlanoStr = JSON.stringify(planejamentoData);
+      if (remotePlanoStr !== localPlanoStr) {
+          setPlanejamentoData(planoDoc.data);
+      }
+    }
   }, [filaDoc, planoDoc, configDoc, loadingConfig]);
 
-  useEffect(() => {
-    if (configLoaded && fila.length > 0 && lossRecords && planStartDate) {
-        const shouldSave = !isInitialLoadRef.current;
-        recalculatePlan(fila, disabledShifts, techOverrides, planStartDate, lossRecords, shouldSave);
-        if (isInitialLoadRef.current) isInitialLoadRef.current = false;
-    }
-  }, [configLoaded, fila.length, lossRecords, planStartDate]);
-
-  const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
-
-  const filteredFila = useMemo(() => {
-    let data = fila;
-    if (selectedSiteFilter !== 'all') {
-      data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
-    }
-    if (deferredRequisitionFilter) { 
-      const search = deferredRequisitionFilter.toLowerCase(); 
-      data = data.filter(item => item.requisicao.toLowerCase().includes(search) || item.nomeDaPeca.toLowerCase().includes(search)); 
-    }
-    return data;
-  }, [fila, selectedSiteFilter, deferredRequisitionFilter]);
-
-  const filteredTornoJobs = useMemo(() => {
-      return filteredFila
-        .filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO')
-        .sort((a, b) => (a.ordemTorno || 9999) - (b.ordemTorno || 9999));
-  }, [filteredFila]);
-
-  const filteredCentroJobs = useMemo(() => {
-      return filteredFila
-        .filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO')
-        .sort((a, b) => (a.ordemCentro || 9999) - (b.ordemCentro || 9999));
-  }, [filteredFila]);
-
-  const jobCompletionStats = useMemo(() => {
-    const map = new Map<string, { total: number, concluded: number }>();
-    for (const item of planejamentoData) {
-      if (item.jobId === 'loss') continue;
-      const stats = map.get(item.jobId) || { total: 0, concluded: 0 };
-      stats.total++;
-      if (item.isConcluded) stats.concluded++;
-      map.set(item.jobId, stats);
-    }
-    return map;
-  }, [planejamentoData]);
-
-  const jobStartDates = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const item of planejamentoData) { 
-      if (item.jobId === 'loss') continue;
-      if (!map.has(item.jobId)) map.set(item.jobId, item.dataExecucao); 
-    }
-    return map;
-  }, [planejamentoData]);
-
-  const filteredPlanejamento = useMemo(() => {
-    let data = planejamentoData;
-    if (selectedSiteFilter !== 'all') data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
-    if (deferredRequisitionFilter) { const search = deferredRequisitionFilter.toLowerCase(); data = data.filter(item => item.requisicao.toLowerCase().includes(search)); }
-    return data;
-  }, [planejamentoData, selectedSiteFilter, deferredRequisitionFilter]);
-
-  const planIndex = useMemo(() => {
-    const map = new Map<string, PlanejamentoItem[]>();
-    for (const i of filteredPlanejamento) {
-      const k = `${i.dataExecucao}|${i.turno}|${i.techKey}`;
-      let arr = map.get(k);
-      if (!arr) { arr = []; map.set(k, arr); }
-      arr.push(i);
-    }
-    return map;
-  }, [filteredPlanejamento]);
-
-  const realItems = useMemo(() => {
-    if (!planejamentoData || !productionRecords || !lossRecords) return [];
-    return cruzarComPlano(planejamentoData, productionRecords, lossRecords, TOLERANCIA_ADERENCIA);
-  }, [planejamentoData, productionRecords, lossRecords]);
-
-  const realIndex = useMemo(() => {
-    const map = new Map<string, ComparacaoItem[]>();
-    for (const i of realItems) {
-      const k = `${i.dataStr}|${i.turno}|${i.techKey}`;
-      let arr = map.get(k);
-      if (!arr) { arr = []; map.set(k, arr); }
-      arr.push(i);
-    }
-    return map;
-  }, [realItems]);
-
-  const toggleConcluded = useCallback(async (itemId: string) => {
-    if (!firestore || !planejamentoData) return;
-    const updatedPlano = planejamentoData.map(item => item.id === itemId ? { ...item, isConcluded: !item.isConcluded } : item);
-    setPlanejamentoData(updatedPlano);
-    const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
-    try { await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(updatedPlano), updatedAt: serverTimestamp() }); } catch (e) { toast({ title: "Erro", description: "Falha ao salvar status.", variant: "destructive" }); }
-  }, [firestore, toast, planejamentoData]);
-
-  const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor?: Date, currentLosses: any[] = lossRecords || [], shouldSaveToDb = true) => {
+  const recalculatePlan = useCallback(async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor?: Date, currentLosses: any[] = lossRecords || [], shouldSaveToDb = true) => {
     if (!firestore) return;
     const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
     const novosPlanItems: PlanejamentoItem[] = [];
@@ -707,6 +623,7 @@ export default function ProgrammingPage() {
               techName = undefined;
             }
 
+            // Fix: Strict check for turnoDesejado
             const isWrongShift = job.turnoDesejado && job.turnoDesejado !== '' && shiftId !== job.turnoDesejado;
 
             if (isShiftDisabled || !techName || isWrongShift) { cursor = shiftAbs + SHIFT_MIN; continue; }
@@ -749,7 +666,7 @@ export default function ProgrammingPage() {
             } else cursor = shiftAbs + SHIFT_MIN;
         }
         return cursor;
-    };
+    }, [disabledShifts, techOverrides, planStartDate, planejamentoData]);
 
     const parseEtapa = (v?: string) => {
         const s = String(v || '').toUpperCase();
@@ -795,7 +712,104 @@ export default function ProgrammingPage() {
           await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
       } catch (error) { toast({ title: "Erro de Salvamento", description: "Falha ao gravar cronograma.", variant: "destructive" }); }
     }
-  };
+  }, [firestore, planStartDate, disabledShifts, techOverrides, lossRecords, planejamentoData]);
+
+  useEffect(() => {
+    if (configLoaded && fila.length > 0 && lossRecords && planStartDate) {
+        const shouldSave = !isInitialLoadRef.current;
+        recalculatePlan(fila, disabledShifts, techOverrides, planStartDate, lossRecords, shouldSave);
+        if (isInitialLoadRef.current) isInitialLoadRef.current = false;
+    }
+  }, [configLoaded, fila.length, lossRecords, planStartDate]);
+
+  const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
+
+  const filteredFila = useMemo(() => {
+    let data = fila;
+    if (selectedSiteFilter !== 'all') {
+      data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
+    }
+    if (deferredRequisitionFilter) { 
+      const search = deferredRequisitionFilter.toLowerCase(); 
+      data = data.filter(item => item.requisicao.toLowerCase().includes(search) || item.nomeDaPeca.toLowerCase().includes(search)); 
+    }
+    return data;
+  }, [fila, selectedSiteFilter, deferredRequisitionFilter]);
+
+  const filteredTornoJobs = useMemo(() => {
+      return filteredFila
+        .filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO')
+        .sort((a, b) => (a.ordemTorno || 9999) - (b.ordemTorno || 9999));
+  }, [filteredFila]);
+
+  const filteredCentroJobs = useMemo(() => {
+      return filteredFila
+        .filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO')
+        .sort((a, b) => (a.ordemCentro || 9999) - (b.ordemCentro || 9999));
+  }, [filteredFila]);
+
+  const jobCompletionStats = useMemo(() => {
+    const map = new Map<string, { total: number, concluded: number }>();
+    for (const item of planejamentoData) {
+      if (item.jobId === 'loss') continue;
+      const stats = map.get(item.jobId) || { total: 0, concluded: 0 };
+      stats.total++;
+      if (item.isConcluded) stats.concluded++;
+      map.set(item.jobId, stats);
+    }
+    return map;
+  }, [planejamentoData]);
+
+  const jobStartDates = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of planejamentoData) { 
+      if (item.jobId === 'loss') continue;
+      if (!map.has(item.jobId)) map.set(item.jobId, item.dataExecucao); 
+    }
+    return map;
+  }, [planejamentoData]);
+
+  const filteredPlanejamento = useMemo(() => {
+    let data = planejamentoData;
+    if (selectedSiteFilter !== 'all') data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
+    if (deferredRequisitionFilter) { const search = deferredRequisitionFilter.toLowerCase(); data = data.filter(item => item.requisicao.toLowerCase().includes(search)); }
+    return data;
+  }, [planejamentoData, selectedSiteFilter, deferredRequisitionFilter]);
+
+  const planIndex = useMemo(() => {
+    const map = new Map<string, PlanejamentoItem[]>();
+    for (const i of filteredPlanejamento) {
+      const k = `${i.dataExecucao}|${i.turno}|${i.techKey}`;
+      let arr = map.get(k);
+      if (!arr) { arr = []; map.set(k, arr); }
+      arr.push(i);
+    }
+    return map;
+  }, [filteredPlanejamento]);
+
+  const realItems = useMemo(() => {
+    if (!planejamentoData || !productionRecords || !lossRecords) return [];
+    return cruzarComPlano(planejamentoData, productionRecords, lossRecords, TOLERANCIA_ADERENCIA);
+  }, [planejamentoData, productionRecords, lossRecords]);
+
+  const realIndex = useMemo(() => {
+    const map = new Map<string, ComparacaoItem[]>();
+    for (const i of realItems) {
+      const k = `${i.dataStr}|${i.turno}|${i.techKey}`;
+      let arr = map.get(k);
+      if (!arr) { arr = []; map.set(k, arr); }
+      arr.push(i);
+    }
+    return map;
+  }, [realItems]);
+
+  const toggleConcluded = useCallback(async (itemId: string) => {
+    if (!firestore || !planejamentoData) return;
+    const updatedPlano = planejamentoData.map(item => item.id === itemId ? { ...item, isConcluded: !item.isConcluded } : item);
+    setPlanejamentoData(updatedPlano);
+    const sanitize = (data: any[]) => data.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
+    try { await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(updatedPlano), updatedAt: serverTimestamp() }); } catch (e) { toast({ title: "Erro", description: "Falha ao salvar status.", variant: "destructive" }); }
+  }, [firestore, toast, planejamentoData]);
 
   const diasVisiveis = useMemo(() => {
     return [startOfDay(currentDate)];
@@ -849,46 +863,62 @@ export default function ProgrammingPage() {
   };
 
   const updateJobField = useCallback(async (id: string, field: keyof JobBase, value: any) => {
-    const currentJob = fila.find(j => j.id === id);
-    if (!currentJob || currentJob[field] === value) return;
-    const newFila = fila.map(j => j.id === id ? { ...j, [field]: value } : j);
-    setFila(newFila); 
-    if (configLoaded) await recalculatePlan(newFila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true);
-  }, [fila, disabledShifts, techOverrides, planStartDate, lossRecords, configLoaded]);
+    setFila(prevFila => {
+      const jobToUpdate = prevFila.find(j => j.id === id);
+      if (!jobToUpdate) return prevFila;
+      
+      // Strict comparison to avoid unnecessary updates
+      if (jobToUpdate[field] === value) return prevFila;
+
+      const newFila = prevFila.map(j => j.id === id ? { ...j, [field]: value } : j);
+      
+      // Recalculate and Save
+      if (configLoaded) {
+        recalculatePlan(newFila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true);
+      }
+      
+      return newFila;
+    });
+  }, [disabledShifts, techOverrides, planStartDate, lossRecords, configLoaded, recalculatePlan]);
 
   const moveJobToPosition = useCallback(async (currentIdx: number, newPos: number, type: 'GERAL' | 'TORNO' | 'CENTRO' = 'GERAL') => {
-    const newFila = [...fila];
-    const itemToMove = newFila[currentIdx];
+    setFila(prevFila => {
+      const newFila = [...prevFila];
+      const itemToMove = newFila[currentIdx];
+      if (!itemToMove) return prevFila;
 
-    if (type === 'GERAL') {
-        const targetIdx = Math.max(0, Math.min(newFila.length - 1, newPos - 1));
-        const [movedItem] = newFila.splice(currentIdx, 1);
-        newFila.splice(targetIdx, 0, movedItem);
-    } else if (type === 'TORNO') {
-        const list = newFila.filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO').sort((a, b) => (a.ordemTorno || 9999) - (b.ordemTorno || 9999));
-        const targetIdx = Math.max(0, Math.min(list.length - 1, newPos - 1));
-        const filteredIdx = list.findIndex(j => j.id === itemToMove.id);
-        const [movedItem] = list.splice(filteredIdx, 1);
-        list.splice(targetIdx, 0, movedItem);
-        list.forEach((job, i) => {
-            const originalJob = newFila.find(nf => nf.id === job.id);
-            if (originalJob) originalJob.ordemTorno = i + 1;
-        });
-    } else if (type === 'CENTRO') {
-        const list = newFila.filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO').sort((a, b) => (a.ordemCentro || 9999) - (b.ordemCentro || 9999));
-        const targetIdx = Math.max(0, Math.min(list.length - 1, newPos - 1));
-        const filteredIdx = list.findIndex(j => j.id === itemToMove.id);
-        const [movedItem] = list.splice(filteredIdx, 1);
-        list.splice(targetIdx, 0, movedItem);
-        list.forEach((job, i) => {
-            const originalJob = newFila.find(nf => nf.id === job.id);
-            if (originalJob) originalJob.ordemCentro = i + 1;
-        });
-    }
-    
-    setFila(newFila); 
-    if (configLoaded) await recalculatePlan(newFila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true);
-  }, [fila, disabledShifts, techOverrides, planStartDate, lossRecords, configLoaded]);
+      if (type === 'GERAL') {
+          const targetIdx = Math.max(0, Math.min(newFila.length - 1, newPos - 1));
+          const [movedItem] = newFila.splice(currentIdx, 1);
+          newFila.splice(targetIdx, 0, movedItem);
+      } else if (type === 'TORNO') {
+          const list = newFila.filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO').sort((a, b) => (a.ordemTorno || 9999) - (b.ordemTorno || 9999));
+          const targetIdx = Math.max(0, Math.min(list.length - 1, newPos - 1));
+          const filteredIdx = list.findIndex(j => j.id === itemToMove.id);
+          const [movedItem] = list.splice(filteredIdx, 1);
+          list.splice(targetIdx, 0, movedItem);
+          list.forEach((job, i) => {
+              const originalJob = newFila.find(nf => nf.id === job.id);
+              if (originalJob) originalJob.ordemTorno = i + 1;
+          });
+      } else if (type === 'CENTRO') {
+          const list = newFila.filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO').sort((a, b) => (a.ordemCentro || 9999) - (b.ordemCentro || 9999));
+          const targetIdx = Math.max(0, Math.min(list.length - 1, newPos - 1));
+          const filteredIdx = list.findIndex(j => j.id === itemToMove.id);
+          const [movedItem] = list.splice(filteredIdx, 1);
+          list.splice(targetIdx, 0, movedItem);
+          list.forEach((job, i) => {
+              const originalJob = newFila.find(nf => nf.id === job.id);
+              if (originalJob) originalJob.ordemCentro = i + 1;
+          });
+      }
+      
+      if (configLoaded) {
+          recalculatePlan(newFila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true);
+      }
+      return newFila;
+    });
+  }, [disabledShifts, techOverrides, planStartDate, lossRecords, configLoaded, recalculatePlan]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file || !firestore) return;
@@ -1027,7 +1057,13 @@ export default function ProgrammingPage() {
               <TableCell>{isFullyConcluded ? (<div className="flex items-center gap-1.5 text-green-500 font-black text-[12px] uppercase"><CheckCircle2 className="h-3.5 w-3.5" />FEITO</div>) : isPartiallyConcluded ? (<div className="flex items-center gap-1.5 text-yellow-500 font-black text-[12px] uppercase"><Clock className="h-3.5 w-3.5" />{Math.round((stats.concluded / stats.total) * 100)}%</div>) : (<div className="text-muted-foreground/40 font-black text-[12px] uppercase">PEND</div>)}</TableCell>
               <TableCell><JobExecutionCell job={job} calculatedDate={calculatedDate} onUpdate={(newDate) => updateJobField(job.id, 'dataDesejada', newDate)}/></TableCell>
               <TableCell>
-                <Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}>
+                <Select 
+                  value={job.turnoDesejado ? job.turnoDesejado : "AUTO"} 
+                  onValueChange={(v) => {
+                    const finalVal = v === "AUTO" ? "" : v;
+                    updateJobField(job.id, 'turnoDesejado', finalVal);
+                  }}
+                >
                   <SelectTrigger className={cn("h-9 text-[12px] font-black uppercase", job.turnoDesejado ? "border-primary text-primary" : "border-border text-muted-foreground/60")}>
                     <SelectValue placeholder="AUTO" />
                   </SelectTrigger>
