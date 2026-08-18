@@ -452,10 +452,8 @@ export default function ProgrammingPage() {
     if (planoDoc) setPlanejamentoData(planoDoc.data || []);
   }, [filaDoc, planoDoc, configDoc, loadingConfig]);
 
-  // Recalcula apenas quando tudo estiver pronto e houver mudança real
   useEffect(() => {
     if (configLoaded && fila.length > 0 && lossRecords && planStartDate) {
-        // Se for a primeira carga, não salva imediatamente para evitar conflitos de cache
         const shouldSave = !isInitialLoadRef.current;
         recalculatePlan(fila, disabledShifts, techOverrides, planStartDate, lossRecords, shouldSave);
         if (isInitialLoadRef.current) isInitialLoadRef.current = false;
@@ -464,17 +462,29 @@ export default function ProgrammingPage() {
 
   const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
 
+  const filteredFila = useMemo(() => {
+    let data = fila;
+    if (selectedSiteFilter !== 'all') {
+      data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
+    }
+    if (deferredRequisitionFilter) { 
+      const search = deferredRequisitionFilter.toLowerCase(); 
+      data = data.filter(item => item.requisicao.toLowerCase().includes(search) || item.nomeDaPeca.toLowerCase().includes(search)); 
+    }
+    return data;
+  }, [fila, selectedSiteFilter, deferredRequisitionFilter]);
+
   const filteredTornoJobs = useMemo(() => {
-      return fila
+      return filteredFila
         .filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO')
         .sort((a, b) => (a.ordemTorno || 9999) - (b.ordemTorno || 9999));
-  }, [fila]);
+  }, [filteredFila]);
 
   const filteredCentroJobs = useMemo(() => {
-      return fila
+      return filteredFila
         .filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO')
         .sort((a, b) => (a.ordemCentro || 9999) - (b.ordemCentro || 9999));
-  }, [fila]);
+  }, [filteredFila]);
 
   const jobCompletionStats = useMemo(() => {
     const map = new Map<string, { total: number, concluded: number }>();
@@ -496,13 +506,6 @@ export default function ProgrammingPage() {
     }
     return map;
   }, [planejamentoData]);
-
-  const filteredFila = useMemo(() => {
-    let data = fila;
-    if (selectedSiteFilter !== 'all') data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
-    if (deferredRequisitionFilter) { const search = deferredRequisitionFilter.toLowerCase(); data = data.filter(item => item.requisicao.toLowerCase().includes(search) || item.nomeDaPeca.toLowerCase().includes(search)); }
-    return data;
-  }, [fila, selectedSiteFilter, deferredRequisitionFilter]);
 
   const filteredPlanejamento = useMemo(() => {
     let data = planejamentoData;
@@ -1023,7 +1026,19 @@ export default function ProgrammingPage() {
               </TableCell>
               <TableCell>{isFullyConcluded ? (<div className="flex items-center gap-1.5 text-green-500 font-black text-[12px] uppercase"><CheckCircle2 className="h-3.5 w-3.5" />FEITO</div>) : isPartiallyConcluded ? (<div className="flex items-center gap-1.5 text-yellow-500 font-black text-[12px] uppercase"><Clock className="h-3.5 w-3.5" />{Math.round((stats.concluded / stats.total) * 100)}%</div>) : (<div className="text-muted-foreground/40 font-black text-[12px] uppercase">PEND</div>)}</TableCell>
               <TableCell><JobExecutionCell job={job} calculatedDate={calculatedDate} onUpdate={(newDate) => updateJobField(job.id, 'dataDesejada', newDate)}/></TableCell>
-              <TableCell><Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}><SelectTrigger className={cn("h-9 text-[12px] font-black uppercase", job.turnoDesejado ? "border-primary text-primary" : "border-border text-muted-foreground/60")}><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO" className="text-[12px] font-black">AUTO</SelectItem><SelectItem value="1" className="text-[12px] font-black">1T</SelectItem><SelectItem value="2" className="text-[12px] font-black">2T</SelectItem><SelectItem value="3" className="text-[12px] font-black">3T</SelectItem></SelectContent></Select></TableCell>
+              <TableCell>
+                <Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}>
+                  <SelectTrigger className={cn("h-9 text-[12px] font-black uppercase", job.turnoDesejado ? "border-primary text-primary" : "border-border text-muted-foreground/60")}>
+                    <SelectValue placeholder="AUTO" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUTO" className="text-[12px] font-black">AUTO</SelectItem>
+                    <SelectItem value="1" className="text-[12px] font-black">1T</SelectItem>
+                    <SelectItem value="2" className="text-[12px] font-black">2T</SelectItem>
+                    <SelectItem value="3" className="text-[12px] font-black">3T</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
                     <Button variant={hasTorno ? "default" : "outline"} size="sm" className={cn("h-7 w-8 p-0 font-black text-[11px]", hasTorno && "bg-cyan-600")} onClick={() => {
@@ -1103,7 +1118,7 @@ export default function ProgrammingPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><Label>Máquina Principal</Label><Select value={newItem.etapa1} onValueChange={v => setNewItem({...newItem, etapa1: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TORNO">TORNO CNC</SelectItem><SelectItem value="CENTRO">CENTRO CNC</SelectItem></SelectContent></Select></div>
-                    <div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: normalizeSiteName(v)})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div>
