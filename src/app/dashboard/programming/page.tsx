@@ -1,14 +1,13 @@
 
 'use client';
 
-import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ChevronLeft, 
   ChevronRight, 
-  Loader, 
   Eraser,
   CalendarDays,
   ArrowUp,
@@ -18,15 +17,12 @@ import {
   Plus,
   Trash2,
   UserRoundPen,
-  Filter,
-  Cpu,
   Search,
   Anchor,
   Clock,
-  CheckCircle2,
+  AlertCircle,
   Power,
-  PowerOff,
-  AlertCircle
+  PowerOff
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -41,18 +37,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -304,10 +290,23 @@ export default function ProgrammingPage() {
 
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
   const [requisitionFilter, setRequisitionFilter] = useState<string>('');
-  const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<string>('all');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
   const [activeSwap, setActiveSwap] = useState<{ day: string, shiftId: string, category: string, currentTech: string } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+
+  const [newJob, setNewJob] = useState<Partial<JobBase>>({
+      requisicao: '',
+      nomeDaPeca: '',
+      quantidade: 1,
+      setup: 20,
+      torno: 0,
+      centro: 0,
+      prog: 0,
+      site: 'VALINHOS',
+      etapa1: '',
+      etapa2: ''
+  });
 
   const { data: filaDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]));
   const { data: planoDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]));
@@ -315,11 +314,16 @@ export default function ProgrammingPage() {
   const { data: lossRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), limit(2000)) : null, [firestore]));
   const { data: productionRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), limit(1000)) : null, [firestore]));
 
-  // Sync from Firestore
+  // Sincronização robusta com Firestore
   useEffect(() => {
     if (filaDoc?.data) {
         const ts = (filaDoc.updatedAt as Timestamp)?.toMillis() || 0;
-        if (ts > lastUpdateRef.current && JSON.stringify(filaDoc.data) !== JSON.stringify(fila)) setFila(filaDoc.data);
+        if (ts > lastUpdateRef.current) {
+            const serverFila = filaDoc.data;
+            if (JSON.stringify(serverFila) !== JSON.stringify(fila)) {
+                setFila(serverFila);
+            }
+        }
     }
     if (planoDoc?.data) {
         const ts = (planoDoc.updatedAt as Timestamp)?.toMillis() || 0;
@@ -338,8 +342,9 @@ export default function ProgrammingPage() {
     }
   }, [filaDoc, planoDoc, configDoc]);
 
-  const recalculatePlan = useCallback(async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor = planStartDate || new Date(), currentLosses = lossRecords || []) => {
-    if (!firestore) return;
+  const recalculatePlan = useCallback(async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor = planStartDate, currentLosses = lossRecords || []) => {
+    if (!firestore || !configLoaded || !anchor) return;
+    
     const baseDate = startOfDay(anchor);
     const novosPlanItems: PlanejamentoItem[] = [];
     const laneBusy: Record<string, { start: number; end: number }[]> = { 'TORNO_0': [], 'CENTRO_0': [], 'ADM_0': [] };
@@ -439,11 +444,13 @@ export default function ProgrammingPage() {
         await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
         await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
     } catch (e) {}
-  }, [firestore, planStartDate, disabledShifts, techOverrides, lossRecords]);
+  }, [firestore, configLoaded, planStartDate, disabledShifts, techOverrides, lossRecords]);
 
-  // Recalcular quando mudar âncora ou fila
+  // Recalcular quando mudar âncora ou fila de forma controlada
   useEffect(() => {
-    if (configLoaded && fila.length > 0) recalculatePlan(fila);
+    if (configLoaded && planStartDate && fila.length > 0) {
+        recalculatePlan(fila);
+    }
   }, [configLoaded, planStartDate, disabledShifts, techOverrides, lossRecords]);
 
   const filteredFila = useMemo(() => {
@@ -458,11 +465,63 @@ export default function ProgrammingPage() {
 
   const updateJobField = useCallback(async (id: string, field: keyof JobBase, value: any) => {
     setFila(prev => {
-        const item = prev.find(j => j.id === id); if (!item || item[field] === value) return prev;
+        const item = prev.find(j => j.id === id); 
+        if (!item || item[field] === value) return prev;
         const nF = prev.map(j => j.id === id ? { ...j, [field]: value } : j);
-        recalculatePlan(nF); return nF;
+        recalculatePlan(nF); 
+        return nF;
     });
   }, [recalculatePlan]);
+
+  const handleAddJob = async () => {
+    if (!newJob.requisicao || !newJob.nomeDaPeca) {
+        toast({ title: 'Erro', description: 'Preencha os campos obrigatórios.', variant: 'destructive' });
+        return;
+    }
+    const job: JobBase = {
+        id: Math.random().toString(36).substr(2, 9),
+        requisicao: newJob.requisicao!,
+        nomeDaPeca: newJob.nomeDaPeca!,
+        quantidade: newJob.quantidade || 1,
+        setup: newJob.setup || 20,
+        torno: newJob.torno || 0,
+        centro: newJob.centro || 0,
+        prog: newJob.prog || 0,
+        site: newJob.site || 'VALINHOS',
+        etapa1: newJob.etapa1 || '',
+        etapa2: newJob.etapa2 || ''
+    };
+    const novaFila = [...fila, job];
+    setFila(novaFila);
+    recalculatePlan(novaFila);
+    setIsAddDialogOpen(false);
+    setNewJob({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: '', etapa2: '' });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    setIsImporting(true); const reader = new FileReader();
+    reader.onload = (evt) => {
+        const bstr = evt.target?.result; const wb = XLSX.read(bstr, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]]; const data: any[] = XLSX.utils.sheet_to_json(ws);
+        const importados = data.map((row: any) => ({
+            id: Math.random().toString(36).substr(2, 9),
+            requisicao: String(row.REQUISICAO || row.REQ || ''),
+            nomeDaPeca: String(row.PECA || row.NOME || ''),
+            quantidade: Number(row.QTD || row.QUANTIDADE || 1),
+            setup: Number(row.SETUP || 20),
+            torno: Number(row.TORNO || row.TEMPO_TORNO || 0),
+            centro: Number(row.CENTRO || row.TEMPO_CENTRO || 0),
+            prog: Number(row.PROG || row.PROGRAMACAO || 0),
+            site: normalizeSiteName(row.SITE || row.FABRICA),
+            etapa1: String(row.ETAPA1 || '').toUpperCase(),
+            etapa2: String(row.ETAPA2 || '').toUpperCase()
+        })).filter(j => j.requisicao);
+        const nF = [...fila, ...importados]; setFila(nF); recalculatePlan(nF);
+        setIsImporting(false); toast({ title: 'Sucesso', description: `${importados.length} itens importados.` });
+    };
+    reader.readAsBinaryString(file);
+  };
 
   const move = useCallback(async (curr: number, nPos: number, type: 'GERAL' | 'TORNO' | 'CENTRO' = 'GERAL') => {
     setFila(prev => {
@@ -536,7 +595,11 @@ export default function ProgrammingPage() {
     <div className="flex flex-col gap-6 p-4">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b pb-6">
         <h1 className="text-4xl font-black uppercase tracking-tighter">Planejamento CNC</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <Button onClick={() => setIsAddDialogOpen(true)} className="h-10 font-black uppercase"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button>
+          <Button variant="secondary" onClick={() => fileInputRef.current?.click()} className="h-10 font-black uppercase" disabled={isImporting}><FileUp className="h-4 w-4 mr-2" /> {isImporting ? "Importando..." : "Importar Excel"}</Button>
+          <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
+          <div className="w-px h-8 bg-border mx-2" />
           <Popover><PopoverTrigger asChild><Button variant="outline" className="h-10 text-xs font-black uppercase"><Anchor className="h-4 w-4 mr-2" /> {planStartDate ? format(planStartDate, 'dd/MM') : "Âncora"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={planStartDate || undefined} onSelect={(d) => d && setPlanStartDate(d)} disabled={isDomingo}/></PopoverContent></Popover>
           <Button variant="ghost" onClick={() => setFila([])} className="text-destructive"><Eraser className="h-5 w-5" /></Button>
         </div>
@@ -598,7 +661,31 @@ export default function ProgrammingPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}><DialogContent className="sm:max-w-[300px]"><DialogHeader><DialogTitle>Substituir Técnico</DialogTitle></DialogHeader><div className="grid gap-2 py-4">{ALL_TECHNICIANS.filter(t => !(activeSwap?.day && activeSwap.day >= '2026-08-16' && t === 'William Martinucci')).map(tech => (<Button key={tech} variant={activeSwap?.currentTech === tech ? "default" : "outline"} className="justify-start h-11" onClick={() => { if(activeSwap) { setTechOverrides(p => ({ ...prev, [`${activeSwap.day}_${activeSwap.category}_${activeSwap.shiftId}`]: tech })); setIsSwapDialogOpen(false); } }}><UserRoundPen className="h-4 w-4 mr-3 opacity-50" />{tech}</Button>))}</div></DialogContent></Dialog>
+      {/* DIÁLOGO: NOVA REQUISIÇÃO */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader><DialogTitle>Adicionar Peça à Fila</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-1.5"><Label>Requisição #</Label><Input value={newJob.requisicao} onChange={e => setNewJob({...newJob, requisicao: e.target.value})} placeholder="Ex: 815"/></div>
+                <div className="grid gap-1.5"><Label>Site / Fábrica</Label><Select value={newJob.site} onValueChange={v => setNewJob({...newJob, site: v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
+            </div>
+            <div className="grid gap-1.5"><Label>Nome da Peça</Label><Input value={newJob.nomeDaPeca} onChange={e => setNewJob({...newJob, nomeDaPeca: e.target.value.toUpperCase()})} placeholder="Ex: EIXO TRANSMISSÃO"/></div>
+            <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-1.5"><Label>Quantidade (pç)</Label><Input type="number" value={newJob.quantidade} onChange={e => setNewJob({...newJob, quantidade: parseInt(e.target.value)})}/></div>
+                <div className="grid gap-1.5"><Label>Setup (min)</Label><Input type="number" value={newJob.setup} onChange={e => setNewJob({...newJob, setup: parseInt(e.target.value)})}/></div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 border-t pt-4">
+                <div className="grid gap-1.5"><Label>Torno (min)</Label><Input type="number" value={newJob.torno} onChange={e => setNewJob({...newJob, torno: parseInt(e.target.value)})}/></div>
+                <div className="grid gap-1.5"><Label>Centro (min)</Label><Input type="number" value={newJob.centro} onChange={e => setNewJob({...newJob, centro: parseInt(e.target.value)})}/></div>
+                <div className="grid gap-1.5"><Label>Prog. (min)</Label><Input type="number" value={newJob.prog} onChange={e => setNewJob({...newJob, prog: parseInt(e.target.value)})}/></div>
+            </div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancelar</Button><Button onClick={handleAddJob}>Adicionar à Fila</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}><DialogContent className="sm:max-w-[300px]"><DialogHeader><DialogTitle>Substituir Técnico</DialogTitle></DialogHeader><div className="grid gap-2 py-4">{ALL_TECHNICIANS.filter(t => !(activeSwap?.day && activeSwap.day >= '2026-08-16' && t === 'William Martinucci')).map(tech => (<Button key={tech} variant={activeSwap?.currentTech === tech ? "default" : "outline"} className="justify-start h-11" onClick={() => { if(activeSwap) { setTechOverrides(prev => ({ ...prev, [`${activeSwap.day}_${activeSwap.category}_${activeSwap.shiftId}`]: tech })); setIsSwapDialogOpen(false); } }}><UserRoundPen className="h-4 w-4 mr-3 opacity-50" />{tech}</Button>))}</div></DialogContent></Dialog>
 
       <style jsx global>{`
         .bg-stripes { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 10px, transparent 10px, transparent 20px); }
