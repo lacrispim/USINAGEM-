@@ -70,7 +70,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { cruzarComPlano, ComparacaoItem } from '@/lib/realizado';
 
@@ -224,7 +224,6 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
             <span className="font-mono text-[14px] font-black shrink-0 drop-shadow-sm">#{item.requisicao}</span>
             <div className="flex items-center gap-1 shrink-0">
               {item.quantidadeNoBloco > 0 && <span className="bg-white/20 px-1 rounded-[1px] text-[12px] font-bold">{item.quantidadeNoBloco}pç</span>}
-              {widthPc > 5 && <span className="bg-black/40 px-1 rounded-[1px] text-[12px] font-black text-yellow-400 border border-yellow-400/20">{Math.round(totalMin)}m</span>}
             </div>
             {widthPc > 15 && (
                 <span className="text-[11px] opacity-90 truncate uppercase font-black leading-none drop-shadow-sm">{item.nomeDaPeca}</span>
@@ -294,7 +293,6 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                             <span>{item.tecnico}</span>
                             <span>{item.dataExecucao} · {item.turno}T</span>
                         </div>
-                        <p className="text-[9px] text-center opacity-50 font-medium">Clique para marcar como concluído/pendente</p>
                     </div>
                 )}
             </TooltipContent>
@@ -360,8 +358,7 @@ const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[250px] p-2 text-[10px]">
-                  <p>Existem <strong>múltiplos apontamentos</strong> para este Forms, pelo mesmo técnico, neste dia.</p>
-                  <p className="mt-1 opacity-70">O sistema somou todos os registros, mas recomenda-se conferir se não houve erro de digitação.</p>
+                  <p>Existem <strong>múltiplos apontamentos</strong> para este Forms.</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -410,9 +407,9 @@ export default function ProgrammingPage() {
   const [configLoaded, setConfigLoaded] = useState(false);
   
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('all');
-  const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<string>('all');
   const [requisitionFilter, setRequisitionFilter] = useState<string>('');
   const deferredRequisitionFilter = useDeferredValue(requisitionFilter);
+  const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<string>('all');
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSwapDialogOpen, setIsSwapDialogOpen] = useState(false);
@@ -432,7 +429,6 @@ export default function ProgrammingPage() {
   const lossRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]);
   const { data: lossRecords } = useCollection(lossRecordsQuery);
 
-  // Sync fila from database, but only if it's actually different to avoid overwriting optimistic updates
   useEffect(() => {
     if (filaDoc && filaDoc.data) {
         const remoteDataStr = JSON.stringify(filaDoc.data);
@@ -481,9 +477,7 @@ export default function ProgrammingPage() {
           const overrideKey = `${dStr}_${tk}_${sId}`;
           let techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
           
-          if (dStr >= '2026-08-16' && techName === 'William Martinucci') {
-            techName = undefined;
-          }
+          if (dStr >= '2026-08-16' && techName === 'William Martinucci') techName = undefined;
 
           if (techName) {
             techScheduleMap.set(`${dStr}|${normalizeTechName(techName)}`, sId);
@@ -500,7 +494,6 @@ export default function ProgrammingPage() {
         const normOp = normalizeTechName(loss.operatorId);
         
         let shiftId = techScheduleMap.get(`${dateStr}|${normOp}`);
-        
         if (!shiftId) {
             const createdAt = loss.createdAt?.toDate ? loss.createdAt.toDate() : d;
             shiftId = getShiftFromDate(createdAt);
@@ -543,10 +536,7 @@ export default function ProgrammingPage() {
                 const overrideKey = `${dStr}_${tk}_${sId}`;
                 let techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
                 
-                if (dStr >= '2026-08-16' && techName === 'William Martinucci') {
-                  techName = undefined;
-                }
-
+                if (dStr >= '2026-08-16' && techName === 'William Martinucci') techName = undefined;
                 if (!techName) return;
 
                 const lossData = techLossSummary.get(`${dStr}_${sId}_${normalizeTechName(techName)}`);
@@ -619,11 +609,8 @@ export default function ProgrammingPage() {
             const isShiftDisabled = currentDisabled[`${dateStr}_${shiftId}`];
             let techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
             
-            if (dateStr >= '2026-08-16' && techName === 'William Martinucci') {
-              techName = undefined;
-            }
+            if (dateStr >= '2026-08-16' && techName === 'William Martinucci') techName = undefined;
 
-            // Fix: Strict check for turnoDesejado
             const isWrongShift = job.turnoDesejado && job.turnoDesejado !== '' && shiftId !== job.turnoDesejado;
 
             if (isShiftDisabled || !techName || isWrongShift) { cursor = shiftAbs + SHIFT_MIN; continue; }
@@ -666,7 +653,7 @@ export default function ProgrammingPage() {
             } else cursor = shiftAbs + SHIFT_MIN;
         }
         return cursor;
-    }, [disabledShifts, techOverrides, planStartDate, planejamentoData]);
+    };
 
     const parseEtapa = (v?: string) => {
         const s = String(v || '').toUpperCase();
@@ -685,7 +672,6 @@ export default function ProgrammingPage() {
     
     tornoJobs.forEach(job => {
         const e1 = parseEtapa(job.etapa1);
-        const e2 = parseEtapa(job.etapa2);
         const isFirst = e1?.techKey === 'TORNO';
         const minStart = isFirst ? 0 : (finishTimes[job.id] || 0);
         finishTimes[job.id] = allocateTask(job, 'TORNO', minStart, 'torno');
@@ -697,7 +683,6 @@ export default function ProgrammingPage() {
 
     centroJobs.forEach(job => {
         const e1 = parseEtapa(job.etapa1);
-        const e2 = parseEtapa(job.etapa2);
         const isFirst = e1?.techKey === 'CENTRO';
         const minStart = isFirst ? 0 : (finishTimes[job.id] || 0);
         finishTimes[job.id] = allocateTask(job, 'CENTRO', minStart, 'centro');
@@ -710,9 +695,9 @@ export default function ProgrammingPage() {
       try {
           await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
           await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
-      } catch (error) { toast({ title: "Erro de Salvamento", description: "Falha ao gravar cronograma.", variant: "destructive" }); }
+      } catch (error) { toast({ title: "Erro", description: "Falha ao gravar cronograma.", variant: "destructive" }); }
     }
-  }, [firestore, planStartDate, disabledShifts, techOverrides, lossRecords, planejamentoData]);
+  }, [firestore, planStartDate, disabledShifts, techOverrides, lossRecords, planejamentoData, toast]);
 
   useEffect(() => {
     if (configLoaded && fila.length > 0 && lossRecords && planStartDate) {
@@ -720,7 +705,7 @@ export default function ProgrammingPage() {
         recalculatePlan(fila, disabledShifts, techOverrides, planStartDate, lossRecords, shouldSave);
         if (isInitialLoadRef.current) isInitialLoadRef.current = false;
     }
-  }, [configLoaded, fila.length, lossRecords, planStartDate]);
+  }, [configLoaded, fila.length, lossRecords, planStartDate, recalculatePlan, disabledShifts, techOverrides]);
 
   const indexById = useMemo(() => new Map(fila.map((j, i) => [j.id, i])), [fila]);
 
@@ -811,9 +796,7 @@ export default function ProgrammingPage() {
     try { await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(updatedPlano), updatedAt: serverTimestamp() }); } catch (e) { toast({ title: "Erro", description: "Falha ao salvar status.", variant: "destructive" }); }
   }, [firestore, toast, planejamentoData]);
 
-  const diasVisiveis = useMemo(() => {
-    return [startOfDay(currentDate)];
-  }, [currentDate]);
+  const diasVisiveis = useMemo(() => [startOfDay(currentDate)], [currentDate]);
 
   const stepDay = (dir: 1 | -1) => setCurrentDate(p => { const n = addDays(p, dir); return isDomingo(n) ? addDays(n, dir) : n; });
 
@@ -865,18 +848,9 @@ export default function ProgrammingPage() {
   const updateJobField = useCallback(async (id: string, field: keyof JobBase, value: any) => {
     setFila(prevFila => {
       const jobToUpdate = prevFila.find(j => j.id === id);
-      if (!jobToUpdate) return prevFila;
-      
-      // Strict comparison to avoid unnecessary updates
-      if (jobToUpdate[field] === value) return prevFila;
-
+      if (!jobToUpdate || jobToUpdate[field] === value) return prevFila;
       const newFila = prevFila.map(j => j.id === id ? { ...j, [field]: value } : j);
-      
-      // Recalculate and Save
-      if (configLoaded) {
-        recalculatePlan(newFila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true);
-      }
-      
+      if (configLoaded) recalculatePlan(newFila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true);
       return newFila;
     });
   }, [disabledShifts, techOverrides, planStartDate, lossRecords, configLoaded, recalculatePlan]);
@@ -886,7 +860,6 @@ export default function ProgrammingPage() {
       const newFila = [...prevFila];
       const itemToMove = newFila[currentIdx];
       if (!itemToMove) return prevFila;
-
       if (type === 'GERAL') {
           const targetIdx = Math.max(0, Math.min(newFila.length - 1, newPos - 1));
           const [movedItem] = newFila.splice(currentIdx, 1);
@@ -897,25 +870,16 @@ export default function ProgrammingPage() {
           const filteredIdx = list.findIndex(j => j.id === itemToMove.id);
           const [movedItem] = list.splice(filteredIdx, 1);
           list.splice(targetIdx, 0, movedItem);
-          list.forEach((job, i) => {
-              const originalJob = newFila.find(nf => nf.id === job.id);
-              if (originalJob) originalJob.ordemTorno = i + 1;
-          });
+          list.forEach((job, i) => { const originalJob = newFila.find(nf => nf.id === job.id); if (originalJob) originalJob.ordemTorno = i + 1; });
       } else if (type === 'CENTRO') {
           const list = newFila.filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO').sort((a, b) => (a.ordemCentro || 9999) - (b.ordemCentro || 9999));
           const targetIdx = Math.max(0, Math.min(list.length - 1, newPos - 1));
           const filteredIdx = list.findIndex(j => j.id === itemToMove.id);
           const [movedItem] = list.splice(filteredIdx, 1);
           list.splice(targetIdx, 0, movedItem);
-          list.forEach((job, i) => {
-              const originalJob = newFila.find(nf => nf.id === job.id);
-              if (originalJob) originalJob.ordemCentro = i + 1;
-          });
+          list.forEach((job, i) => { const originalJob = newFila.find(nf => nf.id === job.id); if (originalJob) originalJob.ordemCentro = i + 1; });
       }
-      
-      if (configLoaded) {
-          recalculatePlan(newFila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true);
-      }
+      if (configLoaded) recalculatePlan(newFila, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true);
       return newFila;
     });
   }, [disabledShifts, techOverrides, planStartDate, lossRecords, configLoaded, recalculatePlan]);
@@ -928,22 +892,15 @@ export default function ProgrammingPage() {
       try {
         const workbook = XLSX.read(new Uint8Array(event.target?.result as ArrayBuffer), { type: 'array' });
         const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-        const findVal = (row: any, keys: string[]) => {
-            for (const key of keys) { const rowKey = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase().trim()); if (rowKey !== undefined) return row[rowKey]; }
-            return undefined;
-        };
+        const findVal = (row: any, keys: string[]) => { for (const key of keys) { const rowKey = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase().trim()); if (rowKey !== undefined) return row[rowKey]; } return undefined; };
         const novaFila: JobBase[] = json.map((row, i) => {
             const rawSite = String(findVal(row, ['site', 'fabrica', 'Fábrica', 'unidade', 'unidade de negócio']) || 'VALINHOS');
             const rawShift = String(findVal(row, ['turno', 'turno desejado', 'T', 'Shift']) || '');
-            let turnoDesejado = '';
-            if (rawShift.includes('1')) turnoDesejado = '1'; else if (rawShift.includes('2')) turnoDesejado = '2'; else if (rawShift.includes('3')) turnoDesejado = '3';
+            let turnoDesejado = ''; if (rawShift.includes('1')) turnoDesejado = '1'; else if (rawShift.includes('2')) turnoDesejado = '2'; else if (rawShift.includes('3')) turnoDesejado = '3';
             return {
-              id: `job-${i}-${Date.now()}`,
-              requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
-              nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'),
-              quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
-              setup: Number(findVal(row, ['Tempo setup TORNO', 'Tempo setup CENTRO', 'setup', 'Setup Minutos']) || 20),
-              torno: Number(findVal(row, ['Tempo de Planejamento Torno Minutos todas as peças solicitadas', 'torno', 'torno minutos', 'torno min']) || 0),
+              id: `job-${i}-${Date.now()}`, requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms', 'Nº forms', 'Requisição2']) || 'S/N'),
+              nomeDaPeca: String(findVal(row, ['peca', 'peça', 'nome', 'Nome da peça']) || 'SEM NOME'), quantidade: Number(findVal(row, ['qtd', 'quantidade', 'Quantidade solicitada']) || 1),
+              setup: Number(findVal(row, ['Tempo setup TORNO', 'Tempo setup CENTRO', 'setup', 'Setup Minutos']) || 20), torno: Number(findVal(row, ['Tempo de Planejamento Torno Minutos todas as peças solicitadas', 'torno', 'torno minutos', 'torno min']) || 0),
               centro: Number(findVal(row, ['Tempo de Planejamento Centro Minutos todas as peças solicitadas', 'centro', 'centro minutos', 'centro min']) || 0),
               prog: Number(findVal(row, ['Tempo Programação Minutos', 'Tempo de Planejamento Programação Minutos todas as peças solicitadas', 'prog', 'programação', 'Programação Minutos']) || 0),
               site: normalizeSiteName(rawSite), etapa1: String(findVal(row, ['Etapa 1', 'etapa1', 'Etapa1', 'Etapa']) || 'TORNO'), etapa2: String(findVal(row, ['Etapa 2', 'etapa2', 'Etapa2', 'Etapa']) || ''), 
@@ -963,47 +920,26 @@ export default function ProgrammingPage() {
     const exportData = fila.map((job, idx) => {
       const stats = jobCompletionStats.get(job.id);
       const isFullyConcluded = stats && stats.total > 0 && stats.total === stats.concluded;
-      const statusText = isFullyConcluded ? 'CONCLUÍDO' : (stats && stats.concluded > 0 ? 'EM ANDAMENTO' : 'PENDENTE');
       const calculatedDate = jobStartDates.get(job.id);
-      
       return {
-        'Posição Geral': idx + 1,
-        'Posição Torno': job.ordemTorno || '-',
-        'Posição Centro': job.ordemCentro || '-',
-        'Status': statusText,
-        'Data Planejada': job.dataDesejada || (calculatedDate ? calculatedDate : 'PENDENTE'),
-        'Turno': job.turnoDesejado || 'AUTO',
-        'Fábrica (Site)': job.site,
-        'Etapa 1': job.etapa1,
-        'Etapa 2': job.etapa2,
-        'Requisição': job.requisicao,
-        'Peça': job.nomeDaPeca,
-        'Quantidade': job.quantidade,
-        'Tempo Torno (min)': job.torno,
-        'Tempo Centro (min)': job.centro,
-        'Tempo Setup (min)': job.setup,
-        'Tempo Programação (min)': job.prog
+        'Posição Geral': idx + 1, 'Posição Torno': job.ordemTorno || '-', 'Posição Centro': job.ordemCentro || '-',
+        'Status': isFullyConcluded ? 'CONCLUÍDO' : (stats && stats.concluded > 0 ? 'EM ANDAMENTO' : 'PENDENTE'),
+        'Data Planejada': job.dataDesejada || (calculatedDate ? calculatedDate : 'PENDENTE'), 'Turno': job.turnoDesejado || 'AUTO',
+        'Fábrica (Site)': job.site, 'Etapa 1': job.etapa1, 'Etapa 2': job.etapa2, 'Requisição': job.requisicao, 'Peça': job.nomeDaPeca, 'Quantidade': job.quantidade,
+        'Tempo Torno (min)': job.torno, 'Tempo Centro (min)': job.centro, 'Tempo Setup (min)': job.setup, 'Tempo Programação (min)': job.prog
       };
     });
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Planejamento");
-    XLSX.writeFile(wb, `planejamento_usinagem_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-    
-    toast({ title: "Sucesso", description: "Planilha exportada com sucesso." });
+    const ws = XLSX.utils.json_to_sheet(exportData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Planejamento"); XLSX.writeFile(wb, `planejamento_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast({ title: "Sucesso", description: "Planilha exportada." });
   };
 
   const handleAddManual = async () => {
     if (!newItem.requisicao || !newItem.nomeDaPeca) { toast({ title: "Erro", description: "Preencha Requisição e Peça.", variant: "destructive" }); return; }
     const nextOrder = fila.length + 1;
     const job: JobBase = {
-      id: `job-m-${Date.now()}`,
-      requisicao: newItem.requisicao || 'S/N', nomeDaPeca: newItem.nomeDaPeca || 'SEM NOME',
-      quantidade: Number(newItem.quantidade) || 1, setup: Number(newItem.setup) || 20, torno: Number(newItem.torno) || 0,
-      centro: Number(newItem.centro) || 0, prog: Number(newItem.prog) || 0, site: normalizeSiteName(newItem.site),
-      etapa1: newItem.etapa1 || 'TORNO', etapa2: newItem.etapa2 || '', turnoDesejado: newItem.turnoDesejado || '',
-      ordemTorno: nextOrder, ordemCentro: nextOrder
+      id: `job-m-${Date.now()}`, requisicao: newItem.requisicao || 'S/N', nomeDaPeca: newItem.nomeDaPeca || 'SEM NOME',
+      quantidade: Number(newItem.quantidade) || 1, setup: Number(newItem.setup) || 20, torno: Number(newItem.torno) || 0, centro: Number(newItem.centro) || 0, prog: Number(newItem.prog) || 0, site: normalizeSiteName(newItem.site),
+      etapa1: newItem.etapa1 || 'TORNO', etapa2: newItem.etapa2 || '', turnoDesejado: newItem.turnoDesejado || '', ordemTorno: nextOrder, ordemCentro: nextOrder
     };
     const nf = [...fila, job]; setFila(nf); await recalculatePlan(nf, disabledShifts, techOverrides, planStartDate || undefined, lossRecords || [], true); setIsAddDialogOpen(false);
     setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: 'TORNO', etapa2: '', turnoDesejado: '' });
@@ -1019,88 +955,17 @@ export default function ProgrammingPage() {
           <TableRow><TableCell colSpan={11} className="text-center py-10 text-muted-foreground font-mono text-sm uppercase tracking-widest italic opacity-50">Nenhuma requisição encontrada</TableCell></TableRow>
         ) : jobs.map((job, localIdx) => {
           const globalIdx = indexById.get(job.id) ?? 0;
-          
-          let displayPos = localIdx + 1;
-          if (type === 'TORNO') displayPos = job.ordemTorno || localIdx + 1;
-          else if (type === 'CENTRO') displayPos = job.ordemCentro || localIdx + 1;
-
-          const stats = jobCompletionStats.get(job.id);
-          const isFullyConcluded = stats && stats.total > 0 && stats.total === stats.concluded;
-          const isPartiallyConcluded = stats && stats.concluded > 0 && stats.concluded < stats.total;
-          const calculatedDate = jobStartDates.get(job.id);
-
-          const hasTorno = job.etapa1 === 'TORNO' || job.etapa2 === 'TORNO';
-          const hasCentro = job.etapa1 === 'CENTRO' || job.etapa2 === 'CENTRO';
-
+          let displayPos = type === 'TORNO' ? (job.ordemTorno || localIdx + 1) : (type === 'CENTRO' ? (job.ordemCentro || localIdx + 1) : localIdx + 1);
+          const stats = jobCompletionStats.get(job.id); const calculatedDate = jobStartDates.get(job.id);
+          const hasTorno = job.etapa1 === 'TORNO' || job.etapa2 === 'TORNO'; const hasCentro = job.etapa1 === 'CENTRO' || job.etapa2 === 'CENTRO';
           return (
-            <TableRow key={job.id} className={cn("hover:bg-muted/5 transition-colors", isFullyConcluded && "bg-green-500/5 opacity-80")}>
-              <TableCell className="text-center px-4">
-                <Input 
-                  type="number" 
-                  defaultValue={displayPos} 
-                  key={`${job.id}-${displayPos}-${type}`} 
-                  className="h-9 w-14 text-center text-[12px] font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all" 
-                  onFocus={(e) => e.target.select()} 
-                  onBlur={(e) => { 
-                    const newPos = parseInt(e.target.value); 
-                    if (isNaN(newPos) || newPos < 1) { e.target.value = String(displayPos); return; } 
-                    if (newPos !== displayPos) moveJobToPosition(globalIdx, newPos, type); 
-                  }}
-                />
-              </TableCell>
-              <TableCell className="text-center">
-                <div className="flex flex-col items-center gap-1">
-                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, displayPos - 1, type)} disabled={localIdx === 0}><ArrowUp className="h-3 w-3" /></Button>
-                  <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, displayPos + 1, type)} disabled={localIdx === jobs.length - 1}><ArrowDown className="h-3 w-3" /></Button>
-                </div>
-              </TableCell>
-              <TableCell>{isFullyConcluded ? (<div className="flex items-center gap-1.5 text-green-500 font-black text-[12px] uppercase"><CheckCircle2 className="h-3.5 w-3.5" />FEITO</div>) : isPartiallyConcluded ? (<div className="flex items-center gap-1.5 text-yellow-500 font-black text-[12px] uppercase"><Clock className="h-3.5 w-3.5" />{Math.round((stats.concluded / stats.total) * 100)}%</div>) : (<div className="text-muted-foreground/40 font-black text-[12px] uppercase">PEND</div>)}</TableCell>
+            <TableRow key={job.id} className={cn("hover:bg-muted/5 transition-colors", stats?.total === stats?.concluded && stats?.total > 0 && "bg-green-500/5 opacity-80")}>
+              <TableCell className="text-center px-4"><Input type="number" defaultValue={displayPos} key={`${job.id}-${displayPos}-${type}`} className="h-9 w-14 text-center text-[12px] font-black bg-background border-2 border-border focus:border-primary focus:ring-0 rounded-md transition-all" onFocus={(e) => e.target.select()} onBlur={(e) => { const newPos = parseInt(e.target.value); if (isNaN(newPos) || newPos < 1) { e.target.value = String(displayPos); return; } if (newPos !== displayPos) moveJobToPosition(globalIdx, newPos, type); }}/></TableCell>
+              <TableCell className="text-center"><div className="flex flex-col items-center gap-1"><Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, displayPos - 1, type)} disabled={localIdx === 0}><ArrowUp className="h-3 w-3" /></Button><Button variant="outline" size="icon" className="h-6 w-6" onClick={() => moveJobToPosition(globalIdx, displayPos + 1, type)} disabled={localIdx === jobs.length - 1}><ArrowDown className="h-3 w-3" /></Button></div></TableCell>
+              <TableCell>{stats?.total === stats?.concluded && stats?.total > 0 ? (<div className="flex items-center gap-1.5 text-green-500 font-black text-[12px] uppercase"><CheckCircle2 className="h-3.5 w-3.5" />FEITO</div>) : stats && stats.concluded > 0 ? (<div className="flex items-center gap-1.5 text-yellow-500 font-black text-[12px] uppercase"><Clock className="h-3.5 w-3.5" />{Math.round((stats.concluded / stats.total) * 100)}%</div>) : (<div className="text-muted-foreground/40 font-black text-[12px] uppercase">PEND</div>)}</TableCell>
               <TableCell><JobExecutionCell job={job} calculatedDate={calculatedDate} onUpdate={(newDate) => updateJobField(job.id, 'dataDesejada', newDate)}/></TableCell>
-              <TableCell>
-                <Select 
-                  value={job.turnoDesejado ? job.turnoDesejado : "AUTO"} 
-                  onValueChange={(v) => {
-                    const finalVal = v === "AUTO" ? "" : v;
-                    updateJobField(job.id, 'turnoDesejado', finalVal);
-                  }}
-                >
-                  <SelectTrigger className={cn("h-9 text-[12px] font-black uppercase", job.turnoDesejado ? "border-primary text-primary" : "border-border text-muted-foreground/60")}>
-                    <SelectValue placeholder="AUTO" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AUTO" className="text-[12px] font-black">AUTO</SelectItem>
-                    <SelectItem value="1" className="text-[12px] font-black">1T</SelectItem>
-                    <SelectItem value="2" className="text-[12px] font-black">2T</SelectItem>
-                    <SelectItem value="3" className="text-[12px] font-black">3T</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-1">
-                    <Button variant={hasTorno ? "default" : "outline"} size="sm" className={cn("h-7 w-8 p-0 font-black text-[11px]", hasTorno && "bg-cyan-600")} onClick={() => {
-                        if (hasTorno) {
-                            if (job.etapa1 === 'TORNO') updateJobField(job.id, 'etapa1', job.etapa2 || '');
-                            else updateJobField(job.id, 'etapa2', '');
-                        } else {
-                            if (!job.etapa1) updateJobField(job.id, 'etapa1', 'TORNO');
-                            else updateJobField(job.id, 'etapa2', 'TORNO');
-                        }
-                    }}>T</Button>
-                    <Button variant={hasCentro ? "default" : "outline"} size="sm" className={cn("h-7 w-8 p-0 font-black text-[11px]", hasCentro && "bg-purple-600")} onClick={() => {
-                        if (hasCentro) {
-                            if (job.etapa1 === 'CENTRO') updateJobField(job.id, 'etapa1', job.etapa2 || '');
-                            else updateJobField(job.id, 'etapa2', '');
-                        } else {
-                            if (!job.etapa1) updateJobField(job.id, 'etapa1', 'CENTRO');
-                            else updateJobField(job.id, 'etapa2', 'CENTRO');
-                        }
-                    }}>C</Button>
-                    <div className="ml-2 flex flex-col leading-none text-[10px] font-black uppercase opacity-50">
-                        {job.etapa1 && <span>{job.etapa1}</span>}
-                        {job.etapa2 && <span className="text-primary opacity-100">→ {job.etapa2}</span>}
-                    </div>
-                </div>
-              </TableCell>
+              <TableCell><Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}><SelectTrigger className={cn("h-9 text-[12px] font-black uppercase", job.turnoDesejado ? "border-primary text-primary" : "border-border text-muted-foreground/60")}><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO" className="text-[12px] font-black">AUTO</SelectItem><SelectItem value="1" className="text-[12px] font-black">1T</SelectItem><SelectItem value="2" className="text-[12px] font-black">2T</SelectItem><SelectItem value="3" className="text-[12px] font-black">3T</SelectItem></SelectContent></Select></TableCell>
+              <TableCell><div className="flex items-center gap-1"><Button variant={hasTorno ? "default" : "outline"} size="sm" className={cn("h-7 w-8 p-0 font-black text-[11px]", hasTorno && "bg-cyan-600")} onClick={() => { if (hasTorno) { if (job.etapa1 === 'TORNO') updateJobField(job.id, 'etapa1', job.etapa2 || ''); else updateJobField(job.id, 'etapa2', ''); } else { if (!job.etapa1) updateJobField(job.id, 'etapa1', 'TORNO'); else updateJobField(job.id, 'etapa2', 'TORNO'); } }}>T</Button><Button variant={hasCentro ? "default" : "outline"} size="sm" className={cn("h-7 w-8 p-0 font-black text-[11px]", hasCentro && "bg-purple-600")} onClick={() => { if (hasCentro) { if (job.etapa1 === 'CENTRO') updateJobField(job.id, 'etapa1', job.etapa2 || ''); else updateJobField(job.id, 'etapa2', ''); } else { if (!job.etapa1) updateJobField(job.id, 'etapa1', 'CENTRO'); else updateJobField(job.id, 'etapa2', 'CENTRO'); } }}>C</Button><div className="ml-2 flex flex-col leading-none text-[10px] font-black uppercase opacity-50">{job.etapa1 && <span>{job.etapa1}</span>}{job.etapa2 && <span className="text-primary opacity-100">→ {job.etapa2}</span>}</div></div></TableCell>
               <TableCell><Input className="h-8 w-20 font-mono font-bold text-[12px] p-1.5 bg-background/50 border-primary/20" defaultValue={job.requisicao} onBlur={(e) => updateJobField(job.id, 'requisicao', e.target.value)}/></TableCell>
               <TableCell><Input className="h-8 w-full min-w-[180px] uppercase text-[12px] font-medium p-1.5 bg-background/50 border-primary/20" defaultValue={job.nomeDaPeca} onBlur={(e) => updateJobField(job.id, 'nomeDaPeca', e.target.value.toUpperCase())}/></TableCell>
               <TableCell className="text-right"><Input type="number" className="h-8 w-14 text-right text-[12px] font-black p-1.5 bg-background/50 border-primary/20" defaultValue={job.quantidade} onBlur={(e) => updateJobField(job.id, 'quantidade', Number(e.target.value))}/></TableCell>
@@ -1119,155 +984,48 @@ export default function ProgrammingPage() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div><h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none">Planejamento CNC</h1></div>
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" title="Limpar Todo Planejamento">
-                  <Eraser className="h-5 w-5" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Deseja limpar todo o planejamento?</AlertDialogTitle>
-                  <AlertDialogDescription>Esta ação removerá permanentemente todas as requisições da fila, o cronograma visual e todas as configurações de turnos.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleClearAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Limpar Tudo</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            <Popover open={isAnchorPopoverOpen} onOpenChange={setIsAnchorPopoverOpen}><PopoverTrigger asChild><Button variant="outline" className="h-10 text-[12px] font-black uppercase flex-1 sm:flex-none"><Anchor className="h-4 w-4 mr-2" /> {planStartDate ? `Início: ${format(planStartDate, 'dd/MM/yy')}` : "Definir Âncora"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="end"><div className="px-3 pt-3 pb-1 border-b border-border/50"><p className="text-[10px] font-black uppercase tracking-widest">Início do plano</p><p className="text-[9px] text-muted-foreground">Define onde a programação começa a preencher os turnos.</p></div><Calendar mode="single" locale={ptBR} selected={planStartDate || undefined} onSelect={handleSetAnchorDate} disabled={isDomingo} initialFocus/></PopoverContent></Popover>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="secondary" className="h-10 text-[12px] font-black uppercase flex-1 sm:flex-none">
-                  <Plus className="h-4 w-4 mr-2" /> Nova Requisição
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Adicionar Requisição Manual</DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Requisição</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} /></div>
-                    <div className="space-y-2"><Label>Nome da Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Máquina Principal</Label><Select value={newItem.etapa1} onValueChange={v => setNewItem({...newItem, etapa1: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TORNO">TORNO CNC</SelectItem><SelectItem value="CENTRO">CENTRO CNC</SelectItem></SelectContent></Select></div>
-                    <div className="space-y-2"><Label>Fábrica (Site)</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: normalizeSiteName(v)})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div>
-                    <div className="space-y-2"><Label>Turno Desejado</Label><Select value={newItem.turnoDesejado || "AUTO"} onValueChange={v => setNewItem({...newItem, turnoDesejado: v === "AUTO" ? "" : v})}><SelectTrigger><SelectValue placeholder="AUTO" /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2"><Label>Torno (min)</Label><Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})} /></div>
-                    <div className="space-y-2"><Label>Centro (min)</Label><Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})} /></div>
-                    <div className="space-y-2"><Label>Setup (min)</Label><Input type="number" value={newItem.setup} onChange={e => setNewItem({...newItem, setup: Number(e.target.value)})} /></div>
-                  </div>
-                </div>
-                <DialogFooter><Button onClick={handleAddManual} className="w-full">Adicionar na Fila</Button></DialogFooter>
-              </DialogContent>
-            </Dialog>
-            <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
-            <Button className="h-10 bg-primary text-primary-foreground font-black text-[12px] uppercase flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
-              {isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Planilha
-            </Button>
-            <Button variant="outline" className="h-10 text-[12px] font-black uppercase flex-1 sm:flex-none" onClick={handleExport}>
-              <FileDown className="h-4 w-4 mr-2" /> Exportar Plano
-            </Button>
+            <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" title="Limpar Tudo"><Eraser className="h-5 w-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Limpar todo o planejamento?</AlertDialogTitle><AlertDialogDescription>Ação irreversível.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleClearAll} className="bg-destructive">Limpar Tudo</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+            <Popover open={isAnchorPopoverOpen} onOpenChange={setIsAnchorPopoverOpen}><PopoverTrigger asChild><Button variant="outline" className="h-10 text-[12px] font-black uppercase flex-1 sm:flex-none"><Anchor className="h-4 w-4 mr-2" /> {planStartDate ? `Início: ${format(planStartDate, 'dd/MM/yy')}` : "Âncora"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="end"><div className="p-3 border-b"><p className="text-[10px] font-black uppercase">Início do plano</p></div><Calendar mode="single" locale={ptBR} selected={planStartDate || undefined} onSelect={handleSetAnchorDate} disabled={isDomingo} initialFocus/></PopoverContent></Popover>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}><DialogTrigger asChild><Button variant="secondary" className="h-10 text-[12px] font-black uppercase flex-1 sm:flex-none"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button></DialogTrigger><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Adicionar Requisição</DialogTitle></DialogHeader><div className="grid gap-4 py-4"><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Requisição</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})} /></div><div className="space-y-2"><Label>Nome da Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})} /></div></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Máquina</Label><Select value={newItem.etapa1} onValueChange={v => setNewItem({...newItem, etapa1: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TORNO">TORNO CNC</SelectItem><SelectItem value="CENTRO">CENTRO CNC</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label>Fábrica</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: normalizeSiteName(v)})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Quantidade</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})} /></div><div className="space-y-2"><Label>Turno</Label><Select value={newItem.turnoDesejado || "AUTO"} onValueChange={v => setNewItem({...newItem, turnoDesejado: v === "AUTO" ? "" : v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></div></div></div><DialogFooter><Button onClick={handleAddManual} className="w-full">Adicionar</Button></DialogFooter></DialogContent></Dialog>
+            <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" /><Button className="h-10 font-black text-[12px] uppercase flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4 mr-2" />} Importar</Button>
+            <Button variant="outline" className="h-10 text-[12px] font-black uppercase flex-1 sm:flex-none" onClick={handleExport}><FileDown className="h-4 w-4 mr-2" /> Exportar</Button>
           </div>
         </div>
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4"><div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1.5 w-full md:w-auto"><Filter className="h-4 w-4 text-muted-foreground ml-2" /><Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}><SelectTrigger className="h-9 w-[180px] text-[12px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0"><SelectValue placeholder="Fábrica" /></SelectTrigger><SelectContent><SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><div className="h-5 w-px bg-border/50" /><Cpu className="h-4 w-4 text-muted-foreground ml-2" /><Select value={selectedEquipmentFilter} onValueChange={setSelectedEquipmentFilter}><SelectTrigger className="h-9 w-[160px] text-[12px] font-black uppercase border-0 bg-transparent shadow-none focus:ring-0"><SelectValue placeholder="Equipamento" /></SelectTrigger><SelectContent><SelectItem value="all">TODOS</SelectItem><SelectItem value="TORNO">TORNO CNC</SelectItem><SelectItem value="CENTRO">CENTRO CNC</SelectItem><SelectItem value="ADM">PROGRAMAÇÃO</SelectItem></SelectContent></Select></div><div className="flex items-center bg-card/50 border rounded-lg p-1.5 w-full md:w-auto justify-center">{planStartDate && (<Button variant="ghost" size="icon" className="h-9 w-9 text-primary" onClick={() => setCurrentDate(planStartDate)} title="Ir para o início do plano"><ChevronsLeft className="h-5 w-5" /></Button>)}<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => stepDay(-1)}><ChevronLeft className="h-5 w-5" /></Button><Popover><PopoverTrigger asChild><Button variant="ghost" className="font-black px-4 text-[12px] min-w-[140px] justify-center text-primary"><CalendarDays className="h-4 w-4 opacity-70 mr-2" />{format(currentDate, 'dd/MM/yyyy')}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" locale={ptBR} selected={currentDate} onSelect={(d) => d && setCurrentDate(startOfDay(d))} disabled={isDomingo} initialFocus/></PopoverContent></Popover><Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => stepDay(1)}><ChevronRight className="h-5 w-5" /></Button></div></div>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4"><div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1.5 w-full md:w-auto"><Filter className="h-4 w-4 text-muted-foreground ml-2" /><Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}><SelectTrigger className="h-9 w-[180px] text-[12px] font-black uppercase border-0 bg-transparent shadow-none"><SelectValue placeholder="Fábrica" /></SelectTrigger><SelectContent><SelectItem value="all">TODAS AS FÁBRICAS</SelectItem>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><div className="h-5 w-px bg-border/50" /><Cpu className="h-4 w-4 text-muted-foreground ml-2" /><Select value={selectedEquipmentFilter} onValueChange={setSelectedEquipmentFilter}><SelectTrigger className="h-9 w-[160px] text-[12px] font-black uppercase border-0 bg-transparent shadow-none"><SelectValue placeholder="Equipamento" /></SelectTrigger><SelectContent><SelectItem value="all">TODOS</SelectItem><SelectItem value="TORNO">TORNO CNC</SelectItem><SelectItem value="CENTRO">CENTRO CNC</SelectItem><SelectItem value="ADM">PROGRAMAÇÃO</SelectItem></SelectContent></Select></div><div className="flex items-center bg-card/50 border rounded-lg p-1.5 w-full md:w-auto justify-center">{planStartDate && (<Button variant="ghost" size="icon" className="h-9 w-9 text-primary" onClick={() => setCurrentDate(planStartDate)} title="Início do Plano"><ChevronsLeft className="h-5 w-5" /></Button>)}<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => stepDay(-1)}><ChevronLeft className="h-5 w-5" /></Button><Popover><PopoverTrigger asChild><Button variant="ghost" className="font-black px-4 text-[12px] min-w-[140px] text-primary"><CalendarDays className="h-4 w-4 opacity-70 mr-2" />{format(currentDate, 'dd/MM/yyyy')}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" locale={ptBR} selected={currentDate} onSelect={(d) => d && setCurrentDate(startOfDay(d))} disabled={isDomingo} initialFocus/></PopoverContent></Popover><Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => stepDay(1)}><ChevronRight className="h-5 w-5" /></Button></div></div>
       </div>
-      <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}>
-        <DialogContent className="sm:max-w-[350px]">
-          <DialogHeader><DialogTitle>Substituir Técnico</DialogTitle></DialogHeader>
-          <div className="grid gap-2 py-4">
-            {ALL_TECHNICIANS.filter(tech => {
-              const dStr = activeSwap?.day || '';
-              if (dStr >= '2026-08-16' && tech === 'William Martinucci') return false;
-              return true;
-            }).map(tech => (
-              <Button key={tech} variant={activeSwap?.currentTech === tech ? "default" : "outline"} className="justify-start h-11" onClick={() => handleTechSwap(tech)}>
-                <UserRoundPen className="h-4 w-4 mr-3 opacity-50" />
-                {tech}
-                {tech === "Marcos Barbosa" && <span className="ml-auto text-[10px] font-black uppercase bg-blue-500/20 px-1.5 rounded">Folgista</span>}
-              </Button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
+
+      <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}><DialogContent className="sm:max-w-[350px]"><DialogHeader><DialogTitle>Substituir Técnico</DialogTitle></DialogHeader><div className="grid gap-2 py-4">{ALL_TECHNICIANS.filter(t => !(activeSwap?.day && activeSwap.day >= '2026-08-16' && t === 'William Martinucci')).map(tech => (<Button key={tech} variant={activeSwap?.currentTech === tech ? "default" : "outline"} className="justify-start h-11" onClick={() => handleTechSwap(tech)}><UserRoundPen className="h-4 w-4 mr-3 opacity-50" />{tech}</Button>))}</div></DialogContent></Dialog>
+
       <div className="space-y-8">
         {diasVisiveis.map((day) => {
-            const displayDate = format(day, 'dd/MM/yyyy');
-            const dateStr = format(day, 'yyyy-MM-dd');
+            const displayDate = format(day, 'dd/MM/yyyy'); const dateStr = format(day, 'yyyy-MM-dd');
             return (
                 <div key={dateStr} className="bg-card border border-border shadow-md rounded-lg overflow-hidden">
                     <div className="bg-muted/10 p-4 border-b border-border flex justify-between items-center"><div className="flex items-center gap-4"><span className="text-2xl font-bold uppercase tracking-widest">{format(day, 'dd · MM/yy')}</span><span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{format(day, 'EEEE', { locale: ptBR })}</span></div></div>
                     {TURNOS.map(t => {
-                        const shiftKey = `${dateStr}_${t.id}`;
-                        const isDisabled = disabledShifts[shiftKey];
+                        const shiftKey = `${dateStr}_${t.id}`; const isDisabled = disabledShifts[shiftKey];
                         return (
                             <div key={t.id} className={cn("grid grid-cols-[100px_1fr] border-b border-border/20 last:border-0 relative overflow-hidden", isDisabled && "bg-stripes")}>
                                 <div className="bg-muted/5 border-r border-border/20 p-4 flex flex-col justify-center items-center gap-2 z-20"><span className={cn("text-2xl font-bold", isDisabled ? "text-muted-foreground" : "text-foreground")}>{t.label}</span><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleShift(day, t.id)}>{isDisabled ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-green-500" />}</Button></div>
-                                <div className="p-4 bg-background/20 overflow-x-auto min-w-0 custom-scrollbar">
-                                    <div className="min-w-[800px] relative">
-                                        {!isDisabled && (
-                                            <>
-                                                <Ruler />
-                                                {['TORNO', 'CENTRO', 'ADM'].filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat).map(cat => {
-                                                    const overrideKey = `${dateStr}_${cat}_${t.id}`;
-                                                    let tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
-                                                    
-                                                    if (dateStr >= '2026-08-16' && tech === 'William Martinucci') {
-                                                      tech = undefined;
-                                                    }
-
-                                                    if (!tech) return null;
-
-                                                    const itemsForLane = planIndex.get(`${displayDate}|${t.id}|${cat}`) || [];
-                                                    const realItemsForLane = realIndex.get(`${displayDate}|${t.id}|${cat}`) || [];
-                                                    return (
-                                                      <div key={`${cat}-${t.id}`} className="grid grid-cols-[165px_1fr] items-start mb-10">
-                                                          <div className="pr-4 truncate cursor-pointer group/tech pt-1" onClick={() => { setActiveSwap({ day: dateStr, shiftId: t.id, category: cat, currentTech: tech }); setIsSwapDialogOpen(true); }}>
-                                                              <div className={cn("text-[11px] font-mono font-black uppercase flex items-center gap-1.5", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>{cat}<UserRoundPen className="h-3 w-3 opacity-0 group-hover/tech:opacity-100 transition-opacity" /></div>
-                                                              <div className="text-sm font-black truncate">{tech}</div>
-                                                          </div>
-                                                          <div className="space-y-4 w-full">
-                                                              <div className="space-y-1">
-                                                                  <div className="flex items-center justify-between"><span className="text-[10px] font-black uppercase text-muted-foreground/40 tracking-widest">Planejado</span></div>
-                                                                  <div className="relative h-[48px] border border-border/50 rounded bg-black/20 overflow-hidden">
-                                                                      {PAUSAS.map(p => (<div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-3 w-3 text-yellow-500/30" /></div>))}
-                                                                      {itemsForLane.map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}
-                                                                  </div>
-                                                              </div>
-
-                                                              <div className="bg-black/5 rounded-sm border border-border/20 overflow-hidden shadow-inner">
-                                                                  <div className="grid grid-cols-[80px_100px_100px_100px_1fr_80px] bg-muted/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/10">
-                                                                      <div>Forms</div>
-                                                                      <div>Planejado</div>
-                                                                      <div>Realizado</div>
-                                                                      <div>Desvio</div>
-                                                                      <div className="text-center">Status / Info</div>
-                                                                      <div className="text-right">Peças</div>
-                                                                  </div>
-                                                                  <div className="divide-y divide-border/5 max-h-[300px] overflow-y-auto">
-                                                                      {realItemsForLane.length === 0 ? (
-                                                                        <div className="px-3 py-4 text-center text-[11px] text-muted-foreground/30 font-black uppercase tracking-widest italic">Aguardando apontamentos...</div>
-                                                                      ) : (
-                                                                        realItemsForLane.map(item => <ActualRow key={item.id} item={item} />)
-                                                                      )}
-                                                                  </div>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                    );
-                                                })}
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
+                                <div className="p-4 bg-background/20 overflow-x-auto min-w-0 custom-scrollbar"><div className="min-w-[800px] relative">{!isDisabled && (<><Ruler />{['TORNO', 'CENTRO', 'ADM'].filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat).map(cat => {
+                                    const overrideKey = `${dateStr}_${cat}_${t.id}`; let tech = techOverrides[overrideKey] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
+                                    if (dateStr >= '2026-08-16' && tech === 'William Martinucci') tech = undefined;
+                                    if (!tech) return null;
+                                    const itemsForLane = planIndex.get(`${displayDate}|${t.id}|${cat}`) || [];
+                                    const realItemsForLane = realIndex.get(`${displayDate}|${t.id}|${cat}`) || [];
+                                    return (
+                                        <div key={`${cat}-${t.id}`} className="grid grid-cols-[165px_1fr] items-start mb-10">
+                                            <div className="pr-4 truncate cursor-pointer group/tech pt-1" onClick={() => { setActiveSwap({ day: dateStr, shiftId: t.id, category: cat, currentTech: tech! }); setIsSwapDialogOpen(true); }}>
+                                                <div className={cn("text-[11px] font-mono font-black uppercase flex items-center gap-1.5", cat === 'TORNO' ? "text-cyan-400" : (cat === 'CENTRO' ? "text-purple-400" : "text-slate-400"))}>{cat}<UserRoundPen className="h-3 w-3 opacity-0 group-hover/tech:opacity-100 transition-opacity" /></div>
+                                                <div className="text-sm font-black truncate">{tech}</div>
+                                            </div>
+                                            <div className="space-y-4 w-full">
+                                                <div className="space-y-1"><div className="flex items-center justify-between"><span className="text-[10px] font-black uppercase text-muted-foreground/40 tracking-widest">Planejado</span></div><div className="relative h-[48px] border border-border/50 rounded bg-black/20 overflow-hidden">{PAUSAS.map(p => (<div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x border-yellow-500/20 flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-3 w-3 text-yellow-500/30" /></div>))}{itemsForLane.map(item => <TimelineBar key={item.id} item={item} onToggle={toggleConcluded} />)}</div></div>
+                                                <div className="bg-black/5 rounded-sm border border-border/20 overflow-hidden shadow-inner"><div className="grid grid-cols-[80px_100px_100px_100px_1fr_80px] bg-muted/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/10"><div>Forms</div><div>Planejado</div><div>Realizado</div><div>Desvio</div><div className="text-center">Status</div><div className="text-right">Peças</div></div><div className="divide-y divide-border/5 max-h-[300px] overflow-y-auto">{realItemsForLane.length === 0 ? (<div className="px-3 py-4 text-center text-[11px] text-muted-foreground/30 font-black uppercase italic">Aguardando apontamentos...</div>) : (realItemsForLane.map(item => <ActualRow key={item.id} item={item} />))}</div></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}</>)}</div></div>
                             </div>
                         );
                     })}
@@ -1275,8 +1033,9 @@ export default function ProgrammingPage() {
             );
         })}
       </div>
+
       <Card className="shadow-lg border-border">
-        <CardHeader className="bg-muted/5 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"><div className="space-y-1"><CardTitle className="text-2xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle><div className="flex items-center gap-2">{selectedSiteFilter !== 'all' && (<Badge className="bg-primary text-primary-foreground font-black text-[12px]">{selectedSiteFilter}</Badge>)}{(selectedSiteFilter !== 'all' || requisitionFilter) && (<Button variant="ghost" size="sm" onClick={() => { setSelectedSiteFilter('all'); setRequisitionFilter(''); }} className="h-7 px-2 text-[12px] font-black uppercase text-destructive hover:bg-destructive/10">Limpar Filtros</Button>)}</div></div><div className="flex items-center gap-2 bg-background border rounded-md px-3 h-11 w-full sm:w-[320px] shadow-sm"><Search className="h-5 w-5 text-muted-foreground shrink-0" /><Input placeholder="PESQUISAR REQ. OU PEÇA..." value={requisitionFilter} onChange={(e) => setRequisitionFilter(e.target.value)} className="h-full w-full text-[12px] font-black uppercase border-0 bg-transparent shadow-none focus-visible:ring-0 p-0"/>{requisitionFilter && (<Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-transparent" onClick={() => setRequisitionFilter('')}><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>)}</div></CardHeader>
+        <CardHeader className="bg-muted/5 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"><div className="space-y-1"><CardTitle className="text-2xl uppercase tracking-wider">Fila de Produção & Sequenciamento</CardTitle><div className="flex items-center gap-2">{selectedSiteFilter !== 'all' && (<Badge className="bg-primary text-primary-foreground font-black text-[12px]">{selectedSiteFilter}</Badge>)}{(selectedSiteFilter !== 'all' || requisitionFilter) && (<Button variant="ghost" size="sm" onClick={() => { setSelectedSiteFilter('all'); setRequisitionFilter(''); }} className="h-7 px-2 text-[12px] font-black uppercase text-destructive hover:bg-destructive/10">Limpar Filtros</Button>)}</div></div><div className="flex items-center gap-2 bg-background border rounded-md px-3 h-11 w-full sm:w-[320px] shadow-sm"><Search className="h-5 w-5 text-muted-foreground shrink-0" /><Input placeholder="PESQUISAR..." value={requisitionFilter} onChange={(e) => setRequisitionFilter(e.target.value)} className="h-full w-full text-[12px] font-black uppercase border-0 bg-transparent shadow-none focus-visible:ring-0 p-0"/>{requisitionFilter && (<Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-transparent" onClick={() => setRequisitionFilter('')}><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>)}</div></CardHeader>
         <CardContent className="p-0">
           <Tabs defaultValue="all" className="w-full">
             <div className="px-6 py-2 bg-muted/5 border-b"><TabsList className="grid grid-cols-3 w-full max-w-md h-10"><TabsTrigger value="all" className="text-[12px] font-black uppercase">GERAL</TabsTrigger><TabsTrigger value="torno" className="text-[12px] font-black uppercase">TORNO CNC</TabsTrigger><TabsTrigger value="centro" className="text-[12px] font-black uppercase">CENTRO CNC</TabsTrigger></TabsList></div>
