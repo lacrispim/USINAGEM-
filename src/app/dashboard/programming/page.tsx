@@ -15,10 +15,6 @@ import {
   ArrowUp,
   ArrowDown,
   FileUp,
-  FileDown,
-  Coffee,
-  Mic,
-  Check,
   Plus,
   Trash2,
   Filter,
@@ -27,7 +23,11 @@ import {
   Anchor,
   Power,
   PowerOff,
-  AlertCircle
+  AlertCircle,
+  Check,
+  Coffee,
+  Mic,
+  FileCode
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -90,6 +90,7 @@ interface JobBase {
   turnoDesejado?: string; 
   ordemTorno?: number;
   ordemCentro?: number;
+  updatedAt?: any;
 }
 
 interface PlanejamentoItem {
@@ -151,15 +152,6 @@ const normalizeTechName = (name: any): string => {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 };
-
-function getShiftFromDate(d: Date): string {
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const totalMinutes = h * 60 + m;
-  if (totalMinutes >= 360 && totalMinutes < 810) return '1'; 
-  if (totalMinutes >= 810 && totalMinutes < 1230) return '2';
-  return '3';
-}
 
 const Ruler = React.memo(() => {
   const marks = [];
@@ -409,19 +401,7 @@ export default function ProgrammingPage() {
     const baseDate = startOfDay(anchor ?? planStartDate ?? new Date());
     const novosPlanItems: PlanejamentoItem[] = [];
     const laneBusy: Record<string, { start: number; end: number }[]> = { 'TORNO_0': [], 'CENTRO_0': [], 'ADM_0': [] };
-    const techScheduleMap = new Map<string, string>(); 
-    for (let dIdx = 0; dIdx < 365; dIdx++) {
-      const d = addDays(baseDate, dIdx); if (isDomingo(d)) continue;
-      const dStr = format(d, 'yyyy-MM-dd');
-      ['1', '2', '3'].forEach(sId => {
-        ['TORNO', 'CENTRO', 'ADM'].forEach(tk => {
-          const overrideKey = `${dStr}_${tk}_${sId}`;
-          let techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
-          if (dStr >= '2026-08-16' && techName === 'William Martinucci') techName = undefined;
-          if (techName) techScheduleMap.set(`${dStr}|${normalizeTechName(techName)}`, sId);
-        });
-      });
-    }
+    
     const occupy = (laneId: string, start: number, end: number) => { if (!laneBusy[laneId]) laneBusy[laneId] = []; laneBusy[laneId].push({ start, end }); laneBusy[laneId].sort((a, b) => a.start - b.start); };
     const nextFree = (laneId: string, from: number) => {
       let t = from; const intervals = laneBusy[laneId] || [];
@@ -429,6 +409,7 @@ export default function ProgrammingPage() {
       return { start: t, limit: Infinity };
     };
     const concluidos = new Set(planejamentoData.filter(i => i.isConcluded).map(i => `${i.jobId}|${i.techKey}|${i.dataExecucao}|${i.turno}`));
+    
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
         let prodTime = Number(job[type]) || 0;
         let setupTime = (type === 'torno' || type === 'centro') ? (Number(job.setup) || 20) : 0;
@@ -436,30 +417,61 @@ export default function ProgrammingPage() {
         const laneId = `${techKey}_0`;
         let pendingSetup = setupTime; let pendingProd = prodTime; let doneProdTime = 0;
         const cycleTime = job.quantidade > 0 ? prodTime / job.quantidade : 0;
+        
         let cursor = minStartTime;
-        if (job.dataDesejada) { const forcedDate = startOfDay(parse(job.dataDesejada, 'yyyy-MM-dd', new Date())); if (isValid(forcedDate)) { cursor = Math.max(cursor, differenceInCalendarDays(forcedDate, baseDate) * 3 * SHIFT_MIN); } }
+        // CORREÇÃO: Se data fixa, pula direto para ela em vez de Math.max
+        if (job.dataDesejada) { 
+            const forcedDate = startOfDay(parse(job.dataDesejada, 'yyyy-MM-dd', new Date())); 
+            if (isValid(forcedDate)) { 
+                cursor = differenceInCalendarDays(forcedDate, baseDate) * 3 * SHIFT_MIN; 
+            } 
+        }
+
         let iter = 0;
         while ((pendingSetup > 0.01 || pendingProd > 0.01) && iter < 3000) {
-            iter++; const free = nextFree(laneId, cursor); cursor = free.start;
-            const dayIdx = Math.floor(cursor / (SHIFT_MIN * 3)); const dayDate = addDays(baseDate, dayIdx);
+            iter++; 
+            const free = nextFree(laneId, cursor); 
+            cursor = free.start;
+            const dayIdx = Math.floor(cursor / (SHIFT_MIN * 3)); 
+            const dayDate = addDays(baseDate, dayIdx);
+            
             if (isDomingo(dayDate)) { cursor = (dayIdx + 1) * 3 * SHIFT_MIN; continue; }
-            const shiftIdx = Math.floor((cursor % (SHIFT_MIN * 3)) / SHIFT_MIN); const shiftAbs = dayIdx * 3 * SHIFT_MIN + shiftIdx * SHIFT_MIN; const shiftId = String(shiftIdx + 1);
+            
+            const shiftIdx = Math.floor((cursor % (SHIFT_MIN * 3)) / SHIFT_MIN); 
+            const shiftAbs = dayIdx * 3 * SHIFT_MIN + shiftIdx * SHIFT_MIN; 
+            const shiftId = String(shiftIdx + 1);
             const dateStr = format(dayDate, 'yyyy-MM-dd');
             const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
             const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
             const isShiftDisabled = currentDisabled[`${dateStr}_${shiftId}`];
+            
+            // CORREÇÃO: Lógica rigorosa de Turno Escolhido
             const isWrongShift = job.turnoDesejado && job.turnoDesejado !== '' && shiftId !== job.turnoDesejado;
-            if (isShiftDisabled || !techName || (dateStr >= '2026-08-16' && techName === 'William Martinucci') || isWrongShift) { cursor = shiftAbs + SHIFT_MIN; continue; }
+            
+            if (isShiftDisabled || !techName || (dateStr >= '2026-08-16' && techName === 'William Martinucci') || isWrongShift) { 
+                cursor = shiftAbs + SHIFT_MIN; 
+                continue; 
+            }
+
             let winStart = cursor % SHIFT_MIN;
             for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) winStart = p.start + p.duration; }
-            const abs = shiftAbs + winStart; const avail = Math.min(SHIFT_MIN - winStart, free.limit - abs);
-            if (avail < 1) { cursor = Number.isFinite(free.limit) ? Math.max(free.limit, abs) : shiftAbs + SHIFT_MIN; continue; }
-            const sInShift = pendingSetup > 0 ? Math.min(pendingSetup, avail) : 0; pendingSetup -= sInShift;
+            const abs = shiftAbs + winStart; 
+            const avail = Math.min(SHIFT_MIN - winStart, free.limit - abs);
+            
+            if (avail < 1) { 
+                cursor = Number.isFinite(free.limit) ? Math.max(free.limit, abs) : shiftAbs + SHIFT_MIN; 
+                continue; 
+            }
+            
+            const sInShift = pendingSetup > 0 ? Math.min(pendingSetup, avail) : 0; 
+            pendingSetup -= sInShift;
             const pInShift = Math.min(avail - sInShift, pendingProd);
             let qInShift = 0;
             if (pInShift > 0 && cycleTime > 0) { const before = Math.floor(doneProdTime / cycleTime + 1e-7); doneProdTime += pInShift; qInShift = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7)) - before; pendingProd -= pInShift; } else if (pInShift > 0) { pendingProd -= pInShift; }
+            
             if (sInShift > 0 || pInShift > 0) {
-                const duration = sInShift + pInShift; occupy(laneId, abs, abs + duration);
+                const duration = sInShift + pInShift; 
+                occupy(laneId, abs, abs + duration);
                 const displayDateStr = format(dayDate, 'dd/MM/yyyy');
                 novosPlanItems.push({ id: `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${Math.round(winStart)}`, dataExecucao: displayDateStr, tecnico: techName, equipamento: type.toUpperCase(), requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca, quantidadeTotal: job.quantidade, quantidadeNoBloco: qInShift, tempoMinutos: pInShift, setupMinutos: sInShift, turno: shiftId, startOffsetMin: winStart, tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', techKey, jobId: job.id, laneIndex: 0, isConcluded: concluidos.has(`${job.id}|${techKey}|${displayDateStr}|${shiftId}`), site: normalizeSiteName(job.site) });
                 cursor = abs + duration;
@@ -467,10 +479,12 @@ export default function ProgrammingPage() {
         }
         return cursor;
     };
+
     const finishTimes: Record<string, number> = {};
     novaFila.forEach(j => allocateTask(j, 'ADM', 0, 'prog'));
     [...novaFila].filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO').sort((a, b) => (a.ordemTorno || 999) - (b.ordemTorno || 999)).forEach(j => finishTimes[j.id] = allocateTask(j, 'TORNO', j.etapa1 === 'TORNO' ? 0 : (finishTimes[j.id] || 0), 'torno'));
     [...novaFila].filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO').sort((a, b) => (a.ordemCentro || 999) - (b.ordemCentro || 999)).forEach(j => finishTimes[j.id] = allocateTask(j, 'CENTRO', j.etapa1 === 'CENTRO' ? 0 : (finishTimes[j.id] || 0), 'centro'));
+    
     try {
         await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: novaFila, updatedAt: serverTimestamp() });
         await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: novosPlanItems, updatedAt: serverTimestamp() });
@@ -484,7 +498,8 @@ export default function ProgrammingPage() {
   };
 
   const updateJobField = async (id: string, field: keyof JobBase, value: any) => {
-    const newFila = fila.map(j => j.id === id ? { ...j, [field]: value } : j); setFila(newFila);
+    const newFila = fila.map(j => j.id === id ? { ...j, [field]: value, updatedAt: Date.now() } : j); 
+    setFila(newFila);
     await recalculatePlan(newFila);
   };
 
@@ -555,11 +570,26 @@ export default function ProgrammingPage() {
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b pb-6">
         <div>
           <h1 className="text-4xl font-black uppercase tracking-tighter">Planejamento CNC</h1>
-          <div className="flex items-center gap-2 mt-1">{isSaving ? <Badge variant="outline" className="animate-pulse bg-amber-500/10 text-amber-500 border-amber-500/20">Salvando...</Badge> : <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">Sincronizado</Badge>}</div>
+          <div className="flex items-center gap-2 mt-1">
+            {isSaving ? <Badge variant="outline" className="animate-pulse bg-amber-500/10 text-amber-500 border-amber-500/20">Salvando...</Badge> : <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">Sincronizado</Badge>}
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Eraser className="h-5 w-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Limpar Tudo?</AlertDialogTitle><AlertDialogDescription>Isso apagará toda a fila e o cronograma.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => { setFila([]); setPlanejamentoData([]); setDoc(doc(firestore!, 'programacaoState', 'fila'), { data: [] }); }} className="bg-destructive">Limpar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-          <Popover><PopoverTrigger asChild><Button variant="outline" className="h-10 font-black uppercase text-[11px]"><Anchor className="h-4 w-4 mr-2" /> {planStartDate ? `Início: ${format(planStartDate, 'dd/MM')}` : "Definir Âncora"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" locale={ptBR} selected={planStartDate || undefined} onSelect={handleSetAnchorDate} disabled={isDomingo} initialFocus/></PopoverContent></Popover>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" onClick={() => handleSetAnchorDate(planStartDate || new Date())} className="h-10 font-black uppercase text-[11px]"><Anchor className="h-4 w-4 mr-2" /> {planStartDate ? `Início: ${format(planStartDate, 'dd/MM')}` : "Definir Âncora"}</Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Recalcular plano desde a âncora</p></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <Popover>
+            <PopoverTrigger asChild><Button variant="ghost" size="icon" className="text-primary"><CalendarDays className="h-5 w-5" /></Button></PopoverTrigger>
+            <PopoverContent className="w-auto p-0"><Calendar mode="single" locale={ptBR} selected={planStartDate || undefined} onSelect={handleSetAnchorDate} disabled={isDomingo} initialFocus/></PopoverContent>
+          </Popover>
           
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild><Button variant="secondary" className="h-10 font-black uppercase text-[11px]"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button></DialogTrigger>
