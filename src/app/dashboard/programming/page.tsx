@@ -316,7 +316,6 @@ export default function ProgrammingPage() {
   const { data: lossRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), limit(2000)) : null, [firestore]));
   const { data: productionRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), limit(1000)) : null, [firestore]));
 
-  // Sincronização robusta com Firestore
   useEffect(() => {
     if (filaDoc?.data) {
         if (isUpdatingRef.current) return;
@@ -467,12 +466,10 @@ export default function ProgrammingPage() {
     }
   };
 
-  // Recalcular quando mudar âncora ou fila de forma controlada
   useEffect(() => {
     if (configLoaded && planStartDate && fila.length > 0) {
         recalculatePlan(fila).then(res => {
             setPlanejamentoData(res);
-            // Salvar se não for um eco
             if (!isUpdatingRef.current) saveAll(fila, res);
         });
     }
@@ -588,7 +585,7 @@ export default function ProgrammingPage() {
     <Table>
       <TableHeader><TableRow><TableHead className="w-20 text-center text-xs">POS</TableHead><TableHead className="w-16 text-center text-xs">MOVE</TableHead><TableHead className="text-xs">STATUS</TableHead><TableHead className="w-32 text-xs">DATA</TableHead><TableHead className="w-24 text-xs">TURNO</TableHead><TableHead className="w-40 text-xs">MÁQUINA</TableHead><TableHead className="text-xs">REQ.</TableHead><TableHead className="text-xs">PEÇA</TableHead><TableHead className="text-right text-xs">QTD</TableHead><TableHead className="w-10"></TableHead></TableRow></TableHeader>
       <TableBody>
-        {jobs.length === 0 ? <TableRow><TableCell colSpan={10} className="text-center py-10 opacity-50">Nenhuma requisição</TableCell></TableRow> : jobs.map((job, localIdx) => {
+        {jobs.length === 0 ? <TableRow><TableCell colSpan={10} className="text-center py-10 opacity-50">Nenhuma requisição encontrada com os filtros atuais.</TableCell></TableRow> : jobs.map((job, localIdx) => {
           const globalIdx = fila.findIndex(f => f.id === job.id);
           const pos = type === 'TORNO' ? (job.ordemTorno || localIdx + 1) : (type === 'CENTRO' ? (job.ordemCentro || localIdx + 1) : localIdx + 1);
           const done = planejamentoData.filter(p => p.jobId === job.id && p.isConcluded).length;
@@ -647,7 +644,6 @@ export default function ProgrammingPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 bg-card/50 p-3 rounded-lg border">
         <div className="flex items-center gap-3">
           <Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}><SelectTrigger className="h-9 w-40 text-xs font-black uppercase"><SelectValue placeholder="Fábrica" /></SelectTrigger><SelectContent><SelectItem value="all">TODAS</SelectItem>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select>
-          <div className="relative w-60"><Search className="absolute left-2 top-2.5 h-4 w-4 opacity-50" /><Input placeholder="Pesquisar..." value={requisitionFilter} onChange={(e) => setRequisitionFilter(e.target.value)} className="pl-8 h-9 text-xs uppercase"/></div>
         </div>
         <div className="flex items-center gap-1">
             <Button variant="outline" size="sm" onClick={jumpToToday} className="mr-2 text-[10px] font-black uppercase h-8">Hoje</Button>
@@ -695,7 +691,18 @@ export default function ProgrammingPage() {
       </div>
 
       <Card>
-        <CardHeader className="border-b"><CardTitle className="uppercase tracking-widest">Fila de Produção & Sequenciamento</CardTitle></CardHeader>
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b">
+          <CardTitle className="uppercase tracking-widest">Fila de Produção & Sequenciamento</CardTitle>
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 opacity-50" />
+            <Input 
+              placeholder="Buscar Requisição ou Peça..." 
+              value={requisitionFilter} 
+              onChange={(e) => setRequisitionFilter(e.target.value)} 
+              className="pl-8 h-9 text-xs uppercase"
+            />
+          </div>
+        </CardHeader>
         <CardContent className="p-0">
           <Tabs defaultValue="all">
             <div className="px-6 py-2 bg-muted/5 border-b"><TabsList className="grid grid-cols-3 w-60"><TabsTrigger value="all" className="text-[10px] font-black">GERAL</TabsTrigger><TabsTrigger value="torno" className="text-[10px] font-black">TORNO</TabsTrigger><TabsTrigger value="centro" className="text-[10px] font-black">CENTRO</TabsTrigger></TabsList></div>
