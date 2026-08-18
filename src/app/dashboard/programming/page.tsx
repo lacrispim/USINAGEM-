@@ -22,7 +22,8 @@ import {
   Clock,
   AlertCircle,
   Power,
-  PowerOff
+  PowerOff,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -56,6 +57,7 @@ import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/comp
 import { cruzarComPlano, ComparacaoItem } from '@/lib/realizado';
 
 const TOLERANCIA_ADERENCIA = 0.10;
+const WILLIAM_OFF_DATE = '2026-08-16';
 
 interface JobBase {
   id: string;
@@ -279,6 +281,7 @@ export default function ProgrammingPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastUpdateRef = useRef<number>(0);
   const concludedIdsRef = useRef<Set<string>>(new Set());
+  const isUpdatingRef = useRef(false);
 
   const [fila, setFila] = useState<JobBase[]>([]);
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
@@ -317,6 +320,7 @@ export default function ProgrammingPage() {
   // Sincronização robusta com Firestore
   useEffect(() => {
     if (filaDoc?.data) {
+        if (isUpdatingRef.current) return;
         const ts = (filaDoc.updatedAt as Timestamp)?.toMillis() || 0;
         if (ts > lastUpdateRef.current) {
             const serverFila = filaDoc.data;
@@ -337,13 +341,16 @@ export default function ProgrammingPage() {
     if (configDoc) {
         setDisabledShifts(configDoc.disabledShifts || {});
         setTechOverrides(configDoc.techOverrides || {});
-        if (configDoc.planStartDate) setPlanStartDate(startOfDay(parse(configDoc.planStartDate, 'yyyy-MM-dd', new Date())));
+        if (configDoc.planStartDate) {
+            const d = startOfDay(parse(configDoc.planStartDate, 'yyyy-MM-dd', new Date()));
+            if (isValid(d)) setPlanStartDate(d);
+        }
         setConfigLoaded(true);
     }
   }, [filaDoc, planoDoc, configDoc]);
 
   const recalculatePlan = useCallback(async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor = planStartDate, currentLosses = lossRecords || []) => {
-    if (!firestore || !configLoaded || !anchor) return;
+    if (!firestore || !configLoaded || !anchor) return [];
     
     const baseDate = startOfDay(anchor);
     const novosPlanItems: PlanejamentoItem[] = [];
@@ -356,7 +363,7 @@ export default function ProgrammingPage() {
       const dStr = format(d, 'yyyy-MM-dd');
       ['1', '2', '3'].forEach(sId => ['TORNO', 'CENTRO', 'ADM'].forEach(tk => {
         let tech = currentOverrides[`${dStr}_${tk}_${sId}`] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
-        if (dStr >= '2026-08-16' && tech === 'William Martinucci') tech = undefined;
+        if (dStr >= WILLIAM_OFF_DATE && tech === 'William Martinucci') tech = undefined;
         if (tech) techScheduleMap.set(`${dStr}|${normalizeTechName(tech)}`, sId);
       }));
     }
@@ -365,8 +372,11 @@ export default function ProgrammingPage() {
         if (!loss.operatorId || !loss.timeLost) return;
         const d = loss.date?.toDate ? loss.date.toDate() : new Date(loss.date);
         const dStr = format(d, 'yyyy-MM-dd');
-        const shiftId = techScheduleMap.get(`${dStr}|${normalizeTechName(loss.operatorId)}`) || '1';
-        const key = `${dStr}_${shiftId}_${normalizeTechName(loss.operatorId)}`;
+        const techNorm = normalizeTechName(loss.operatorId);
+        if (dStr >= WILLIAM_OFF_DATE && techNorm === 'william martinucci') return;
+
+        const shiftId = techScheduleMap.get(`${dStr}|${techNorm}`) || '1';
+        const key = `${dStr}_${shiftId}_${techNorm}`;
         const ex = techLossSummary.get(key) || { total: 0, descriptions: '' };
         techLossSummary.set(key, { total: ex.total + Number(loss.timeLost), descriptions: ex.descriptions ? `${ex.descriptions}\n• ${loss.lossReason}: ${loss.timeLost}m` : `• ${loss.lossReason}: ${loss.timeLost}m` });
     });
@@ -389,7 +399,7 @@ export default function ProgrammingPage() {
             const shiftAbs = dIdx * 3 * SHIFT_MIN + sIdx * SHIFT_MIN;
             ['TORNO', 'CENTRO', 'ADM'].forEach(tk => {
                 let tech = currentOverrides[`${dStr}_${tk}_${sId}`] || DEFAULT_MACHINE_LANES[tk][sId]?.[0];
-                if (dStr >= '2026-08-16' && tech === 'William Martinucci') tech = undefined;
+                if (dStr >= WILLIAM_OFF_DATE && tech === 'William Martinucci') tech = undefined;
                 if (!tech) return;
                 const loss = techLossSummary.get(`${dStr}_${sId}_${normalizeTechName(tech)}`);
                 if (loss && loss.total > 0) {
@@ -413,7 +423,7 @@ export default function ProgrammingPage() {
             const sIdx = Math.floor((cursor % (SHIFT_MIN * 3)) / SHIFT_MIN); const sId = String(sIdx + 1);
             const dStr = format(dDate, 'yyyy-MM-dd'); const dDisplay = format(dDate, 'dd/MM/yyyy');
             let tech = currentOverrides[`${dStr}_${techKey}_${sId}`] || DEFAULT_MACHINE_LANES[techKey][sId]?.[0];
-            if (dStr >= '2026-08-16' && tech === 'William Martinucci') tech = undefined;
+            if (dStr >= WILLIAM_OFF_DATE && tech === 'William Martinucci') tech = undefined;
             if (currentDisabled[`${dStr}_${sId}`] || !tech || (job.turnoDesejado && sId !== job.turnoDesejado)) { cursor = (dIdx * 3 * SHIFT_MIN) + (sIdx + 1) * SHIFT_MIN; continue; }
             let offset = cursor % SHIFT_MIN; for (const p of PAUSAS) { if (offset < p.start + p.duration && offset + 0.1 >= p.start) offset = p.start + p.duration; }
             const abs = (dIdx * 3 * SHIFT_MIN) + (sIdx * SHIFT_MIN) + offset;
@@ -437,21 +447,37 @@ export default function ProgrammingPage() {
     const fC = [...novaFila].filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO').sort((a,b) => (a.ordemCentro || 999)-(b.ordemCentro || 999));
     fC.forEach(j => allocate(j, 'CENTRO', 0, 'centro'));
 
-    setPlanejamentoData(novosPlanItems);
+    return novosPlanItems;
+  }, [firestore, configLoaded, planStartDate, disabledShifts, techOverrides, lossRecords]);
+
+  const saveAll = async (nFila: JobBase[], nPlano: PlanejamentoItem[]) => {
+    if (!firestore) return;
+    isUpdatingRef.current = true;
     lastUpdateRef.current = Date.now();
     const sanitize = (arr: any[]) => arr.map(i => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v === undefined ? null : v])));
     try {
-        await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(novaFila), updatedAt: serverTimestamp() });
-        await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(novosPlanItems), updatedAt: serverTimestamp() });
-    } catch (e) {}
-  }, [firestore, configLoaded, planStartDate, disabledShifts, techOverrides, lossRecords]);
+        await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: sanitize(nFila), updatedAt: serverTimestamp() });
+        await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: sanitize(nPlano), updatedAt: serverTimestamp() });
+        await setDoc(doc(firestore, 'programacaoState', 'config'), { 
+            planStartDate: planStartDate ? format(planStartDate, 'yyyy-MM-dd') : null,
+            disabledShifts,
+            techOverrides
+        }, { merge: true });
+    } finally {
+        setTimeout(() => { isUpdatingRef.current = false; }, 1000);
+    }
+  };
 
   // Recalcular quando mudar âncora ou fila de forma controlada
   useEffect(() => {
     if (configLoaded && planStartDate && fila.length > 0) {
-        recalculatePlan(fila);
+        recalculatePlan(fila).then(res => {
+            setPlanejamentoData(res);
+            // Salvar se não for um eco
+            if (!isUpdatingRef.current) saveAll(fila, res);
+        });
     }
-  }, [configLoaded, planStartDate, disabledShifts, techOverrides, lossRecords]);
+  }, [configLoaded, planStartDate, disabledShifts, techOverrides, lossRecords, fila]);
 
   const filteredFila = useMemo(() => {
     let data = fila;
@@ -463,17 +489,15 @@ export default function ProgrammingPage() {
     return data;
   }, [fila, selectedSiteFilter, requisitionFilter]);
 
-  const updateJobField = useCallback(async (id: string, field: keyof JobBase, value: any) => {
+  const updateJobField = useCallback((id: string, field: keyof JobBase, value: any) => {
     setFila(prev => {
         const item = prev.find(j => j.id === id); 
         if (!item || item[field] === value) return prev;
-        const nF = prev.map(j => j.id === id ? { ...j, [field]: value } : j);
-        recalculatePlan(nF); 
-        return nF;
+        return prev.map(j => j.id === id ? { ...j, [field]: value } : j);
     });
-  }, [recalculatePlan]);
+  }, []);
 
-  const handleAddJob = async () => {
+  const handleAddJob = () => {
     if (!newJob.requisicao || !newJob.nomeDaPeca) {
         toast({ title: 'Erro', description: 'Preencha os campos obrigatórios.', variant: 'destructive' });
         return;
@@ -491,9 +515,7 @@ export default function ProgrammingPage() {
         etapa1: newJob.etapa1 || '',
         etapa2: newJob.etapa2 || ''
     };
-    const novaFila = [...fila, job];
-    setFila(novaFila);
-    recalculatePlan(novaFila);
+    setFila(prev => [...prev, job]);
     setIsAddDialogOpen(false);
     setNewJob({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: '', etapa2: '' });
   };
@@ -517,13 +539,13 @@ export default function ProgrammingPage() {
             etapa1: String(row.ETAPA1 || '').toUpperCase(),
             etapa2: String(row.ETAPA2 || '').toUpperCase()
         })).filter(j => j.requisicao);
-        const nF = [...fila, ...importados]; setFila(nF); recalculatePlan(nF);
+        setFila(prev => [...prev, ...importados]);
         setIsImporting(false); toast({ title: 'Sucesso', description: `${importados.length} itens importados.` });
     };
     reader.readAsBinaryString(file);
   };
 
-  const move = useCallback(async (curr: number, nPos: number, type: 'GERAL' | 'TORNO' | 'CENTRO' = 'GERAL') => {
+  const move = (curr: number, nPos: number, type: 'GERAL' | 'TORNO' | 'CENTRO' = 'GERAL') => {
     setFila(prev => {
       const nF = [...prev]; const item = nF[curr]; if (!item) return prev;
       if (type === 'GERAL') { const t = Math.max(0, Math.min(nF.length - 1, nPos - 1)); const [m] = nF.splice(curr, 1); nF.splice(t, 0, m); }
@@ -538,9 +560,9 @@ export default function ProgrammingPage() {
           const [m] = list.splice(fIdx, 1); list.splice(t, 0, m);
           list.forEach((j, i) => { const o = nF.find(nf => nf.id === j.id); if (o) o.ordemCentro = i + 1; });
       }
-      recalculatePlan(nF); return nF;
+      return nF;
     });
-  }, [recalculatePlan]);
+  };
 
   const planIndex = useMemo(() => {
     const map = new Map<string, PlanejamentoItem[]>();
@@ -574,15 +596,20 @@ export default function ProgrammingPage() {
           const tot = planejamentoData.filter(p => p.jobId === job.id && p.jobId !== 'loss').length;
           return (
             <TableRow key={job.id} className={cn(done === tot && tot > 0 && "bg-green-500/5 opacity-80")}>
-              <TableCell className="text-center"><Input type="number" defaultValue={pos} className="h-9 w-14 text-center text-xs font-black" onBlur={(e) => move(globalIdx, parseInt(e.target.value), type)}/></TableCell>
+              <TableCell className="text-center"><Input type="number" value={pos} className="h-9 w-14 text-center text-xs font-black" onChange={(e) => move(globalIdx, parseInt(e.target.value), type)}/></TableCell>
               <TableCell><div className="flex flex-col items-center gap-1"><Button variant="outline" size="icon" className="h-6 w-6" onClick={() => move(globalIdx, pos - 1, type)} disabled={localIdx === 0}><ArrowUp className="h-3/3" /></Button><Button variant="outline" size="icon" className="h-6 w-6" onClick={() => move(globalIdx, pos + 1, type)} disabled={localIdx === jobs.length - 1}><ArrowDown className="h-3/3" /></Button></div></TableCell>
               <TableCell>{done === tot && tot > 0 ? <Badge className="bg-green-500">FEITO</Badge> : <span className="text-[10px] font-black opacity-40">PEND</span>}</TableCell>
               <TableCell><JobExecutionCell job={job} onUpdate={(d) => updateJobField(job.id, 'dataDesejada', d)}/></TableCell>
-              <TableCell><Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}><SelectTrigger className="h-9 text-[11px] font-black"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></TableCell>
+              <TableCell>
+                <Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}>
+                    <SelectTrigger className="h-9 text-[11px] font-black"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent>
+                </Select>
+              </TableCell>
               <TableCell><div className="flex gap-1"><Button variant={job.etapa1 === 'TORNO' || job.etapa2 === 'TORNO' ? "default" : "outline"} size="sm" className="h-7 w-8 font-black" onClick={() => updateJobField(job.id, job.etapa1 === 'TORNO' ? 'etapa1' : 'etapa2', job.etapa1 === 'TORNO' || job.etapa2 === 'TORNO' ? '' : 'TORNO')}>T</Button><Button variant={job.etapa1 === 'CENTRO' || job.etapa2 === 'CENTRO' ? "default" : "outline"} size="sm" className="h-7 w-8 font-black" onClick={() => updateJobField(job.id, job.etapa1 === 'CENTRO' ? 'etapa1' : 'etapa2', job.etapa1 === 'CENTRO' || job.etapa2 === 'CENTRO' ? '' : 'CENTRO')}>C</Button></div></TableCell>
-              <TableCell><Input className="h-8 font-mono text-xs" defaultValue={job.requisicao} onBlur={(e) => updateJobField(job.id, 'requisicao', e.target.value)}/></TableCell>
-              <TableCell><Input className="h-8 text-xs uppercase" defaultValue={job.nomeDaPeca} onBlur={(e) => updateJobField(job.id, 'nomeDaPeca', e.target.value.toUpperCase())}/></TableCell>
-              <TableCell><Input type="number" className="h-8 w-14 text-right text-xs" defaultValue={job.quantidade} onBlur={(e) => updateJobField(job.id, 'quantidade', parseInt(e.target.value))}/></TableCell>
+              <TableCell><Input className="h-8 font-mono text-xs" value={job.requisicao} onChange={(e) => updateJobField(job.id, 'requisicao', e.target.value)}/></TableCell>
+              <TableCell><Input className="h-8 text-xs uppercase" value={job.nomeDaPeca} onChange={(e) => updateJobField(job.id, 'nomeDaPeca', e.target.value.toUpperCase())}/></TableCell>
+              <TableCell><Input type="number" className="h-8 w-14 text-right text-xs" value={job.quantidade} onChange={(e) => updateJobField(job.id, 'quantidade', parseInt(e.target.value))}/></TableCell>
               <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setFila(f => f.filter(x => x.id !== job.id))}><Trash2 className="h-4/4" /></Button></TableCell>
             </TableRow>
           );
@@ -590,6 +617,14 @@ export default function ProgrammingPage() {
       </TableBody>
     </Table>
   );
+
+  const jumpToStart = () => {
+    if (planStartDate) setCurrentDate(planStartDate);
+  };
+
+  const jumpToToday = () => {
+    setCurrentDate(startOfDay(new Date()));
+  };
 
   return (
     <div className="flex flex-col gap-6 p-4">
@@ -600,7 +635,12 @@ export default function ProgrammingPage() {
           <Button variant="secondary" onClick={() => fileInputRef.current?.click()} className="h-10 font-black uppercase" disabled={isImporting}><FileUp className="h-4 w-4 mr-2" /> {isImporting ? "Importando..." : "Importar Excel"}</Button>
           <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
           <div className="w-px h-8 bg-border mx-2" />
-          <Popover><PopoverTrigger asChild><Button variant="outline" className="h-10 text-xs font-black uppercase"><Anchor className="h-4 w-4 mr-2" /> {planStartDate ? format(planStartDate, 'dd/MM') : "Âncora"}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={planStartDate || undefined} onSelect={(d) => d && setPlanStartDate(d)} disabled={isDomingo}/></PopoverContent></Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+                <Button variant="outline" className="h-10 text-xs font-black uppercase"><Anchor className="h-4 w-4 mr-2 text-primary" /> {planStartDate ? format(planStartDate, 'dd/MM/yy') : "Âncora"}</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={planStartDate || undefined} onSelect={(d) => d && setPlanStartDate(d)} disabled={isDomingo}/></PopoverContent>
+          </Popover>
           <Button variant="ghost" onClick={() => setFila([])} className="text-destructive"><Eraser className="h-5 w-5" /></Button>
         </div>
       </div>
@@ -610,7 +650,13 @@ export default function ProgrammingPage() {
           <Select value={selectedSiteFilter} onValueChange={setSelectedSiteFilter}><SelectTrigger className="h-9 w-40 text-xs font-black uppercase"><SelectValue placeholder="Fábrica" /></SelectTrigger><SelectContent><SelectItem value="all">TODAS</SelectItem>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select>
           <div className="relative w-60"><Search className="absolute left-2 top-2.5 h-4 w-4 opacity-50" /><Input placeholder="Pesquisar..." value={requisitionFilter} onChange={(e) => setRequisitionFilter(e.target.value)} className="pl-8 h-9 text-xs uppercase"/></div>
         </div>
-        <div className="flex items-center gap-1"><Button variant="ghost" size="icon" onClick={() => setCurrentDate(d => addDays(d, -1))}><ChevronLeft /></Button><Popover><PopoverTrigger asChild><Button variant="ghost" className="font-black">{format(currentDate, 'dd/MM/yyyy')}</Button></PopoverTrigger><PopoverContent className="p-0"><Calendar mode="single" selected={currentDate} onSelect={(d) => d && setCurrentDate(d)}/></PopoverContent></Popover><Button variant="ghost" size="icon" onClick={() => setCurrentDate(d => addDays(d, 1))}><ChevronRight /></Button></div>
+        <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={jumpToToday} className="mr-2 text-[10px] font-black uppercase h-8">Hoje</Button>
+            <Button variant="outline" size="sm" onClick={jumpToStart} className="mr-4 text-[10px] font-black uppercase h-8 border-primary/50 text-primary">Início Plano (03/08)</Button>
+            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(d => addDays(d, -1))}><ChevronLeft /></Button>
+            <Popover><PopoverTrigger asChild><Button variant="ghost" className="font-black">{format(currentDate, 'dd/MM/yyyy')}</Button></PopoverTrigger><PopoverContent className="p-0"><Calendar mode="single" selected={currentDate} onSelect={(d) => d && setCurrentDate(d)}/></PopoverContent></Popover>
+            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(d => addDays(d, 1))}><ChevronRight /></Button>
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -628,7 +674,7 @@ export default function ProgrammingPage() {
                   const items = planIndex.get(`${format(currentDate, 'dd/MM/yyyy')}|${t.id}|${tk}`) || [];
                   const reals = realIndex.get(`${format(currentDate, 'dd/MM/yyyy')}|${t.id}|${tk}`) || [];
                   let tech = techOverrides[`${format(currentDate, 'yyyy-MM-dd')}_${tk}_${t.id}`] || DEFAULT_MACHINE_LANES[tk][t.id]?.[0];
-                  if (format(currentDate, 'yyyy-MM-dd') >= '2026-08-16' && tech === 'William Martinucci') tech = undefined;
+                  if (format(currentDate, 'yyyy-MM-dd') >= WILLIAM_OFF_DATE && tech === 'William Martinucci') tech = undefined;
                   if (!tech) return null;
                   return (
                     <div key={tk} className="grid grid-cols-[160px_1fr] mb-8 items-start">
@@ -661,7 +707,6 @@ export default function ProgrammingPage() {
         </CardContent>
       </Card>
 
-      {/* DIÁLOGO: NOVA REQUISIÇÃO */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader><DialogTitle>Adicionar Peça à Fila</DialogTitle></DialogHeader>
@@ -685,7 +730,7 @@ export default function ProgrammingPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}><DialogContent className="sm:max-w-[300px]"><DialogHeader><DialogTitle>Substituir Técnico</DialogTitle></DialogHeader><div className="grid gap-2 py-4">{ALL_TECHNICIANS.filter(t => !(activeSwap?.day && activeSwap.day >= '2026-08-16' && t === 'William Martinucci')).map(tech => (<Button key={tech} variant={activeSwap?.currentTech === tech ? "default" : "outline"} className="justify-start h-11" onClick={() => { if(activeSwap) { setTechOverrides(prev => ({ ...prev, [`${activeSwap.day}_${activeSwap.category}_${activeSwap.shiftId}`]: tech })); setIsSwapDialogOpen(false); } }}><UserRoundPen className="h-4 w-4 mr-3 opacity-50" />{tech}</Button>))}</div></DialogContent></Dialog>
+      <Dialog open={isSwapDialogOpen} onOpenChange={setIsSwapDialogOpen}><DialogContent className="sm:max-w-[300px]"><DialogHeader><DialogTitle>Substituir Técnico</DialogTitle></DialogHeader><div className="grid gap-2 py-4">{ALL_TECHNICIANS.filter(t => !(activeSwap?.day && activeSwap.day >= WILLIAM_OFF_DATE && t === 'William Martinucci')).map(tech => (<Button key={tech} variant={activeSwap?.currentTech === tech ? "default" : "outline"} className="justify-start h-11" onClick={() => { if(activeSwap) { setTechOverrides(prev => ({ ...prev, [`${activeSwap.day}_${activeSwap.category}_${activeSwap.shiftId}`]: tech })); setIsSwapDialogOpen(false); } }}><UserRoundPen className="h-4 w-4 mr-3 opacity-50" />{tech}</Button>))}</div></DialogContent></Dialog>
 
       <style jsx global>{`
         .bg-stripes { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 10px, transparent 10px, transparent 20px); }
