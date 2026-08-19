@@ -3,13 +3,11 @@
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, orderBy, limit } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ChevronLeft, 
   ChevronRight, 
-  ChevronsLeft,
-  Loader, 
   Eraser,
   CalendarDays,
   ArrowUp,
@@ -25,8 +23,10 @@ import {
   PowerOff,
   AlertCircle,
   Check,
-  Coffee,
-  Mic
+  Clock,
+  Loader2,
+  ChevronsLeft,
+  UserRoundPen
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -39,9 +39,9 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
@@ -67,11 +67,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { cruzarComPlano, ComparacaoItem } from '@/lib/realizado';
 
 const TOLERANCIA_ADERENCIA = 0.10;
+const WILLIAM_OFF_DATE = '2026-08-16';
 
 interface JobBase {
   id: string;
@@ -129,18 +130,26 @@ const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
 
 const SHIFT_MIN = 420; 
 const PAUSAS = [
-  { start: 0, duration: 10, label: 'DDS', icon: Mic },
-  { start: 180, duration: 15, label: 'CAFÉ', icon: Coffee }
+  { start: 0, duration: 10, label: 'DDS', icon: Clock },
+  { start: 180, duration: 15, label: 'CAFÉ', icon: Clock }
 ];
 
 const isDomingo = (d: Date) => getDay(d) === 0;
-const nextWorkday = (d: Date) => (isDomingo(d) ? addDays(d, 1) : d);
 
 const normalizeSiteName = (site: string | undefined): string => {
   if (!site) return 'VALINHOS';
   const s = String(site).toUpperCase().trim();
   if (s.includes('VALINHOS')) return 'VALINHOS';
   return s;
+};
+
+const normalizeName = (name: any): string => {
+  if (!name) return '';
+  return String(name)
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 };
 
 const Ruler = React.memo(() => {
@@ -211,7 +220,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                 {isLoss ? (
                     <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-2 border-b border-white/20 pb-1"><AlertCircle className="h-4 w-4" /><span className="font-black uppercase text-[10px] tracking-widest">Detalhes das Perdas</span></div>
-                        <div className="whitespace-pre-line text-xs font-bold leading-relaxed opacity-90">{item.nomeDaPeca}</div>
+                        <div className="whitespace-pre-line text-xs font-bold">{item.nomeDaPeca}</div>
                         <div className="pt-1 text-[10px] font-black">TOTAL: {Math.round(totalMin)} min</div>
                     </div>
                 ) : (
@@ -223,8 +232,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                         <p className="text-xs font-black uppercase leading-tight">{item.nomeDaPeca}</p>
                         <div className="grid grid-cols-2 gap-3 pt-1">
                             <div className="flex flex-col"><span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Tempo Total</span><span className="text-xs font-black">{Math.round(totalMin)} min</span></div>
-                            {item.quantidadeNoBloco > 0 && (<div className="flex flex-col"><span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Qtd. Bloco</span><span className="text-xs font-black">{item.quantidadeNoBloco} de {item.quantidadeTotal} pç</span></div>)}
-                            {item.setupMinutos > 0 && (<div className="flex flex-col"><span className="text-[9px] text-yellow-500/80 uppercase font-black tracking-tighter">Setup Previsto</span><span className="text-xs font-black">{item.setupMinutos} min</span></div>)}
+                            {item.quantidadeNoBloco > 0 && (<div className="flex flex-col"><span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Qtd. Bloco</span><span className="text-xs font-black">{item.quantidadeNoBloco} pç</span></div>)}
                             <div className="flex flex-col"><span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Site</span><span className="text-xs font-black">{item.site}</span></div>
                         </div>
                         <div className="pt-2 mt-1 border-t border-border flex items-center justify-between text-[8px] text-muted-foreground uppercase font-bold italic"><span>{item.tecnico}</span><span>{item.dataExecucao} · {item.turno}T</span></div>
@@ -269,7 +277,6 @@ const JobExecutionCell = ({ job, calculatedDate, onUpdate }: { job: JobBase, cal
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <div className="p-2 border-b bg-muted/20 flex justify-between items-center"><span className="text-[10px] font-black uppercase">Agendar para o dia:</span>{job.dataDesejada && (<Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => onUpdate(null)}><Trash2 className="h-3.5 w-3.5" /></Button>)}</div>
         <Calendar mode="single" locale={ptBR} selected={forcedDate || undefined} onSelect={(d) => d && onUpdate(format(d, 'yyyy-MM-dd'))} disabled={isDomingo} initialFocus/>
       </PopoverContent>
     </Popover>
@@ -383,6 +390,8 @@ export default function ProgrammingPage() {
     setPlanejamentoData(updatedPlano);
     try { await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: updatedPlano, updatedAt: serverTimestamp() }); } catch (e) {}
   }, [firestore, planejamentoData]);
+
+  const nextWorkday = (d: Date) => { let res = new Date(d); while (isDomingo(res)) res = addDays(res, 1); return res; };
 
   const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor?: Date) => {
     if (!firestore) return;
@@ -588,7 +597,7 @@ export default function ProgrammingPage() {
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1"><Label>REQ</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})}/></div>
-                  <div className="space-y-1"><Label>Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value})}/></div>
+                  <div className="space-y-1"><Label>Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value.toUpperCase()})}/></div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1"><Label>Máquina</Label><Select value={newItem.etapa1} onValueChange={v => setNewItem({...newItem, etapa1: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TORNO">TORNO</SelectItem><SelectItem value="CENTRO">CENTRO</SelectItem></SelectContent></Select></div>
@@ -605,7 +614,7 @@ export default function ProgrammingPage() {
           </Dialog>
 
           <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
-          <Button className="h-10 font-black uppercase text-[11px]" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Excel</Button>
+          <Button className="h-10 font-black uppercase text-[11px]" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Excel</Button>
         </div>
       </div>
 
@@ -640,7 +649,10 @@ export default function ProgrammingPage() {
                             const items = planIndex.get(`${dDisplay}|${t.id}|${cat}`) || []; const reals = realIndex.get(`${dDisplay}|${t.id}|${cat}`) || [];
                             return (
                               <div key={`${cat}-${t.id}`} className="grid grid-cols-[160px_1fr] gap-4 mb-6 last:mb-0">
-                                <div className="pt-2"><div className={cn("text-[10px] font-black uppercase", cat === 'TORNO' ? "text-cyan-500" : (cat === 'CENTRO' ? "text-purple-500" : "text-slate-500"))}>{cat}</div><div className="text-xs font-black truncate">{tech}</div></div>
+                                <div className="pt-2 cursor-pointer group" onClick={() => {}}>
+                                    <div className={cn("text-[10px] font-black uppercase", cat === 'TORNO' ? "text-cyan-500" : (cat === 'CENTRO' ? "text-purple-500" : "text-slate-500"))}>{cat}</div>
+                                    <div className="text-xs font-black truncate">{tech}</div>
+                                </div>
                                 <div className="space-y-2"><div className="relative h-10 border rounded bg-black/5 overflow-hidden">{PAUSAS.map(p => <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-3 w-3 opacity-20" /></div>)}{items.map(it => <TimelineBar key={it.id} item={it} onToggle={toggleConcluded} />)}</div><div className="space-y-1">{reals.map(it => <ActualRow key={it.id} item={it} />)}</div></div>
                               </div>
                             );
@@ -673,9 +685,8 @@ export default function ProgrammingPage() {
 
       <style jsx global>{`
         .bg-stripes { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 10px, transparent 10px, transparent 20px); }
-        .bg-stripes-red { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.1) 0, rgba(0,0,0,0.1) 10px, transparent 10px, transparent 20px); }
+        .bg-stripes-red { background-image: repeating-linear-gradient(45deg, rgba(255, 0, 0, 0.1) 0px, rgba(255, 0, 0, 0.1) 10px, transparent 10px, transparent 20px); }
       `}</style>
     </div>
   );
 }
-
