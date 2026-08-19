@@ -26,8 +26,7 @@ import {
   AlertCircle,
   Check,
   Coffee,
-  Mic,
-  FileCode
+  Mic
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -142,15 +141,6 @@ const normalizeSiteName = (site: string | undefined): string => {
   const s = String(site).toUpperCase().trim();
   if (s.includes('VALINHOS')) return 'VALINHOS';
   return s;
-};
-
-const normalizeTechName = (name: any): string => {
-  if (!name) return '';
-  return String(name)
-    .toLowerCase()
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 };
 
 const Ruler = React.memo(() => {
@@ -419,7 +409,6 @@ export default function ProgrammingPage() {
         const cycleTime = job.quantidade > 0 ? prodTime / job.quantidade : 0;
         
         let cursor = minStartTime;
-        // CORREÇÃO: Se data fixa, pula direto para ela em vez de Math.max
         if (job.dataDesejada) { 
             const forcedDate = startOfDay(parse(job.dataDesejada, 'yyyy-MM-dd', new Date())); 
             if (isValid(forcedDate)) { 
@@ -445,7 +434,6 @@ export default function ProgrammingPage() {
             const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
             const isShiftDisabled = currentDisabled[`${dateStr}_${shiftId}`];
             
-            // CORREÇÃO: Lógica rigorosa de Turno Escolhido
             const isWrongShift = job.turnoDesejado && job.turnoDesejado !== '' && shiftId !== job.turnoDesejado;
             
             if (isShiftDisabled || !techName || (dateStr >= '2026-08-16' && techName === 'William Martinucci') || isWrongShift) { 
@@ -540,9 +528,9 @@ export default function ProgrammingPage() {
 
   const renderFilaTable = (jobs: JobBase[], type: 'GERAL' | 'TORNO' | 'CENTRO') => (
     <Table>
-      <TableHeader><TableRow><TableHead className="w-20 text-center text-xs">POS</TableHead><TableHead className="w-16 text-center text-xs">MOVE</TableHead><TableHead className="text-xs">STATUS</TableHead><TableHead className="w-32 text-xs">DATA</TableHead><TableHead className="w-24 text-xs">TURNO</TableHead><TableHead className="w-40 text-xs">MÁQUINA</TableHead><TableHead className="text-xs">REQ.</TableHead><TableHead className="text-xs">PEÇA</TableHead><TableHead className="text-right text-xs">QTD</TableHead><TableHead className="text-right text-xs">TEMPO</TableHead><TableHead className="w-10"></TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead className="w-20 text-center text-xs">POS</TableHead><TableHead className="w-16 text-center text-xs">MOVE</TableHead><TableHead className="text-xs">STATUS</TableHead><TableHead className="w-32 text-xs">DATA</TableHead><TableHead className="w-24 text-xs">TURNO</TableHead><TableHead className="w-40 text-xs">MÁQUINA</TableHead><TableHead className="text-xs">REQ.</TableHead><TableHead className="text-xs">PEÇA</TableHead><TableHead className="w-20 text-right text-xs">QTD</TableHead><TableHead className="w-20 text-right text-xs">SETUP</TableHead><TableHead className="w-20 text-right text-xs">TORNO</TableHead><TableHead className="w-20 text-right text-xs">CENTRO</TableHead><TableHead className="w-10"></TableHead></TableRow></TableHeader>
       <TableBody>
-        {jobs.length === 0 ? (<TableRow><TableCell colSpan={11} className="text-center py-10 opacity-30 italic">Nenhuma requisição encontrada</TableCell></TableRow>) : jobs.map((job, idx) => {
+        {jobs.length === 0 ? (<TableRow><TableCell colSpan={13} className="text-center py-10 opacity-30 italic">Nenhuma requisição encontrada</TableCell></TableRow>) : jobs.map((job, idx) => {
           const stats = jobCompletionStats.get(job.id); const isDone = stats && stats.total > 0 && stats.total === stats.concluded;
           const pos = type === 'GERAL' ? (idx + 1) : (type === 'TORNO' ? (job.ordemTorno || idx + 1) : (job.ordemCentro || idx + 1));
           return (
@@ -556,7 +544,9 @@ export default function ProgrammingPage() {
               <TableCell><Input className="h-8 w-20 font-mono text-[11px]" defaultValue={job.requisicao} onBlur={(e) => updateJobField(job.id, 'requisicao', e.target.value)}/></TableCell>
               <TableCell><Input className="h-8 w-full min-w-[150px] text-[11px] uppercase" defaultValue={job.nomeDaPeca} onBlur={(e) => updateJobField(job.id, 'nomeDaPeca', e.target.value.toUpperCase())}/></TableCell>
               <TableCell className="text-right"><Input type="number" className="h-8 w-12 text-right" defaultValue={job.quantidade} onBlur={(e) => updateJobField(job.id, 'quantidade', Number(e.target.value))}/></TableCell>
-              <TableCell className="text-right text-[10px] font-bold">{type === 'TORNO' ? `${job.torno}m` : (type === 'CENTRO' ? `${job.centro}m` : `${job.torno + job.centro}m`)}</TableCell>
+              <TableCell className="text-right"><Input type="number" className="h-8 w-16 text-right font-bold text-amber-500" defaultValue={job.setup} onBlur={(e) => updateJobField(job.id, 'setup', Number(e.target.value))}/></TableCell>
+              <TableCell className="text-right"><Input type="number" className="h-8 w-16 text-right font-bold text-cyan-500" defaultValue={job.torno} onBlur={(e) => updateJobField(job.id, 'torno', Number(e.target.value))}/></TableCell>
+              <TableCell className="text-right"><Input type="number" className="h-8 w-16 text-right font-bold text-purple-500" defaultValue={job.centro} onBlur={(e) => updateJobField(job.id, 'centro', Number(e.target.value))}/></TableCell>
               <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => { const nf = fila.filter(f => f.id !== job.id); setFila(nf); recalculatePlan(nf); }}><Trash2 className="h-4" /></Button></TableCell>
             </TableRow>
           );
@@ -688,3 +678,4 @@ export default function ProgrammingPage() {
     </div>
   );
 }
+
