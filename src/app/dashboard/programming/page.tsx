@@ -1,8 +1,9 @@
+
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, orderBy, limit } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, orderBy, limit, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ChevronLeft, 
@@ -317,10 +318,33 @@ export default function ProgrammingPage() {
   const { data: productionRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]));
   const { data: lossRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]));
 
+  // Lógica de recuperação de dados legados (se a partição estiver vazia mas houver plano genérico)
+  useEffect(() => {
+    async function checkLegacyData() {
+        if (!firestore || fila.length > 0) return;
+        
+        // Se for Agosto de 2026 e estiver vazio, tenta carregar o 'fila' genérico
+        if (selectedMonth === '7' && selectedYear === '2026') {
+            const legacyFila = await getDoc(doc(firestore, 'programacaoState', 'fila'));
+            if (legacyFila.exists() && Array.isArray(legacyFila.data().data)) {
+                setFila(legacyFila.data().data);
+                const legacyPlano = await getDoc(doc(firestore, 'programacaoState', 'plano'));
+                if (legacyPlano.exists() && Array.isArray(legacyPlano.data().data)) {
+                    setPlanejamentoData(legacyPlano.data().data);
+                }
+            }
+        }
+    }
+    checkLegacyData();
+  }, [firestore, selectedMonth, selectedYear, fila.length]);
+
   useEffect(() => {
     const now = Date.now();
     if (now - lastUpdateRef.current < 3000) return;
+    
     if (filaDoc && Array.isArray(filaDoc.data)) setFila(filaDoc.data);
+    if (planoDoc && Array.isArray(planoDoc.data)) setPlanejamentoData(planoDoc.data);
+    
     if (configDoc) {
       setDisabledShifts(configDoc.disabledShifts || {});
       setTechOverrides(configDoc.techOverrides || {});
@@ -337,7 +361,6 @@ export default function ProgrammingPage() {
           setCurrentDate(firstOfMonth);
       }
     }
-    if (planoDoc && Array.isArray(planoDoc.data)) setPlanejamentoData(planoDoc.data);
   }, [filaDoc, planoDoc, configDoc, selectedMonth, selectedYear]);
 
   const jobCompletionStats = useMemo(() => {
