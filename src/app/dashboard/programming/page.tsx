@@ -147,6 +147,20 @@ const normalizeSiteName = (site: string | undefined): string => {
   return s;
 };
 
+const normalizeOperatorName = (name: any) => {
+  if (!name) return '';
+  const n = String(name).toLowerCase().trim();
+  if (n.includes('alisson')) return 'Alisson França';
+  if (n.includes('gustavo')) return 'Gustavo Gozzi';
+  if (n.includes('daniel')) return 'Daniel Solivo';
+  if (n.includes('rodrigo')) return 'Rodrigo Cantano';
+  if (n.includes('william')) return 'William Martinucci';
+  if (n.includes('nathan')) return 'Nathan Xavier';
+  if (n.includes('jair')) return 'Jair Melo';
+  if (n.includes('marcos')) return 'Marcos Barbosa';
+  return n.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+};
+
 const Ruler = React.memo(() => {
   const marks = [];
   for (const m of Array.from({ length: 8 }, (_, i) => i * 60)) {
@@ -184,7 +198,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                   {isLoss ? (
                     <div className="flex items-center gap-2 px-2 text-white overflow-hidden w-full whitespace-nowrap">
                          <AlertCircle className="h-4 w-4 shrink-0 text-red-200" />
-                         <span className="font-black text-[12px] uppercase tracking-tight">Perdas: {Math.round(totalMin)} min</span>
+                         <span className="font-black text-[11px] uppercase tracking-tight">Perdas Reais: {Math.round(totalMin)} min</span>
                     </div>
                   ) : (
                     <>
@@ -432,21 +446,56 @@ export default function ProgrammingPage() {
     const novosPlanItems: PlanejamentoItem[] = [];
     const laneBusy: Record<string, { start: number; end: number }[]> = { 'TORNO_0': [], 'CENTRO_0': [], 'ADM_0': [] };
     
-    const occupy = (laneId: string, start: number, end: number) => { if (!laneBusy[laneId]) laneBusy[laneId] = []; laneBusy[laneId].push({ start, end }); laneBusy[laneId].sort((a, b) => a.start - b.start); };
+    const occupy = (laneId: string, start: number, end: number) => { 
+        if (!laneBusy[laneId]) laneBusy[laneId] = []; 
+        laneBusy[laneId].push({ start, end }); 
+        laneBusy[laneId].sort((a, b) => a.start - b.start); 
+    };
+
     const nextFree = (laneId: string, from: number) => {
-      let t = from; const intervals = laneBusy[laneId] || [];
-      for (const iv of intervals) { if (iv.end <= t + 0.1) continue; if (iv.start > t + 0.1) return { start: t, limit: iv.start }; t = iv.end; }
+      let t = from; 
+      const intervals = laneBusy[laneId] || [];
+      for (const iv of intervals) { 
+        if (iv.end <= t + 0.1) continue; 
+        if (iv.start > t + 0.1) return { start: t, limit: iv.start }; 
+        t = iv.end; 
+      }
       return { start: t, limit: Infinity };
     };
 
+    // PROCESSAR PERDAS REAIS: Elas consomem o início do turno no planejamento
     realItems.filter(r => r.status === 'perda').forEach(p => {
-        const pDate = parse(p.dataStr, 'dd/MM/yyyy', new Date());
-        const dayIdx = differenceInCalendarDays(pDate, baseDate);
-        if (dayIdx < 0) return;
-        const shiftIdx = parseInt(p.turno) - 1;
-        const startAbs = dayIdx * 3 * SHIFT_MIN + shiftIdx * SHIFT_MIN;
-        occupy(`${p.techKey}_0`, startAbs, startAbs + p.tempoRealizado);
-        novosPlanItems.push({ id: `loss-vis-${p.id}`, dataExecucao: p.dataStr, tecnico: p.tecnico, equipamento: 'PERDA', requisicao: 'PERDA', nomeDaPeca: p.motivoPerda || 'PARADA', quantidadeTotal: 0, quantidadeNoBloco: 0, tempoMinutos: p.tempoRealizado, setupMinutos: 0, turno: p.turno, startOffsetMin: 0, tipoAtividade: 'PERDA', techKey: p.techKey as any, jobId: 'loss', laneIndex: 0, site: 'LOCAL' });
+        try {
+            const pDate = parse(p.dataStr, 'dd/MM/yyyy', new Date());
+            const dayIdx = differenceInCalendarDays(pDate, baseDate);
+            if (dayIdx < 0) return;
+            const shiftIdx = parseInt(p.turno) - 1;
+            const shiftAbs = dayIdx * 3 * SHIFT_MIN + shiftIdx * SHIFT_MIN;
+            
+            // Ocupar o tempo de perda no motor de cálculo para empurrar o planejamento
+            occupy(`${p.techKey}_0`, shiftAbs, shiftAbs + p.tempoRealizado);
+            
+            // Adicionar barra visual de perda no lane planejado
+            novosPlanItems.push({ 
+                id: `loss-vis-${p.id}`, 
+                dataExecucao: p.dataStr, 
+                tecnico: normalizeOperatorName(p.tecnico), 
+                equipamento: 'PERDA', 
+                requisicao: 'PERDA', 
+                nomeDaPeca: p.motivoPerda || 'TEMPO IMPRODUTIVO', 
+                quantidadeTotal: 0, 
+                quantidadeNoBloco: 0, 
+                tempoMinutos: p.tempoRealizado, 
+                setupMinutos: 0, 
+                turno: p.turno, 
+                startOffsetMin: 0, 
+                tipoAtividade: 'PERDA', 
+                techKey: p.techKey as any, 
+                jobId: 'loss', 
+                laneIndex: 0, 
+                site: 'LOCAL' 
+            });
+        } catch (e) {}
     });
     
     const concluidos = new Set(planejamentoData.filter(i => i.isConcluded).map(i => `${i.jobId}|${i.techKey}|${i.dataExecucao}|${i.turno}`));
@@ -501,7 +550,8 @@ export default function ProgrammingPage() {
             if (pInShift > 0 && cycleTime > 0) { const before = Math.floor(doneProdTime / cycleTime + 1e-7); doneProdTime += pInShift; qInShift = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7)) - before; pendingProd -= pInShift; } else if (pInShift > 0) { pendingProd -= pInShift; }
             
             if (sInShift > 0 || pInShift > 0) {
-                const duration = sInShift + pInShift; occupy(laneId, abs, abs + duration);
+                const duration = sInShift + pInShift; 
+                occupy(laneId, abs, abs + duration);
                 const displayDateStr = format(dayDate, 'dd/MM/yyyy');
                 novosPlanItems.push({ id: `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${Math.round(winStart)}`, dataExecucao: displayDateStr, tecnico: techName, equipamento: type.toUpperCase(), requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca, quantidadeTotal: job.quantidade, quantidadeNoBloco: qInShift, tempoMinutos: pInShift, setupMinutos: sInShift, turno: shiftId, startOffsetMin: winStart, tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', techKey, jobId: job.id, laneIndex: 0, isConcluded: concluidos.has(`${job.id}|${techKey}|${displayDateStr}|${shiftId}`), site: normalizeSiteName(job.site) });
                 cursor = abs + duration;
@@ -734,7 +784,7 @@ export default function ProgrammingPage() {
 
       <style jsx global>{`
         .bg-stripes { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 10px, transparent 10px, transparent 20px); }
-        .bg-stripes-red { background-image: repeating-linear-gradient(45deg, rgba(255, 0, 0, 0.1) 0px, rgba(255, 0, 0, 0.1) 10px, transparent 10px, transparent 20px); }
+        .bg-stripes-red { background-image: repeating-linear-gradient(45deg, rgba(255, 0, 0, 0.15) 0px, rgba(255, 0, 0, 0.15) 10px, transparent 10px, transparent 20px); }
       `}</style>
     </div>
   );
