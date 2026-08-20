@@ -188,17 +188,17 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                 <div 
                   onClick={() => !isLoss && onToggle(item.id)}
                   className={cn(
-                    "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm transition-all z-[5] cursor-pointer group", 
-                    isLoss ? "bg-red-800 border-red-900 bg-stripes-hazard-red" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
+                    "absolute top-[2px] bottom-[2px] rounded-[3px] overflow-hidden border border-black/40 flex shadow-sm transition-all z-[5] cursor-pointer group", 
+                    isLoss ? "bg-red-900 border-red-700 bg-stripes-hazard-red" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
                     item.isConcluded && !isLoss && "opacity-40 grayscale-[0.5] border-green-500 border-2",
                     !isLoss && "hover:scale-[1.01] hover:brightness-110 hover:shadow-md"
                   )} 
                   style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
                 >
                   {isLoss ? (
-                    <div className="flex items-center gap-2 px-2 text-white overflow-hidden w-full whitespace-nowrap bg-red-900/60">
+                    <div className="flex items-center gap-2 px-2 text-white overflow-hidden w-full whitespace-nowrap bg-red-950/40">
                          <AlertCircle className="h-4 w-4 shrink-0 text-white animate-pulse" />
-                         <span className="font-black text-[11px] uppercase tracking-tight">PERDAS: {Math.round(totalMin)} MIN</span>
+                         <span className="font-black text-[11px] uppercase tracking-tighter">PERDAS: {Math.round(totalMin)} MIN</span>
                     </div>
                   ) : (
                     <>
