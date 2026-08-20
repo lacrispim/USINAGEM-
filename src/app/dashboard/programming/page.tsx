@@ -189,7 +189,7 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                   onClick={() => !isLoss && onToggle(item.id)}
                   className={cn(
                     "absolute top-[2px] bottom-[2px] rounded-[3px] overflow-hidden border border-black/40 flex shadow-sm transition-all z-[5] cursor-pointer group", 
-                    isLoss ? "bg-red-900 border-red-700 bg-stripes-hazard-red" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
+                    isLoss ? "bg-red-900 border-red-700" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
                     item.isConcluded && !isLoss && "opacity-40 grayscale-[0.5] border-green-500 border-2",
                     !isLoss && "hover:scale-[1.01] hover:brightness-110 hover:shadow-md"
                   )} 
@@ -466,33 +466,40 @@ export default function ProgrammingPage() {
     };
 
     // 1. PROCESSAR PERDAS REAIS PRIMEIRO: Elas ocupam o início do turno conforme solicitado
+    const lossByShift: Record<string, number> = {};
     realItems.filter(r => r.status === 'perda').forEach(p => {
+        const k = `${p.dataStr}|${p.turno}|${p.techKey}`;
+        lossByShift[k] = (lossByShift[k] || 0) + p.tempoRealizado;
+    });
+
+    Object.entries(lossByShift).forEach(([key, totalTime]) => {
+        const [dStr, shiftId, techKey] = key.split('|');
         try {
-            const pDate = parse(p.dataStr, 'dd/MM/yyyy', new Date());
+            const pDate = parse(dStr, 'dd/MM/yyyy', new Date());
             const dayIdx = differenceInCalendarDays(pDate, baseDate);
             if (dayIdx < 0) return;
-            const shiftIdx = parseInt(p.turno) - 1;
+            const shiftIdx = parseInt(shiftId) - 1;
             const shiftAbs = dayIdx * 3 * SHIFT_MIN + shiftIdx * SHIFT_MIN;
             
             // Ocupar o tempo de perda no motor de cálculo para empurrar o planejamento
-            occupy(`${p.techKey}_0`, shiftAbs, shiftAbs + p.tempoRealizado);
+            occupy(`${techKey}_0`, shiftAbs, shiftAbs + totalTime);
             
             // Adicionar barra visual de perda no lane planejado
             novosPlanItems.push({ 
-                id: `loss-vis-${p.id}`, 
-                dataExecucao: p.dataStr, 
-                tecnico: normalizeOperatorName(p.tecnico), 
+                id: `loss-vis-${key}`, 
+                dataExecucao: dStr, 
+                tecnico: 'BLOQUEIO', 
                 equipamento: 'PERDA', 
                 requisicao: 'PERDA', 
-                nomeDaPeca: p.motivoPerda || 'TEMPO IMPRODUTIVO', 
+                nomeDaPeca: 'CAPACIDADE BLOQUEADA POR PERDAS', 
                 quantidadeTotal: 0, 
                 quantidadeNoBloco: 0, 
-                tempoMinutos: p.tempoRealizado, 
+                tempoMinutos: totalTime, 
                 setupMinutos: 0, 
-                turno: p.turno, 
+                turno: shiftId, 
                 startOffsetMin: 0, 
                 tipoAtividade: 'PERDA', 
-                techKey: p.techKey as any, 
+                techKey: techKey as any, 
                 jobId: 'loss', 
                 laneIndex: 0, 
                 site: 'LOCAL' 
