@@ -189,23 +189,23 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                   onClick={() => !isLoss && onToggle(item.id)}
                   className={cn(
                     "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm transition-all z-[5] cursor-pointer group", 
-                    isLoss ? "bg-red-700 border-red-900 bg-stripes-red" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
+                    isLoss ? "bg-red-800 border-red-900 bg-stripes-hazard-red" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
                     item.isConcluded && !isLoss && "opacity-40 grayscale-[0.5] border-green-500 border-2",
                     !isLoss && "hover:scale-[1.01] hover:brightness-110 hover:shadow-md"
                   )} 
                   style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
                 >
                   {isLoss ? (
-                    <div className="flex items-center gap-2 px-2 text-white overflow-hidden w-full whitespace-nowrap bg-red-700/80">
+                    <div className="flex items-center gap-2 px-2 text-white overflow-hidden w-full whitespace-nowrap bg-red-900/60">
                          <AlertCircle className="h-4 w-4 shrink-0 text-white animate-pulse" />
-                         <span className="font-black text-[11px] uppercase tracking-tight">PERDA: {Math.round(totalMin)}m</span>
+                         <span className="font-black text-[11px] uppercase tracking-tight">PERDAS: {Math.round(totalMin)} MIN</span>
                     </div>
                   ) : (
                     <>
                       {item.setupMinutos > 0 && (
                         <div 
-                          className="h-full shrink-0 border-r border-black/20 flex items-center justify-center relative z-10" 
-                          style={{ width: `${setupPc}%`, background: 'repeating-linear-gradient(45deg, #F0BC00 0 5px, #101820 5px 10px)' }}
+                          className="h-full shrink-0 border-r border-black/20 flex items-center justify-center relative z-10 bg-stripes-hazard" 
+                          style={{ width: `${setupPc}%` }}
                         >
                            <span className="text-[10px] font-black text-white bg-black/70 px-1 rounded-sm shadow-sm">S</span>
                         </div>
@@ -465,7 +465,7 @@ export default function ProgrammingPage() {
       return { start: t, limit: Infinity };
     };
 
-    // 1. PROCESSAR PERDAS REAIS PRIMEIRO: Elas "roubam" tempo do início do turno
+    // 1. PROCESSAR PERDAS REAIS PRIMEIRO: Elas ocupam o início do turno conforme solicitado
     realItems.filter(r => r.status === 'perda').forEach(p => {
         try {
             const pDate = parse(p.dataStr, 'dd/MM/yyyy', new Date());
@@ -786,7 +786,8 @@ export default function ProgrammingPage() {
 
       <style jsx global>{`
         .bg-stripes { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 10px, transparent 10px, transparent 20px); }
-        .bg-stripes-red { background-image: repeating-linear-gradient(45deg, rgba(255, 0, 0, 0.4) 0px, rgba(255, 0, 0, 0.4) 5px, transparent 5px, transparent 10px); }
+        .bg-stripes-hazard { background-image: repeating-linear-gradient(45deg, #F0BC00 0, #F0BC00 5px, #101820 5px, #101820 10px); }
+        .bg-stripes-hazard-red { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0, rgba(255, 255, 255, 0.1) 5px, transparent 5px, transparent 10px); }
       `}</style>
     </div>
   );
