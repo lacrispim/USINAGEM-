@@ -495,7 +495,7 @@ export default function ProgrammingPage() {
             novosPlanItems.push({ 
                 id: `loss-vis-${key}`, 
                 dataExecucao: dStr, 
-                tecnico: normalizeOperatorName(key.split('|')[1]) || 'SOMA PERDAS', 
+                tecnico: 'BLOQUEIO PERDAS', 
                 equipamento: 'BLOQUEIO', 
                 requisicao: 'PERDA', 
                 nomeDaPeca: 'TEMPO CONSUMIDO POR PERDAS REAIS', 
@@ -816,3 +816,4 @@ export default function ProgrammingPage() {
     </div>
   );
 }
+
