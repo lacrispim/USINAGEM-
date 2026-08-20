@@ -52,6 +52,8 @@ const OPERATOR_DEFAULT_SHIFT: Record<string, string> = {
   "marcos barbosa": "1"
 };
 
+const SHIFT_LIMIT_MIN = 420; // 7 HORAS
+
 function normalizeName(name: any): string {
   if (!name) return '';
   return String(name)
@@ -69,15 +71,12 @@ export function cruzarComPlano(
   tolerancia: number
 ): ComparacaoItem[] {
   const result: ComparacaoItem[] = [];
-  const williamOffDate = new Date(2026, 7, 16);
 
   // 1. Agrupar produção por (Data, Técnico, Forms)
   const prodGroup: Record<string, any[]> = {};
   producao.forEach(p => {
     if (!p.operatorId || !p.date) return;
     const d = p.date.toDate ? p.date.toDate() : new Date(p.date);
-    if (d >= williamOffDate && normalizeName(p.operatorId) === 'william martinucci') return;
-
     const dStr = format(d, 'dd/MM/yyyy');
     const techNorm = normalizeName(p.operatorId);
     const formsNorm = String(p.formsNumber || 'S/N').replace('#', '').trim();
@@ -92,8 +91,6 @@ export function cruzarComPlano(
   perdas.forEach(l => {
     if (!l.operatorId || !l.date) return;
     const d = l.date.toDate ? l.date.toDate() : new Date(l.date);
-    if (d >= williamOffDate && normalizeName(l.operatorId) === 'william martinucci') return;
-
     const dStr = format(d, 'dd/MM/yyyy');
     const techNorm = normalizeName(l.operatorId);
     const key = `${dStr}|${techNorm}`;
@@ -104,10 +101,10 @@ export function cruzarComPlano(
     if (l.lossReason) lossSummary[key].reasons.push(`${l.lossReason} (${time}m)`);
   });
 
-  // 3. Processar itens do Plano
+  // 3. Processar itens do Plano (Apenas Usinagem e Programação)
   const matchedKeys = new Set<string>();
   plano.forEach(pItem => {
-    if (pItem.jobId === 'loss') return; 
+    if (pItem.jobId === 'loss' || pItem.jobId === 'pausa') return; 
 
     const techNorm = normalizeName(pItem.tecnico);
     const formsNorm = String(pItem.requisicao).replace('#', '').trim();
@@ -160,7 +157,7 @@ export function cruzarComPlano(
     });
   });
 
-  // 4. Adicionar Linha de Perdas
+  // 4. Adicionar Linha de Perdas (Consome a Jornada)
   Object.keys(lossSummary).forEach(key => {
     const [dStr, techNorm] = key.split('|');
     const data = lossSummary[key];
@@ -186,43 +183,6 @@ export function cruzarComPlano(
       status: 'perda',
       suspeitaDuplicidade: false,
       motivoPerda: data.reasons.join(' | ')
-    });
-  });
-
-  // 5. Adicionar Apontamentos Extras
-  Object.keys(prodGroup).forEach(key => {
-    if (matchedKeys.has(key)) return;
-    const [dStr, techNorm, formsNorm] = key.split('|');
-    const records = prodGroup[key];
-    
-    let tempoTotal = 0;
-    let pecasTotal = 0;
-    records.forEach(r => {
-        tempoTotal += Number(r.machiningTime) || 0;
-        pecasTotal += Number(r.quantityProduced) || 0;
-    });
-
-    const techName = plano.find(p => normalizeName(p.tecnico) === techNorm)?.tecnico || techNorm;
-    const assignedShift = OPERATOR_DEFAULT_SHIFT[techNorm] || '1';
-
-    result.push({
-        id: `extra-${key}`,
-        requisicao: formsNorm,
-        tecnico: techName,
-        dataStr: dStr,
-        turno: assignedShift,
-        techKey: TECH_BY_OPERATOR[techName] || 'ADM',
-        tempoPlanejado: 0,
-        pecasPlanejadas: 0,
-        tempoSetupPlanejado: 0,
-        startOffsetMin: 0,
-        tempoRealizado: tempoTotal,
-        pecasRealizadas: pecasTotal,
-        tempoPrimeiraPeca: 0,
-        tempoUsinagem: tempoTotal,
-        tempoSetupRealizado: 0,
-        status: 'semPlano',
-        suspeitaDuplicidade: false
     });
   });
 

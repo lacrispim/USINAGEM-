@@ -132,10 +132,10 @@ const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'ADM': { '1': ['William Martinucci'] }
 };
 
-const SHIFT_MIN = 420; 
-const PAUSAS = [
-  { start: 0, duration: 10, label: 'DDS', icon: Clock },
-  { start: 180, duration: 15, label: 'CAFÉ', icon: Clock }
+const SHIFT_MIN = 420; // 7 HORAS TOTAIS
+const PAUSAS_FIXAS = [
+  { start: 0, duration: 10, label: 'DDS' },
+  { start: 180, duration: 15, label: 'CAFÉ' }
 ];
 
 const isDomingo = (d: Date) => getDay(d) === 0;
@@ -158,7 +158,12 @@ const Ruler = React.memo(() => {
   const marks = [];
   for (const m of Array.from({ length: 8 }, (_, i) => i * 60)) {
     const pc = (m / SHIFT_MIN) * 100;
-    marks.push(<div key={m} className="absolute top-0 h-full flex flex-col items-center" style={{ left: `${pc}%` }}><div className={cn("w-px bg-border", m % 120 === 0 ? "h-[12px] bg-muted-foreground" : "h-[8px]")} />{m % 60 === 0 && <span className="text-[12px] font-mono font-black text-muted-foreground leading-none mt-1">{m / 60}h</span>}</div>);
+    marks.push(
+      <div key={m} className="absolute top-0 h-full flex flex-col items-center" style={{ left: `${pc}%` }}>
+        <div className={cn("w-px bg-border", m % 120 === 0 ? "h-[12px] bg-muted-foreground" : "h-[8px]")} />
+        {m % 60 === 0 && <span className="text-[10px] font-mono font-black text-muted-foreground leading-none mt-1">{m / 60}h</span>}
+      </div>
+    );
   }
   return <div className="relative h-[24px] border-b border-border/50 mb-1">{marks}</div>;
 });
@@ -173,25 +178,33 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
   const isTorno = item.techKey === 'TORNO';
   const isProg = item.techKey === 'ADM';
   const isLoss = item.tipoAtividade === 'PERDA';
+  const isPausa = item.tipoAtividade === 'PAUSA';
 
   return (
     <TooltipProvider delayDuration={100}>
         <Tooltip>
             <TooltipTrigger asChild>
                 <div 
-                  onClick={() => !isLoss && onToggle(item.id)}
+                  onClick={() => (!isLoss && !isPausa) && onToggle(item.id)}
                   className={cn(
                     "absolute top-[2px] bottom-[2px] rounded-[3px] overflow-hidden border border-black/40 flex shadow-sm transition-all z-[5] cursor-pointer group", 
-                    isLoss ? "bg-red-900 border-red-700" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
-                    item.isConcluded && !isLoss && "opacity-40 grayscale-[0.5] border-green-500 border-2",
-                    !isLoss && "hover:scale-[1.01] hover:brightness-110 hover:shadow-md"
+                    isLoss ? "bg-red-900 border-red-700" : 
+                    isPausa ? "bg-amber-600 border-amber-800" :
+                    (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
+                    item.isConcluded && !isLoss && !isPausa && "opacity-40 grayscale-[0.5] border-green-500 border-2",
+                    (!isLoss && !isPausa) && "hover:scale-[1.01] hover:brightness-110 hover:shadow-md"
                   )} 
                   style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
                 >
                   {isLoss ? (
                     <div className="flex items-center gap-2 px-2 text-white overflow-hidden w-full whitespace-nowrap bg-red-950/40">
                          <AlertCircle className="h-4 w-4 shrink-0 text-white animate-pulse" />
-                         <span className="font-black text-[11px] uppercase tracking-tighter">PERDAS: {Math.round(totalMin)} MIN</span>
+                         <span className="font-black text-[11px] uppercase tracking-tighter">PERDA: {Math.round(totalMin)} MIN</span>
+                    </div>
+                  ) : isPausa ? (
+                    <div className="flex items-center justify-center w-full text-white overflow-hidden whitespace-nowrap px-1">
+                         <Clock className="h-3 w-3 shrink-0 mr-1 opacity-50" />
+                         <span className="font-black text-[10px] uppercase truncate">{item.nomeDaPeca}</span>
                     </div>
                   ) : (
                     <>
@@ -219,12 +232,14 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                 </div>
             </TooltipTrigger>
             <TooltipContent className={cn("z-[100] p-4 shadow-2xl min-w-[280px]", isLoss ? "bg-red-800 text-white border-none" : "bg-card border")}>
-                {isLoss ? (
+                {isLoss || isPausa ? (
                     <div className="space-y-2">
-                        <div className="flex items-center gap-2 mb-2 border-b border-white/20 pb-1"><AlertCircle className="h-4 w-4" /><span className="font-black uppercase text-[10px] tracking-widest">Capacidade Bloqueada</span></div>
+                        <div className="flex items-center gap-2 mb-2 border-b border-white/20 pb-1">
+                          {isLoss ? <AlertCircle className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                          <span className="font-black uppercase text-[10px] tracking-widest">{isLoss ? "Capacidade Consumida" : "Pausa Obrigatória"}</span>
+                        </div>
                         <div className="whitespace-pre-line text-xs font-bold">{item.nomeDaPeca}</div>
-                        <div className="pt-1 text-[10px] font-black">TOTAL CONSUMIDO: {Math.round(totalMin)} min</div>
-                        <p className="text-[9px] opacity-70 italic">As perdas reais registradas bloqueiam o início do turno e empurram o planejamento restante.</p>
+                        <div className="pt-1 text-[10px] font-black">TEMPO CONSUMIDO: {Math.round(totalMin)} min</div>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -238,7 +253,6 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                             {item.quantidadeNoBloco > 0 && (<div className="flex flex-col"><span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Qtd. Bloco</span><span className="text-xs font-black">{item.quantidadeNoBloco} pç</span></div>)}
                             <div className="flex flex-col"><span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Site</span><span className="text-xs font-black">{item.site}</span></div>
                         </div>
-                        <div className="pt-2 mt-1 border-t border-border flex items-center justify-between text-[8px] text-muted-foreground uppercase font-bold italic"><span>{item.tecnico}</span><span>{item.dataExecucao} · {item.turno}T</span></div>
                     </div>
                 )}
             </TooltipContent>
@@ -267,7 +281,6 @@ const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
       <div className="flex items-center gap-2 overflow-hidden">
         {item.status === 'semPlano' && <Badge variant="outline" className="h-4 text-[8px] border-amber-500/30 text-amber-500 py-0 uppercase font-black shrink-0">Extra</Badge>}
         {isPerda && <span className="text-[10px] uppercase font-black text-red-500/70 truncate">{item.motivoPerda}</span>}
-        {isPending && <span className="text-[10px] uppercase opacity-30 italic font-black">Pendente</span>}
       </div>
       <div className="text-right tabular-nums font-black opacity-80">{isPending ? '-' : (isPerda ? '' : `${item.pecasRealizadas} pç`)}</div>
     </div>
@@ -327,23 +340,6 @@ export default function ProgrammingPage() {
   const { data: lossRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]));
 
   useEffect(() => {
-    async function checkLegacyData() {
-        if (!firestore || fila.length > 0) return;
-        if (selectedMonth === '7' && selectedYear === '2026') {
-            const legacyFila = await getDoc(doc(firestore, 'programacaoState', 'fila'));
-            if (legacyFila.exists() && Array.isArray(legacyFila.data().data)) {
-                setFila(legacyFila.data().data);
-                const legacyPlano = await getDoc(doc(firestore, 'programacaoState', 'plano'));
-                if (legacyPlano.exists() && Array.isArray(legacyPlano.data().data)) {
-                    setPlanejamentoData(legacyPlano.data().data);
-                }
-            }
-        }
-    }
-    checkLegacyData();
-  }, [firestore, selectedMonth, selectedYear, fila.length]);
-
-  useEffect(() => {
     const now = Date.now();
     if (now - lastUpdateRef.current < 3000) return;
     
@@ -356,35 +352,9 @@ export default function ProgrammingPage() {
       if (configDoc.planStartDate) {
         const parsed = parse(configDoc.planStartDate, 'yyyy-MM-dd', new Date());
         if (isValid(parsed)) setPlanStartDate(startOfDay(parsed));
-      } else if (selectedMonth === '7' && selectedYear === '2026') {
-          const augustAnchor = new Date(2026, 7, 3);
-          setPlanStartDate(augustAnchor);
-          setCurrentDate(augustAnchor);
-      } else {
-          const firstOfMonth = new Date(Number(selectedYear), Number(selectedMonth), 1);
-          setPlanStartDate(firstOfMonth);
-          setCurrentDate(firstOfMonth);
       }
     }
-  }, [filaDoc, planoDoc, configDoc, selectedMonth, selectedYear]);
-
-  const jobCompletionStats = useMemo(() => {
-    const map = new Map<string, { total: number, concluded: number }>();
-    for (const item of planejamentoData) {
-      if (item.jobId === 'loss') continue;
-      const stats = map.get(item.jobId) || { total: 0, concluded: 0 };
-      stats.total++;
-      if (item.isConcluded) stats.concluded++;
-      map.set(item.jobId, stats);
-    }
-    return map;
-  }, [planejamentoData]);
-
-  const jobStartDates = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const item of planejamentoData) { if (item.jobId === 'loss') continue; if (!map.has(item.jobId)) map.set(item.jobId, item.dataExecucao); }
-    return map;
-  }, [planejamentoData]);
+  }, [filaDoc, planoDoc, configDoc]);
 
   const filteredFila = useMemo(() => {
     let data = fila;
@@ -430,8 +400,6 @@ export default function ProgrammingPage() {
     try { await setDoc(doc(firestore, 'programacaoState', `plano_${partitionKey}`), { data: updatedPlano, updatedAt: serverTimestamp() }); } catch (e) {}
   }, [firestore, planejamentoData, partitionKey]);
 
-  const nextWorkday = (d: Date) => { let res = new Date(d); while (isDomingo(res)) res = addDays(res, 1); return res; };
-
   const recalculatePlan = async (novaFila: JobBase[], currentDisabled = disabledShifts, currentOverrides = techOverrides, anchor?: Date) => {
     if (!firestore) return;
     setIsSaving(true);
@@ -457,6 +425,7 @@ export default function ProgrammingPage() {
       return { start: t, limit: Infinity };
     };
 
+    // 1. ALOCAR PERDAS REAIS (Padrão: Início do turno)
     const lossByShift: Record<string, number> = {};
     if (lossRecords) {
         lossRecords.forEach(l => {
@@ -494,27 +463,41 @@ export default function ProgrammingPage() {
             
             novosPlanItems.push({ 
                 id: `loss-vis-${key}`, 
-                dataExecucao: dStr, 
-                tecnico: 'BLOQUEIO PERDAS', 
-                equipamento: 'BLOQUEIO', 
-                requisicao: 'PERDA', 
-                nomeDaPeca: 'TEMPO CONSUMIDO POR PERDAS REAIS', 
-                quantidadeTotal: 0, 
-                quantidadeNoBloco: 0, 
-                tempoMinutos: totalTime, 
-                setupMinutos: 0, 
-                turno: shiftId, 
-                startOffsetMin: 0, 
-                tipoAtividade: 'PERDA', 
-                techKey: techKey as any, 
-                jobId: 'loss', 
-                laneIndex: 0, 
-                site: 'LOCAL' 
+                dataExecucao: dStr, tecnico: 'CONSUMO PERDAS', equipamento: 'CAPACIDADE', 
+                requisicao: 'PERDA', nomeDaPeca: 'TEMPO CONSUMIDO POR PERDAS REAIS', 
+                quantidadeTotal: 0, quantidadeNoBloco: 0, tempoMinutos: totalTime, setupMinutos: 0, 
+                turno: shiftId, startOffsetMin: 0, tipoAtividade: 'PERDA', techKey: techKey as any, 
+                jobId: 'loss', laneIndex: 0, site: 'LOCAL' 
             });
         } catch (e) {}
     });
-    
-    const concluidos = new Set(planejamentoData.filter(i => i.isConcluded).map(i => `${i.jobId}|${i.techKey}|${i.dataExecucao}|${i.turno}`));
+
+    // 2. ALOCAR PAUSAS FIXAS (DDS e CAFÉ)
+    const numDays = 60; // Limite de dias para cálculo preventivo
+    for (let dIdx = 0; dIdx < numDays; dIdx++) {
+        const dayDate = addDays(baseDate, dIdx);
+        if (isDomingo(dayDate)) continue;
+        const dStr = format(dayDate, 'dd/MM/yyyy');
+        
+        ['TORNO', 'CENTRO', 'ADM'].forEach(cat => {
+            for (let sIdx = 0; sIdx < 3; sIdx++) {
+                const shiftAbs = dIdx * 3 * SHIFT_MIN + sIdx * SHIFT_MIN;
+                PAUSAS_FIXAS.forEach(p => {
+                    const startAbs = shiftAbs + p.start;
+                    const endAbs = startAbs + p.duration;
+                    occupy(`${cat}_0`, startAbs, endAbs);
+                    novosPlanItems.push({
+                        id: `pausa-${dStr}-${sIdx+1}-${cat}-${p.label}`,
+                        dataExecucao: dStr, tecnico: 'PAUSA', equipamento: cat,
+                        requisicao: 'PAUSA', nomeDaPeca: p.label,
+                        quantidadeTotal: 0, quantidadeNoBloco: 0, tempoMinutos: p.duration, setupMinutos: 0,
+                        turno: String(sIdx + 1), startOffsetMin: p.start, tipoAtividade: 'PAUSA',
+                        techKey: cat as any, jobId: 'pausa', laneIndex: 0, site: 'SISTEMA'
+                    });
+                });
+            }
+        });
+    }
     
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
         let prodTime = Number(job[type]) || 0;
@@ -531,7 +514,7 @@ export default function ProgrammingPage() {
         }
 
         let iter = 0;
-        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iter < 2000) {
+        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iter < 1000) {
             iter++; 
             const free = nextFree(laneId, cursor); 
             cursor = free.start;
@@ -543,16 +526,12 @@ export default function ProgrammingPage() {
             const shiftAbs = dayIdx * 3 * SHIFT_MIN + shiftIdx * SHIFT_MIN; 
             const shiftId = String(shiftIdx + 1);
             const dateStr = format(dayDate, 'yyyy-MM-dd');
-            const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
-            const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
+            const techName = currentOverrides[`${dateStr}_${techKey}_${shiftId}`] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
             const isShiftDisabled = currentDisabled[`${dateStr}_${shiftId}`];
             
-            if (isShiftDisabled || !techName || (dateStr >= '2026-08-16' && techName === 'William Martinucci')) { 
-                cursor = shiftAbs + SHIFT_MIN; continue; 
-            }
+            if (isShiftDisabled || !techName) { cursor = shiftAbs + SHIFT_MIN; continue; }
 
-            let winStart = cursor % SHIFT_MIN;
-            for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) winStart = p.start + p.duration; }
+            const winStart = cursor % SHIFT_MIN;
             const abs = shiftAbs + winStart; 
             const avail = Math.min(SHIFT_MIN - winStart, free.limit - abs);
             if (avail < 1) { cursor = Number.isFinite(free.limit) ? Math.max(free.limit, abs) : shiftAbs + SHIFT_MIN; continue; }
@@ -561,13 +540,20 @@ export default function ProgrammingPage() {
             pendingSetup -= sInShift;
             const pInShift = Math.min(avail - sInShift, pendingProd);
             let qInShift = 0;
-            if (pInShift > 0 && cycleTime > 0) { const before = Math.floor(doneProdTime / cycleTime + 1e-7); doneProdTime += pInShift; qInShift = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7)) - before; pendingProd -= pInShift; } else if (pInShift > 0) { pendingProd -= pInShift; }
+            if (pInShift > 0 && cycleTime > 0) { 
+              const before = Math.floor(doneProdTime / cycleTime + 1e-7); 
+              doneProdTime += pInShift; 
+              qInShift = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7)) - before; 
+              pendingProd -= pInShift; 
+            } else if (pInShift > 0) { 
+              pendingProd -= pInShift; 
+            }
             
             if (sInShift > 0 || pInShift > 0) {
                 const duration = sInShift + pInShift; 
                 occupy(laneId, abs, abs + duration);
                 const displayDateStr = format(dayDate, 'dd/MM/yyyy');
-                novosPlanItems.push({ id: `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${Math.round(winStart)}`, dataExecucao: displayDateStr, tecnico: techName, equipamento: type.toUpperCase(), requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca, quantidadeTotal: job.quantidade, quantidadeNoBloco: qInShift, tempoMinutos: pInShift, setupMinutos: sInShift, turno: shiftId, startOffsetMin: winStart, tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', techKey, jobId: job.id, laneIndex: 0, isConcluded: concluidos.has(`${job.id}|${techKey}|${displayDateStr}|${shiftId}`), site: job.site || 'VALINHOS' });
+                novosPlanItems.push({ id: `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${Math.round(winStart)}`, dataExecucao: displayDateStr, tecnico: techName, equipamento: type.toUpperCase(), requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca, quantidadeTotal: job.quantidade, quantidadeNoBloco: qInShift, tempoMinutos: pInShift, setupMinutos: sInShift, turno: shiftId, startOffsetMin: winStart, tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', techKey, jobId: job.id, laneIndex: 0, isConcluded: false, site: job.site || 'VALINHOS' });
                 cursor = abs + duration;
             } else cursor = shiftAbs + SHIFT_MIN;
         }
@@ -586,15 +572,18 @@ export default function ProgrammingPage() {
   };
 
   useEffect(() => {
-    if (fila.length > 0 && lossRecords && productionRecords) {
+    if (fila.length > 0 && lossRecords) {
         recalculatePlan(fila);
     }
-  }, [lossRecords, productionRecords]);
+  }, [lossRecords]);
 
   const handleSetAnchorDate = async (date: Date | undefined) => {
     if (!firestore || !date) return;
-    const selectedDate = nextWorkday(startOfDay(date)); setPlanStartDate(selectedDate);
-    try { await setDoc(doc(firestore, 'programacaoState', `config_${partitionKey}`), { planStartDate: format(selectedDate, 'yyyy-MM-dd') }, { merge: true }); await recalculatePlan(fila, disabledShifts, techOverrides, selectedDate); } catch (e) {}
+    const selectedDate = startOfDay(date); setPlanStartDate(selectedDate);
+    try { 
+      await setDoc(doc(firestore, 'programacaoState', `config_${partitionKey}`), { planStartDate: format(selectedDate, 'yyyy-MM-dd') }, { merge: true }); 
+      await recalculatePlan(fila, disabledShifts, techOverrides, selectedDate); 
+    } catch (e) {}
   };
 
   const updateJobField = async (id: string, field: keyof JobBase, value: any) => {
@@ -616,41 +605,18 @@ export default function ProgrammingPage() {
     setFila(newFila); await recalculatePlan(newFila);
   };
 
-  const handleAddManual = async () => {
-    if (!newItem.requisicao || !newItem.nomeDaPeca) { toast({ title: "Erro", description: "Preencha Requisição e Peça.", variant: "destructive" }); return; }
-    const job: JobBase = { id: `job-${Date.now()}`, requisicao: newItem.requisicao!, nomeDaPeca: newItem.nomeDaPeca!.toUpperCase(), quantidade: Number(newItem.quantidade) || 1, setup: Number(newItem.setup) || 20, torno: Number(newItem.torno) || 0, centro: Number(newItem.centro) || 0, prog: Number(newItem.prog) || 0, site: newItem.site || 'VALINHOS', etapa1: newItem.etapa1 || 'TORNO', etapa2: '', turnoDesejado: '', ordemTorno: fila.length + 1, ordemCentro: fila.length + 1 };
-    const nf = [...fila, job]; setFila(nf); await recalculatePlan(nf); setIsAddDialogOpen(false);
-    setNewItem({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: 'TORNO', etapa2: '' });
-  };
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file || !firestore) return;
-    setIsImporting(true); const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const workbook = XLSX.read(new Uint8Array(event.target?.result as ArrayBuffer), { type: 'array' });
-        const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-        const findVal = (row: any, keys: string[]) => { for (const k of keys) { const rk = Object.keys(row).find(x => x.toLowerCase().trim() === k.toLowerCase().trim()); if (rk) return row[rk]; } return undefined; };
-        const novaFila: JobBase[] = json.map((row, i) => ({ id: `job-imp-${i}-${Date.now()}`, requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms']) || 'S/N'), nomeDaPeca: String(findVal(row, ['peça', 'peca', 'nome']) || 'SEM NOME').toUpperCase(), quantidade: Number(findVal(row, ['qtd', 'quantidade']) || 1), setup: Number(findVal(row, ['setup']) || 20), torno: Number(findVal(row, ['torno']) || 0), centro: Number(findVal(row, ['centro']) || 0), prog: Number(findVal(row, ['prog', 'programação']) || 0), site: String(findVal(row, ['site', 'fabrica']) || 'VALINHOS'), etapa1: String(findVal(row, ['etapa 1', 'etapa1']) || 'TORNO'), etapa2: String(findVal(row, ['etapa 2', 'etapa2']) || ''), ordemTorno: i + 1, ordemCentro: i + 1 }));
-        setFila(novaFila); await recalculatePlan(novaFila);
-      } catch (err) {} finally { setIsImporting(false); e.target.value = ''; }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
   const renderFilaTable = (jobs: JobBase[], type: 'GERAL' | 'TORNO' | 'CENTRO') => (
     <Table>
       <TableHeader><TableRow><TableHead className="w-20 text-center text-xs">POS</TableHead><TableHead className="w-16 text-center text-xs">MOVE</TableHead><TableHead className="text-xs">STATUS</TableHead><TableHead className="w-32 text-xs">DATA</TableHead><TableHead className="w-24 text-xs">TURNO</TableHead><TableHead className="w-40 text-xs">MÁQUINA</TableHead><TableHead className="text-xs">REQ.</TableHead><TableHead className="text-xs">PEÇA</TableHead><TableHead className="w-20 text-right text-xs">QTD</TableHead><TableHead className="w-24 text-right text-xs">SETUP</TableHead><TableHead className="w-24 text-right text-xs">TORNO</TableHead><TableHead className="w-24 text-right text-xs">CENTRO</TableHead><TableHead className="w-10"></TableHead></TableRow></TableHeader>
       <TableBody>
         {jobs.length === 0 ? (<TableRow><TableCell colSpan={13} className="text-center py-10 opacity-30 italic">Nenhuma requisição encontrada</TableCell></TableRow>) : jobs.map((job, idx) => {
-          const stats = jobCompletionStats.get(job.id); const isDone = stats && stats.total > 0 && stats.total === stats.concluded;
           const pos = type === 'GERAL' ? (idx + 1) : (type === 'TORNO' ? (job.ordemTorno || idx + 1) : (job.ordemCentro || idx + 1));
           return (
-            <TableRow key={job.id} className={cn(isDone && "bg-green-500/5 opacity-60")}>
+            <TableRow key={job.id}>
               <TableCell className="text-center"><Input type="number" defaultValue={pos} className="h-8 w-14 text-center font-black" onBlur={(e) => moveJob(idx, Number(e.target.value), type)}/></TableCell>
               <TableCell><div className="flex flex-col gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveJob(idx, pos - 1, type)} disabled={idx === 0}><ArrowUp className="h-3" /></Button><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveJob(idx, pos + 1, type)} disabled={idx === jobs.length - 1}><ArrowDown className="h-3" /></Button></div></TableCell>
-              <TableCell>{isDone ? <div className="text-green-500 font-black text-[10px]">CONCLUÍDO</div> : <div className="text-muted-foreground/40 font-black text-[10px]">PENDENTE</div>}</TableCell>
-              <TableCell><JobExecutionCell job={job} calculatedDate={jobStartDates.get(job.id)} onUpdate={(d) => updateJobField(job.id, 'dataDesejada', d)}/></TableCell>
+              <TableCell><div className="text-muted-foreground/40 font-black text-[10px]">PENDENTE</div></TableCell>
+              <TableCell><JobExecutionCell job={job} calculatedDate={null as any} onUpdate={(d) => updateJobField(job.id, 'dataDesejada', d)}/></TableCell>
               <TableCell><Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}><SelectTrigger className="h-8 text-[11px] font-black"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></TableCell>
               <TableCell><div className="flex items-center gap-1"><Button variant={job.etapa1 === 'TORNO' || job.etapa2 === 'TORNO' ? "default" : "outline"} size="sm" className="h-7 w-8 font-black text-[10px]" onClick={() => updateJobField(job.id, 'etapa1', job.etapa1 === 'TORNO' ? '' : 'TORNO')}>T</Button><Button variant={job.etapa1 === 'CENTRO' || job.etapa2 === 'CENTRO' ? "default" : "outline"} size="sm" className="h-7 w-8 font-black text-[10px]" onClick={() => updateJobField(job.id, 'etapa1', job.etapa1 === 'CENTRO' ? '' : 'CENTRO')}>C</Button></div></TableCell>
               <TableCell><Input className="h-8 w-20 font-mono text-[11px]" defaultValue={job.requisicao} onBlur={(e) => updateJobField(job.id, 'requisicao', e.target.value)}/></TableCell>
@@ -685,7 +651,10 @@ export default function ProgrammingPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Eraser className="h-5 w-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Limpar Tudo?</AlertDialogTitle><AlertDialogDescription>Isso apagará toda a fila e o cronograma.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => { setFila([]); setPlanejamentoData([]); setDoc(doc(firestore!, 'programacaoState', `fila_${partitionKey}`), { data: [] }); }} className="bg-destructive">Limpar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+          <AlertDialog>
+            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Eraser className="h-5 w-5" /></Button></AlertDialogTrigger>
+            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Limpar Tudo?</AlertDialogTitle><AlertDialogDescription>Isso apagará toda a fila e o cronograma.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => { setFila([]); setPlanejamentoData([]); setDoc(doc(firestore!, 'programacaoState', `fila_${partitionKey}`), { data: [] }); }} className="bg-destructive">Limpar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+          </AlertDialog>
           
           <TooltipProvider>
             <Tooltip>
@@ -701,30 +670,22 @@ export default function ProgrammingPage() {
             <PopoverContent className="w-auto p-0"><Calendar mode="single" locale={ptBR} selected={planStartDate || undefined} onSelect={handleSetAnchorDate} disabled={isDomingo} initialFocus/></PopoverContent>
           </Popover>
           
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild><Button variant="secondary" className="h-10 font-black uppercase text-[11px]"><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button></DialogTrigger>
-            <DialogContent className="sm:max-w-[400px]">
-              <DialogHeader><DialogTitle>Adicionar Peça</DialogTitle></DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><Label>REQ</Label><Input value={newItem.requisicao} onChange={e => setNewItem({...newItem, requisicao: e.target.value})}/></div>
-                  <div className="space-y-1"><Label>Peça</Label><Input value={newItem.nomeDaPeca} onChange={e => setNewItem({...newItem, nomeDaPeca: e.target.value.toUpperCase()})}/></div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><Label>Máquina</Label><Select value={newItem.etapa1} onValueChange={v => setNewItem({...newItem, etapa1: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TORNO">TORNO</SelectItem><SelectItem value="CENTRO">CENTRO</SelectItem></SelectContent></Select></div>
-                  <div className="space-y-1"><Label>Fábrica</Label><Select value={newItem.site} onValueChange={v => setNewItem({...newItem, site: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{FACTORIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select></div>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1"><Label>Qtd</Label><Input type="number" value={newItem.quantidade} onChange={e => setNewItem({...newItem, quantidade: Number(e.target.value)})}/></div>
-                  <div className="space-y-1"><Label>T (min)</Label><Input type="number" value={newItem.torno} onChange={e => setNewItem({...newItem, torno: Number(e.target.value)})}/></div>
-                  <div className="space-y-1"><Label>C (min)</Label><Input type="number" value={newItem.centro} onChange={e => setNewItem({...newItem, centro: Number(e.target.value)})}/></div>
-                </div>
-              </div>
-              <DialogFooter><Button onClick={handleAddManual} className="w-full">Adicionar</Button></DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button variant="secondary" className="h-10 font-black uppercase text-[11px]" onClick={() => setIsAddDialogOpen(true)}><Plus className="h-4 w-4 mr-2" /> Nova Requisição</Button>
 
-          <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".xlsx,.xls" />
+          <input type="file" ref={fileInputRef} onChange={(e) => {
+             const file = e.target.files?.[0]; if (!file || !firestore) return;
+             setIsImporting(true); const reader = new FileReader();
+             reader.onload = async (event) => {
+               try {
+                 const workbook = XLSX.read(new Uint8Array(event.target?.result as ArrayBuffer), { type: 'array' });
+                 const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                 const findVal = (row: any, keys: string[]) => { for (const k of keys) { const rk = Object.keys(row).find(x => x.toLowerCase().trim() === k.toLowerCase().trim()); if (rk) return row[rk]; } return undefined; };
+                 const novaFila: JobBase[] = json.map((row, i) => ({ id: `job-imp-${i}-${Date.now()}`, requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms']) || 'S/N'), nomeDaPeca: String(findVal(row, ['peça', 'peca', 'nome']) || 'SEM NOME').toUpperCase(), quantidade: Number(findVal(row, ['qtd', 'quantidade']) || 1), setup: Number(findVal(row, ['setup']) || 20), torno: Number(findVal(row, ['torno']) || 0), centro: Number(findVal(row, ['centro']) || 0), prog: Number(findVal(row, ['prog', 'programação']) || 0), site: String(findVal(row, ['site', 'fabrica']) || 'VALINHOS'), etapa1: String(findVal(row, ['etapa 1', 'etapa1']) || 'TORNO'), etapa2: String(findVal(row, ['etapa 2', 'etapa2']) || ''), ordemTorno: i + 1, ordemCentro: i + 1 }));
+                 setFila(novaFila); await recalculatePlan(novaFila);
+               } catch (err) {} finally { setIsImporting(false); e.target.value = ''; }
+             };
+             reader.readAsArrayBuffer(file);
+          }} className="hidden" accept=".xlsx,.xls" />
           <Button className="h-10 font-black uppercase text-[11px]" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Excel</Button>
         </div>
       </div>
@@ -756,17 +717,24 @@ export default function ProgrammingPage() {
                     <div className="p-4 flex flex-col items-center justify-center border-r bg-muted/5"><span className={cn("text-xl font-black", isDisabled && "opacity-20")}>{t.label}</span><Button variant="ghost" size="icon" className="h-7 w-7 mt-2" onClick={() => { const nd = { ...disabledShifts, [shiftKey]: !isDisabled }; setDisabledShifts(nd); setDoc(doc(firestore!, 'programacaoState', `config_${partitionKey}`), { disabledShifts: nd }, { merge: true }); recalculatePlan(fila, nd); }}>{isDisabled ? <PowerOff className="h-4 text-destructive" /> : <Power className="h-4 text-green-500" />}</Button></div>
                     <div className="p-4 overflow-x-auto">{!isDisabled && (<div className="min-w-[800px]"><Ruler />{['TORNO', 'CENTRO', 'ADM'].filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat).map(cat => {
                             const tech = techOverrides[`${dStr}_${cat}_${t.id}`] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
-                            if (!tech || (dStr >= '2026-08-16' && tech === 'William Martinucci')) return null;
+                            if (!tech) return null;
                             const items = planIndex.get(`${dDisplay}|${t.id}|${cat}`) || []; const reals = realIndex.get(`${dDisplay}|${t.id}|${cat}`) || [];
+                            
+                            // CALCULAR SALDO
+                            const totalConsumidoShift = items.reduce((acc, curr) => acc + (curr.tempoMinutos || 0) + (curr.setupMinutos || 0), 0);
+                            const saldoShift = Math.max(0, SHIFT_MIN - totalConsumidoShift);
+
                             return (
                               <div key={`${cat}-${t.id}`} className="grid grid-cols-[160px_1fr] gap-4 mb-6 last:mb-0">
                                 <div className="pt-2">
                                     <div className={cn("text-[10px] font-black uppercase", cat === 'TORNO' ? "text-cyan-500" : (cat === 'CENTRO' ? "text-purple-500" : "text-slate-500"))}>{cat}</div>
                                     <div className="text-xs font-black truncate">{tech}</div>
+                                    <div className="mt-1 flex items-center gap-1.5">
+                                      <Badge variant="outline" className={cn("text-[8px] font-black", saldoShift > 0 ? "text-emerald-500 border-emerald-500/30" : "text-rose-500 border-rose-500/30")}>SALDO: {Math.round(saldoShift)} MIN</Badge>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                   <div className="relative h-10 border rounded bg-black/5 overflow-hidden">
-                                    {PAUSAS.map(p => <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-3 w-3 opacity-20" /></div>)}
                                     {items.map(it => <TimelineBar key={it.id} item={it} onToggle={toggleConcluded} />)}
                                   </div>
                                   <div className="space-y-1">
@@ -794,13 +762,7 @@ export default function ProgrammingPage() {
         </CardHeader>
         <CardContent className="p-0">
           <Tabs defaultValue="all">
-            <div className="px-6 border-b">
-                <TabsList className="h-10 bg-transparent gap-6">
-                    <TabsTrigger value="all" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">GERAL</TabsTrigger>
-                    <TabsTrigger value="TORNO" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">TORNO CNC</TabsTrigger>
-                    <TabsTrigger value="CENTRO" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">CENTRO CNC</TabsTrigger>
-                </TabsList>
-            </div>
+            <div className="px-6 border-b"><TabsList className="h-10 bg-transparent gap-6"><TabsTrigger value="all" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">GERAL</TabsTrigger><TabsTrigger value="TORNO" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">TORNO CNC</TabsTrigger><TabsTrigger value="CENTRO" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">CENTRO CNC</TabsTrigger></TabsList></div>
             <TabsContent value="all">{renderFilaTable(filteredFila, 'GERAL')}</TabsContent>
             <TabsContent value="TORNO">{renderFilaTable(filteredFila.filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO'), 'TORNO')}</TabsContent>
             <TabsContent value="CENTRO">{renderFilaTable(filteredFila.filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO'), 'CENTRO')}</TabsContent>
@@ -811,9 +773,7 @@ export default function ProgrammingPage() {
       <style jsx global>{`
         .bg-stripes { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 10px, transparent 10px, transparent 20px); }
         .bg-stripes-hazard { background-image: repeating-linear-gradient(45deg, #F0BC00 0, #F0BC00 5px, #101820 5px, #101820 10px); }
-        .bg-stripes-hazard-red { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0, rgba(255, 255, 255, 0.1) 5px, transparent 5px, transparent 10px); }
       `}</style>
     </div>
   );
 }
-
