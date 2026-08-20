@@ -189,16 +189,16 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                   onClick={() => !isLoss && onToggle(item.id)}
                   className={cn(
                     "absolute top-[3px] bottom-[3px] rounded-[2px] overflow-hidden border border-black/40 flex shadow-sm transition-all z-[5] cursor-pointer group", 
-                    isLoss ? "bg-red-600/60 border-red-500 bg-stripes-red" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
+                    isLoss ? "bg-red-700 border-red-900 bg-stripes-red" : (isProg ? "bg-slate-700" : (isTorno ? "bg-[#00707F]" : "bg-[#5B36A8]")),
                     item.isConcluded && !isLoss && "opacity-40 grayscale-[0.5] border-green-500 border-2",
                     !isLoss && "hover:scale-[1.01] hover:brightness-110 hover:shadow-md"
                   )} 
                   style={{ left: `${leftPc}%`, width: `${widthPc}%` }} 
                 >
                   {isLoss ? (
-                    <div className="flex items-center gap-2 px-2 text-white overflow-hidden w-full whitespace-nowrap">
-                         <AlertCircle className="h-4 w-4 shrink-0 text-red-200" />
-                         <span className="font-black text-[11px] uppercase tracking-tight">Perdas Reais: {Math.round(totalMin)} min</span>
+                    <div className="flex items-center gap-2 px-2 text-white overflow-hidden w-full whitespace-nowrap bg-red-700/80">
+                         <AlertCircle className="h-4 w-4 shrink-0 text-white animate-pulse" />
+                         <span className="font-black text-[11px] uppercase tracking-tight">PERDA: {Math.round(totalMin)}m</span>
                     </div>
                   ) : (
                     <>
@@ -225,12 +225,13 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
                   )}
                 </div>
             </TooltipTrigger>
-            <TooltipContent className={cn("z-[100] p-4 shadow-2xl min-w-[280px]", isLoss ? "bg-destructive text-destructive-foreground border-none" : "bg-card border")}>
+            <TooltipContent className={cn("z-[100] p-4 shadow-2xl min-w-[280px]", isLoss ? "bg-red-800 text-white border-none" : "bg-card border")}>
                 {isLoss ? (
                     <div className="space-y-2">
-                        <div className="flex items-center gap-2 mb-2 border-b border-white/20 pb-1"><AlertCircle className="h-4 w-4" /><span className="font-black uppercase text-[10px] tracking-widest">Detalhes das Perdas</span></div>
+                        <div className="flex items-center gap-2 mb-2 border-b border-white/20 pb-1"><AlertCircle className="h-4 w-4" /><span className="font-black uppercase text-[10px] tracking-widest">Capacidade Bloqueada</span></div>
                         <div className="whitespace-pre-line text-xs font-bold">{item.nomeDaPeca}</div>
-                        <div className="pt-1 text-[10px] font-black">TOTAL: {Math.round(totalMin)} min</div>
+                        <div className="pt-1 text-[10px] font-black">TOTAL CONSUMIDO: {Math.round(totalMin)} min</div>
+                        <p className="text-[9px] opacity-70 italic">As perdas reais registradas bloqueiam o início do turno e empurram o planejamento restante.</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -332,6 +333,7 @@ export default function ProgrammingPage() {
   const { data: productionRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1500)) : null, [firestore]));
   const { data: lossRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]));
 
+  // Lógica de legado e inicialização de âncora
   useEffect(() => {
     async function checkLegacyData() {
         if (!firestore || fila.length > 0) return;
@@ -463,7 +465,7 @@ export default function ProgrammingPage() {
       return { start: t, limit: Infinity };
     };
 
-    // PROCESSAR PERDAS REAIS: Elas consomem o início do turno no planejamento
+    // 1. PROCESSAR PERDAS REAIS PRIMEIRO: Elas "roubam" tempo do início do turno
     realItems.filter(r => r.status === 'perda').forEach(p => {
         try {
             const pDate = parse(p.dataStr, 'dd/MM/yyyy', new Date());
@@ -784,7 +786,7 @@ export default function ProgrammingPage() {
 
       <style jsx global>{`
         .bg-stripes { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 10px, transparent 10px, transparent 20px); }
-        .bg-stripes-red { background-image: repeating-linear-gradient(45deg, rgba(255, 0, 0, 0.15) 0px, rgba(255, 0, 0, 0.15) 10px, transparent 10px, transparent 20px); }
+        .bg-stripes-red { background-image: repeating-linear-gradient(45deg, rgba(255, 0, 0, 0.4) 0px, rgba(255, 0, 0, 0.4) 5px, transparent 5px, transparent 10px); }
       `}</style>
     </div>
   );

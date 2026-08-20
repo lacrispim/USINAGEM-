@@ -106,7 +106,7 @@ export function cruzarComPlano(
     if (l.lossReason) lossSummary[key].reasons.push(`${l.lossReason} (${time}m)`);
   });
 
-  // 3. Mapear Turnos Planejados por Técnico/Data
+  // 3. Mapear Turnos Planejados por Técnico/Data para alinhar perdas e extras
   const techShiftMap: Record<string, string> = {};
   plano.forEach(p => {
     const key = `${p.dataExecucao}|${normalizeName(p.tecnico)}`;
@@ -115,7 +115,7 @@ export function cruzarComPlano(
 
   const matchedKeys = new Set<string>();
 
-  // 4. Processar itens do Plano
+  // 4. Processar itens do Plano (Comparação de Produção)
   plano.forEach(pItem => {
     if (pItem.jobId === 'loss') return; 
 
