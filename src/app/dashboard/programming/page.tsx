@@ -251,15 +251,15 @@ const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
   const devText = (!hasPlan || isPending || isPerda) ? '-' : (deviation === 0 ? 'OK' : (deviation > 0 ? `+${deviation}m` : `${deviation}m`));
 
   return (
-    <div className={cn("grid grid-cols-[80px_100px_100px_100px_1fr_80px] items-center px-3 py-1.5 text-[12px] font-bold border-l-4", bgColors[item.status], item.status === 'dentro' ? "border-emerald-500" : item.status === 'estourou' ? "border-rose-500" : item.status === 'adiantado' ? "border-sky-500" : item.status === 'semPlano' ? "border-amber-500" : item.status === 'perda' ? "border-red-500" : "border-transparent")}>
-      <div className={cn("font-mono", isPerda && "text-red-500")}>#{item.requisicao}</div>
+    <div className={cn("grid grid-cols-[80px_100px_100px_100px_1fr_80px] items-center px-3 py-1.5 text-[12px] font-bold border-l-4 transition-colors", bgColors[item.status], item.status === 'dentro' ? "border-emerald-500" : item.status === 'estourou' ? "border-rose-500" : item.status === 'adiantado' ? "border-sky-500" : item.status === 'semPlano' ? "border-amber-500" : item.status === 'perda' ? "border-red-500" : "border-transparent")}>
+      <div className={cn("font-mono", isPerda ? "text-red-500" : "text-foreground")}>{isPerda ? "#PERDAS" : `#${item.requisicao}`}</div>
       <div className="flex flex-col"><span className="text-muted-foreground/50 font-medium">{item.tempoPlanejado} min</span></div>
       <div className="flex flex-col"><span className={cn("font-black", colors[item.status])}>{isPending ? '---' : `${item.tempoRealizado} min`}</span></div>
       <div className={cn("font-black tabular-nums", colors[item.status])}>{devText}</div>
-      <div className="flex items-center gap-2">
-        {item.status === 'semPlano' && <Badge variant="outline" className="h-4 text-[8px] border-amber-500/30 text-amber-500 py-0 uppercase font-black">Extra</Badge>}
-        {isPerda && <span className="text-[9px] uppercase font-black text-red-500 truncate max-w-[300px]">{item.motivoPerda}</span>}
-        {isPending && <span className="text-[10px] uppercase opacity-30 italic font-black">Não Apontado</span>}
+      <div className="flex items-center gap-2 overflow-hidden">
+        {item.status === 'semPlano' && <Badge variant="outline" className="h-4 text-[8px] border-amber-500/30 text-amber-500 py-0 uppercase font-black shrink-0">Extra</Badge>}
+        {isPerda && <span className="text-[10px] uppercase font-black text-red-500/70 truncate">{item.motivoPerda}</span>}
+        {isPending && <span className="text-[10px] uppercase opacity-30 italic font-black">Pendente</span>}
       </div>
       <div className="text-right tabular-nums font-black opacity-80">{isPending ? '-' : (isPerda ? '' : `${item.pecasRealizadas} pç`)}</div>
     </div>
@@ -315,15 +315,12 @@ export default function ProgrammingPage() {
   const { data: planoDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', `plano_${partitionKey}`) : null, [firestore, partitionKey]));
   const { data: configDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', `config_${partitionKey}`) : null, [firestore, partitionKey]));
   
-  const { data: productionRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]));
+  const { data: productionRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1500)) : null, [firestore]));
   const { data: lossRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]));
 
-  // Lógica de recuperação de dados legados (se a partição estiver vazia mas houver plano genérico)
   useEffect(() => {
     async function checkLegacyData() {
         if (!firestore || fila.length > 0) return;
-        
-        // Se for Agosto de 2026 e estiver vazio, tenta carregar o 'fila' genérico
         if (selectedMonth === '7' && selectedYear === '2026') {
             const legacyFila = await getDoc(doc(firestore, 'programacaoState', 'fila'));
             if (legacyFila.exists() && Array.isArray(legacyFila.data().data)) {
@@ -442,7 +439,6 @@ export default function ProgrammingPage() {
       return { start: t, limit: Infinity };
     };
 
-    // Adicionar as perdas REAIS ao cronograma visual para ocupar espaço
     realItems.filter(r => r.status === 'perda').forEach(p => {
         const pDate = parse(p.dataStr, 'dd/MM/yyyy', new Date());
         const dayIdx = differenceInCalendarDays(pDate, baseDate);
@@ -466,19 +462,16 @@ export default function ProgrammingPage() {
         let cursor = minStartTime;
         if (job.dataDesejada) { 
             const forcedDate = startOfDay(parse(job.dataDesejada, 'yyyy-MM-dd', new Date())); 
-            if (isValid(forcedDate)) { 
-                cursor = differenceInCalendarDays(forcedDate, baseDate) * 3 * SHIFT_MIN; 
-            } 
+            if (isValid(forcedDate)) cursor = differenceInCalendarDays(forcedDate, baseDate) * 3 * SHIFT_MIN; 
         }
 
         let iter = 0;
-        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iter < 3000) {
+        while ((pendingSetup > 0.01 || pendingProd > 0.01) && iter < 2000) {
             iter++; 
             const free = nextFree(laneId, cursor); 
             cursor = free.start;
             const dayIdx = Math.floor(cursor / (SHIFT_MIN * 3)); 
             const dayDate = addDays(baseDate, dayIdx);
-            
             if (isDomingo(dayDate)) { cursor = (dayIdx + 1) * 3 * SHIFT_MIN; continue; }
             
             const shiftIdx = Math.floor((cursor % (SHIFT_MIN * 3)) / SHIFT_MIN); 
@@ -488,7 +481,6 @@ export default function ProgrammingPage() {
             const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
             const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
             const isShiftDisabled = currentDisabled[`${dateStr}_${shiftId}`];
-            
             const isWrongShift = job.turnoDesejado && job.turnoDesejado !== '' && shiftId !== job.turnoDesejado;
             
             if (isShiftDisabled || !techName || (dateStr >= '2026-08-16' && techName === 'William Martinucci') || isWrongShift) { 
@@ -500,11 +492,7 @@ export default function ProgrammingPage() {
             for (const p of PAUSAS) { if (winStart < p.start + p.duration && winStart + 0.1 >= p.start) winStart = p.start + p.duration; }
             const abs = shiftAbs + winStart; 
             const avail = Math.min(SHIFT_MIN - winStart, free.limit - abs);
-            
-            if (avail < 1) { 
-                cursor = Number.isFinite(free.limit) ? Math.max(free.limit, abs) : shiftAbs + SHIFT_MIN; 
-                continue; 
-            }
+            if (avail < 1) { cursor = Number.isFinite(free.limit) ? Math.max(free.limit, abs) : shiftAbs + SHIFT_MIN; continue; }
             
             const sInShift = pendingSetup > 0 ? Math.min(pendingSetup, avail) : 0; 
             pendingSetup -= sInShift;
@@ -513,8 +501,7 @@ export default function ProgrammingPage() {
             if (pInShift > 0 && cycleTime > 0) { const before = Math.floor(doneProdTime / cycleTime + 1e-7); doneProdTime += pInShift; qInShift = Math.min(job.quantidade, Math.floor(doneProdTime / cycleTime + 1e-7)) - before; pendingProd -= pInShift; } else if (pInShift > 0) { pendingProd -= pInShift; }
             
             if (sInShift > 0 || pInShift > 0) {
-                const duration = sInShift + pInShift; 
-                occupy(laneId, abs, abs + duration);
+                const duration = sInShift + pInShift; occupy(laneId, abs, abs + duration);
                 const displayDateStr = format(dayDate, 'dd/MM/yyyy');
                 novosPlanItems.push({ id: `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${Math.round(winStart)}`, dataExecucao: displayDateStr, tecnico: techName, equipamento: type.toUpperCase(), requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca, quantidadeTotal: job.quantidade, quantidadeNoBloco: qInShift, tempoMinutos: pInShift, setupMinutos: sInShift, turno: shiftId, startOffsetMin: winStart, tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', techKey, jobId: job.id, laneIndex: 0, isConcluded: concluidos.has(`${job.id}|${techKey}|${displayDateStr}|${shiftId}`), site: normalizeSiteName(job.site) });
                 cursor = abs + duration;
@@ -703,7 +690,7 @@ export default function ProgrammingPage() {
                             const items = planIndex.get(`${dDisplay}|${t.id}|${cat}`) || []; const reals = realIndex.get(`${dDisplay}|${t.id}|${cat}`) || [];
                             return (
                               <div key={`${cat}-${t.id}`} className="grid grid-cols-[160px_1fr] gap-4 mb-6 last:mb-0">
-                                <div className="pt-2 cursor-pointer group">
+                                <div className="pt-2">
                                     <div className={cn("text-[10px] font-black uppercase", cat === 'TORNO' ? "text-cyan-500" : (cat === 'CENTRO' ? "text-purple-500" : "text-slate-500"))}>{cat}</div>
                                     <div className="text-xs font-black truncate">{tech}</div>
                                 </div>

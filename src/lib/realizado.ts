@@ -1,3 +1,4 @@
+
 'use client';
 
 import { format, parse } from 'date-fns';
@@ -61,14 +62,6 @@ function normalizeName(name: any): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9 ]/g, "")
     .trim();
-}
-
-function getShiftFromDate(d: Date): string {
-  const h = d.getHours();
-  const totalMinutes = h * 60 + d.getMinutes();
-  if (totalMinutes >= 360 && totalMinutes < 810) return '1'; 
-  if (totalMinutes >= 810 && totalMinutes < 1230) return '2';
-  return '3';
 }
 
 export function cruzarComPlano(
@@ -173,7 +166,7 @@ export function cruzarComPlano(
       pecasPlanejadas: pItem.quantidadeNoBloco || 0,
       startOffsetMin: pItem.startOffsetMin,
       tempoRealizado: status === 'semApontamento' ? tempoTotalPlanejado : tempoTotalRealizado,
-      tempoSetupRealizado: 0, // Agora as perdas são tratadas separadamente no summary
+      tempoSetupRealizado: 0,
       pecasRealizadas,
       tempoPrimeiraPeca,
       tempoUsinagem: tempoUsinagemRealizado,
@@ -210,6 +203,43 @@ export function cruzarComPlano(
       status: 'perda',
       suspeitaDuplicidade: false,
       motivoPerda: data.reasons.join(' | ')
+    });
+  });
+
+  // 6. Identificar Apontamentos "Extras" (Sem Plano)
+  Object.keys(prodGroup).forEach(key => {
+    if (matchedKeys.has(key)) return;
+    const [dStr, techNorm, formsNorm] = key.split('|');
+    const records = prodGroup[key];
+    
+    let tempoTotal = 0;
+    let pecasTotal = 0;
+    records.forEach(r => {
+        tempoTotal += Number(r.machiningTime) || 0;
+        pecasTotal += Number(r.quantityProduced) || 0;
+    });
+
+    const techName = plano.find(p => normalizeName(p.tecnico) === techNorm)?.tecnico || techNorm;
+    const assignedShift = techShiftMap[`${dStr}|${techNorm}`] || OPERATOR_DEFAULT_SHIFT[techNorm] || '1';
+
+    result.push({
+        id: `extra-${key}`,
+        requisicao: formsNorm,
+        tecnico: techName,
+        dataStr: dStr,
+        turno: assignedShift,
+        techKey: TECH_BY_OPERATOR[techName] || 'ADM',
+        tempoPlanejado: 0,
+        pecasPlanejadas: 0,
+        tempoSetupPlanejado: 0,
+        startOffsetMin: 0,
+        tempoRealizado: tempoTotal,
+        pecasRealizadas: pecasTotal,
+        tempoPrimeiraPeca: 0,
+        tempoUsinagem: tempoTotal,
+        tempoSetupRealizado: 0,
+        status: 'semPlano',
+        suspeitaDuplicidade: false
     });
   });
 
