@@ -24,8 +24,9 @@ export interface ComparacaoItem {
   tempoSetupRealizado: number;
   
   // Flags de Status
-  status: 'dentro' | 'estourou' | 'adiantado' | 'semPlano' | 'semApontamento';
+  status: 'dentro' | 'estourou' | 'adiantado' | 'semPlano' | 'semApontamento' | 'perda';
   suspeitaDuplicidade: boolean;
+  motivoPerda?: string;
 }
 
 // Mapeamento mestre de tecnologia por técnico
@@ -40,7 +41,7 @@ const TECH_BY_OPERATOR: Record<string, 'TORNO' | 'CENTRO' | 'ADM'> = {
   "Marcos Barbosa": "TORNO"
 };
 
-// Mapeamento de turno padrão por técnico para casos de "Extra"
+// Mapeamento de turno padrão por técnico para casos de "Extra" e atribuição correta
 const OPERATOR_DEFAULT_SHIFT: Record<string, string> = {
   "gustavo gozzi": "1",
   "jair melo": "2",
@@ -64,13 +65,9 @@ function normalizeName(name: any): string {
 
 function getShiftFromDate(d: Date): string {
   const h = d.getHours();
-  const m = d.getMinutes();
-  const totalMinutes = h * 60 + m;
-  // 1T: 06:00 - 13:30 (810 min)
+  const totalMinutes = h * 60 + d.getMinutes();
   if (totalMinutes >= 360 && totalMinutes < 810) return '1'; 
-  // 2T: 13:30 - 20:30 (1230 min)
   if (totalMinutes >= 810 && totalMinutes < 1230) return '2';
-  // 3T: 20:30 - 03:00
   return '3';
 }
 
@@ -86,36 +83,34 @@ export function cruzarComPlano(
   // 1. Agrupar produção por (Data, Técnico, Forms)
   const prodGroup: Record<string, any[]> = {};
   producao.forEach(p => {
-    if (!p.formsNumber || !p.operatorId || !p.date) return;
+    if (!p.operatorId || !p.date) return;
     const d = p.date.toDate ? p.date.toDate() : new Date(p.date);
-    
     if (d >= williamOffDate && normalizeName(p.operatorId) === 'william martinucci') return;
 
     const dStr = format(d, 'dd/MM/yyyy');
     const techNorm = normalizeName(p.operatorId);
-    const formsNorm = String(p.formsNumber).replace('#', '').trim();
+    const formsNorm = String(p.formsNumber || 'S/N').replace('#', '').trim();
     
     const key = `${dStr}|${techNorm}|${formsNorm}`;
     if (!prodGroup[key]) prodGroup[key] = [];
     prodGroup[key].push(p);
   });
 
-  // 2. Agrupar perdas de SETUP por (Data, Técnico, Forms)
-  const setupLossGroup: Record<string, number> = {};
+  // 2. Agrupar perdas por (Data, Técnico) - SOMA TOTAL DE TEMPO IMPRODUTIVO
+  const lossSummary: Record<string, { total: number, reasons: string[] }> = {};
   perdas.forEach(l => {
-    if (!l.formsNumber || !l.operatorId || !l.date) return;
-    const reason = String(l.lossReason || '').toUpperCase();
-    if (!reason.includes('SETUP')) return;
-
+    if (!l.operatorId || !l.date) return;
     const d = l.date.toDate ? l.date.toDate() : new Date(l.date);
     if (d >= williamOffDate && normalizeName(l.operatorId) === 'william martinucci') return;
 
     const dStr = format(d, 'dd/MM/yyyy');
     const techNorm = normalizeName(l.operatorId);
-    const formsNorm = String(l.formsNumber).replace('#', '').trim();
+    const key = `${dStr}|${techNorm}`;
     
-    const key = `${dStr}|${techNorm}|${formsNorm}`;
-    setupLossGroup[key] = (setupLossGroup[key] || 0) + (Number(l.timeLost) || 0);
+    if (!lossSummary[key]) lossSummary[key] = { total: 0, reasons: [] };
+    const time = Number(l.timeLost) || 0;
+    lossSummary[key].total += time;
+    if (l.lossReason) lossSummary[key].reasons.push(`${l.lossReason} (${time}m)`);
   });
 
   // 3. Mapear Turnos Planejados por Técnico/Data
@@ -141,10 +136,7 @@ export function cruzarComPlano(
     } catch (e) {}
     
     const records = prodGroup[key] || [];
-    const setupRealizado = setupLossGroup[key] || 0;
-    
     const tempoTotalPlanejado = (Number(pItem.tempoMinutos) || 0) + (Number(pItem.setupMinutos) || 0);
-    const pecasPlanejadas = pItem.quantidadeNoBloco || 0;
     
     let tempoUsinagemRealizado = 0;
     let tempoPrimeiraPeca = 0;
@@ -157,12 +149,11 @@ export function cruzarComPlano(
       pecasRealizadas += Number(r.quantityProduced) || 0;
     });
 
-    const tempoTotalRealizado = tempoUsinagemRealizado + tempoPrimeiraPeca + setupRealizado;
-
-    if (records.length > 0 || setupRealizado > 0) matchedKeys.add(key);
+    const tempoTotalRealizado = tempoUsinagemRealizado + tempoPrimeiraPeca;
+    if (records.length > 0) matchedKeys.add(key);
 
     let status: ComparacaoItem['status'] = 'dentro';
-    if (records.length === 0 && setupRealizado === 0) {
+    if (records.length === 0) {
       status = 'semApontamento';
     } else {
       const desvio = tempoTotalPlanejado > 0 ? (tempoTotalRealizado - tempoTotalPlanejado) / tempoTotalPlanejado : 0;
@@ -179,10 +170,10 @@ export function cruzarComPlano(
       techKey: pItem.techKey,
       tempoPlanejado: tempoTotalPlanejado,
       tempoSetupPlanejado: pItem.setupMinutos || 0,
-      pecasPlanejadas,
+      pecasPlanejadas: pItem.quantidadeNoBloco || 0,
       startOffsetMin: pItem.startOffsetMin,
       tempoRealizado: status === 'semApontamento' ? tempoTotalPlanejado : tempoTotalRealizado,
-      tempoSetupRealizado: setupRealizado,
+      tempoSetupRealizado: 0, // Agora as perdas são tratadas separadamente no summary
       pecasRealizadas,
       tempoPrimeiraPeca,
       tempoUsinagem: tempoUsinagemRealizado,
@@ -191,65 +182,34 @@ export function cruzarComPlano(
     });
   });
 
-  // 5. Processar registros sem plano (Extras)
-  Object.keys(prodGroup).forEach(key => {
-    if (matchedKeys.has(key)) return;
-    const records = prodGroup[key];
-    const [dStr, techNorm, forms] = key.split('|');
-    const setupRealizado = setupLossGroup[key] || 0;
+  // 5. Adicionar Linha de Perdas (Resumo Improdutivo)
+  Object.keys(lossSummary).forEach(key => {
+    const [dStr, techNorm] = key.split('|');
+    const data = lossSummary[key];
+    const techName = plano.find(p => normalizeName(p.tecnico) === techNorm)?.tecnico || techNorm;
     
-    let tempoRealizado = 0;
-    let tempoUsinagem = 0;
-    let tempoPrimeiraPeca = 0;
-    let pecasRealizadas = 0;
-
-    records.forEach(r => {
-      const t = Number(r.machiningTime) || 0;
-      tempoRealizado += t;
-      if (String(r.activityType || '').toUpperCase().includes('PRIMEIRA')) tempoPrimeiraPeca += t;
-      else tempoUsinagem += t;
-      pecasRealizadas += Number(r.quantityProduced) || 0;
-    });
-
-    tempoRealizado += setupRealizado;
-
-    const opName = records[0].operatorId;
-    const opNorm = normalizeName(opName);
+    // Identificar o turno correto para a perda
+    const assignedShift = techShiftMap[`${dStr}|${techNorm}`] || OPERATOR_DEFAULT_SHIFT[techNorm] || '1';
     
-    let techKey: 'TORNO' | 'CENTRO' | 'ADM' = 'ADM';
-    const firstMachine = String(records[0].machine || '').toUpperCase();
-    if (firstMachine.includes('TORNO')) techKey = 'TORNO';
-    else if (firstMachine.includes('CENTRO')) techKey = 'CENTRO';
-    else techKey = TECH_BY_OPERATOR[opName] || 'ADM';
-
-    // Lógica refinada de Turno para Extras: 
-    // 1. Ver se o técnico tem algum planejamento nesse dia (mesmo que em outra peça)
-    // 2. Usar o turno padrão do técnico
-    // 3. Usar o horário do registro como última opção
-    const assignedShift = techShiftMap[`${dStr}|${opNorm}`];
-    const defaultShift = OPERATOR_DEFAULT_SHIFT[opNorm];
-    const timeShift = getShiftFromDate(records[0].createdAt?.toDate ? records[0].createdAt.toDate() : new Date());
-
-    let turno = assignedShift || defaultShift || timeShift;
-
     result.push({
-      id: `extra-${key}`,
-      requisicao: forms,
-      tecnico: opName,
+      id: `loss-${key}`,
+      requisicao: 'PERDAS',
+      tecnico: techName,
       dataStr: dStr,
-      turno,
-      techKey,
+      turno: assignedShift,
+      techKey: TECH_BY_OPERATOR[techName] || 'ADM',
       tempoPlanejado: 0,
-      tempoSetupPlanejado: 0,
       pecasPlanejadas: 0,
+      tempoSetupPlanejado: 0,
       startOffsetMin: 0,
-      tempoRealizado,
-      tempoSetupRealizado: setupRealizado,
-      pecasRealizadas,
-      tempoPrimeiraPeca,
-      tempoUsinagem,
-      status: 'semPlano',
-      suspeitaDuplicidade: records.length > 1
+      tempoRealizado: data.total,
+      pecasRealizadas: 0,
+      tempoPrimeiraPeca: 0,
+      tempoUsinagem: 0,
+      tempoSetupRealizado: data.total,
+      status: 'perda',
+      suspeitaDuplicidade: false,
+      motivoPerda: data.reasons.join(' | ')
     });
   });
 

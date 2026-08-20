@@ -240,21 +240,27 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
 TimelineBar.displayName = 'TimelineBar';
 
 const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
-  const colors = { dentro: 'text-emerald-500', estourou: 'text-rose-500', adiantado: 'text-sky-500', semPlano: 'text-amber-500', semApontamento: 'text-muted-foreground/30' };
-  const bgColors = { dentro: 'bg-emerald-500/5', estourou: 'bg-rose-500/5', adiantado: 'bg-sky-500/5', semPlano: 'bg-amber-500/5', semApontamento: 'bg-transparent' };
+  const isPerda = item.status === 'perda';
+  const colors = { dentro: 'text-emerald-500', estourou: 'text-rose-500', adiantado: 'text-sky-500', semPlano: 'text-amber-500', semApontamento: 'text-muted-foreground/30', perda: 'text-red-500' };
+  const bgColors = { dentro: 'bg-emerald-500/5', estourou: 'bg-rose-500/5', adiantado: 'bg-sky-500/5', semPlano: 'bg-amber-500/5', semApontamento: 'bg-transparent', perda: 'bg-red-500/10' };
+  
   const hasPlan = item.tempoPlanejado > 0;
   const isPending = item.status === 'semApontamento';
   const deviation = hasPlan ? (item.tempoRealizado - item.tempoPlanejado) : 0;
-  const devText = (!hasPlan || isPending) ? '-' : (deviation === 0 ? 'OK' : (deviation > 0 ? `+${deviation}m` : `${deviation}m`));
+  const devText = (!hasPlan || isPending || isPerda) ? '-' : (deviation === 0 ? 'OK' : (deviation > 0 ? `+${deviation}m` : `${deviation}m`));
 
   return (
-    <div className={cn("grid grid-cols-[80px_100px_100px_100px_1fr_80px] items-center px-3 py-1.5 text-[12px] font-bold border-l-4", bgColors[item.status], item.status === 'dentro' ? "border-emerald-500" : item.status === 'estourou' ? "border-rose-500" : item.status === 'adiantado' ? "border-sky-500" : item.status === 'semPlano' ? "border-amber-500" : "border-transparent")}>
-      <div className="font-mono">#{item.requisicao}</div>
+    <div className={cn("grid grid-cols-[80px_100px_100px_100px_1fr_80px] items-center px-3 py-1.5 text-[12px] font-bold border-l-4", bgColors[item.status], item.status === 'dentro' ? "border-emerald-500" : item.status === 'estourou' ? "border-rose-500" : item.status === 'adiantado' ? "border-sky-500" : item.status === 'semPlano' ? "border-amber-500" : item.status === 'perda' ? "border-red-500" : "border-transparent")}>
+      <div className={cn("font-mono", isPerda && "text-red-500")}>#{item.requisicao}</div>
       <div className="flex flex-col"><span className="text-muted-foreground/50 font-medium">{item.tempoPlanejado} min</span></div>
       <div className="flex flex-col"><span className={cn("font-black", colors[item.status])}>{isPending ? '---' : `${item.tempoRealizado} min`}</span></div>
       <div className={cn("font-black tabular-nums", colors[item.status])}>{devText}</div>
-      <div className="flex items-center gap-2">{item.status === 'semPlano' && <Badge variant="outline" className="h-4 text-[8px] border-amber-500/30 text-amber-500 py-0 uppercase font-black">Extra</Badge>}{isPending && <span className="text-[10px] uppercase opacity-30 italic font-black">Não Apontado</span>}</div>
-      <div className="text-right tabular-nums font-black opacity-80">{isPending ? '-' : `${item.pecasRealizadas} pç`}</div>
+      <div className="flex items-center gap-2">
+        {item.status === 'semPlano' && <Badge variant="outline" className="h-4 text-[8px] border-amber-500/30 text-amber-500 py-0 uppercase font-black">Extra</Badge>}
+        {isPerda && <span className="text-[9px] uppercase font-black text-red-500 truncate max-w-[300px]">{item.motivoPerda}</span>}
+        {isPending && <span className="text-[10px] uppercase opacity-30 italic font-black">Não Apontado</span>}
+      </div>
+      <div className="text-right tabular-nums font-black opacity-80">{isPending ? '-' : (isPerda ? '' : `${item.pecasRealizadas} pç`)}</div>
     </div>
   );
 });
@@ -412,6 +418,18 @@ export default function ProgrammingPage() {
       for (const iv of intervals) { if (iv.end <= t + 0.1) continue; if (iv.start > t + 0.1) return { start: t, limit: iv.start }; t = iv.end; }
       return { start: t, limit: Infinity };
     };
+
+    // Adicionar as perdas REAIS ao cronograma visual para ocupar espaço
+    realItems.filter(r => r.status === 'perda').forEach(p => {
+        const pDate = parse(p.dataStr, 'dd/MM/yyyy', new Date());
+        const dayIdx = differenceInCalendarDays(pDate, baseDate);
+        if (dayIdx < 0) return;
+        const shiftIdx = parseInt(p.turno) - 1;
+        const startAbs = dayIdx * 3 * SHIFT_MIN + shiftIdx * SHIFT_MIN;
+        occupy(`${p.techKey}_0`, startAbs, startAbs + p.tempoRealizado);
+        novosPlanItems.push({ id: `loss-vis-${p.id}`, dataExecucao: p.dataStr, tecnico: p.tecnico, equipamento: 'PERDA', requisicao: 'PERDA', nomeDaPeca: p.motivoPerda || 'PARADA', quantidadeTotal: 0, quantidadeNoBloco: 0, tempoMinutos: p.tempoRealizado, setupMinutos: 0, turno: p.turno, startOffsetMin: 0, tipoAtividade: 'PERDA', techKey: p.techKey as any, jobId: 'loss', laneIndex: 0, site: 'LOCAL' });
+    });
+    
     const concluidos = new Set(planejamentoData.filter(i => i.isConcluded).map(i => `${i.jobId}|${i.techKey}|${i.dataExecucao}|${i.turno}`));
     
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
@@ -666,7 +684,15 @@ export default function ProgrammingPage() {
                                     <div className={cn("text-[10px] font-black uppercase", cat === 'TORNO' ? "text-cyan-500" : (cat === 'CENTRO' ? "text-purple-500" : "text-slate-500"))}>{cat}</div>
                                     <div className="text-xs font-black truncate">{tech}</div>
                                 </div>
-                                <div className="space-y-2"><div className="relative h-10 border rounded bg-black/5 overflow-hidden">{PAUSAS.map(p => <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-3 w-3 opacity-20" /></div>)}{items.map(it => <TimelineBar key={it.id} item={it} onToggle={toggleConcluded} />)}</div><div className="space-y-1">{reals.map(it => <ActualRow key={it.id} item={it} />)}</div></div>
+                                <div className="space-y-2">
+                                  <div className="relative h-10 border rounded bg-black/5 overflow-hidden">
+                                    {PAUSAS.map(p => <div key={p.label} className="absolute top-0 bottom-0 bg-yellow-500/10 border-x flex items-center justify-center" style={{ left: `${(p.start / SHIFT_MIN) * 100}%`, width: `${(p.duration / SHIFT_MIN) * 100}%` }}><p.icon className="h-3 w-3 opacity-20" /></div>)}
+                                    {items.map(it => <TimelineBar key={it.id} item={it} onToggle={toggleConcluded} />)}
+                                  </div>
+                                  <div className="space-y-1">
+                                    {reals.map(it => <ActualRow key={it.id} item={it} />)}
+                                  </div>
+                                </div>
                               </div>
                             );
                           })}</div>)}</div>
