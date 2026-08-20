@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, orderBy, limit, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, orderBy, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ChevronLeft, 
@@ -35,14 +35,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -425,7 +417,7 @@ export default function ProgrammingPage() {
       return { start: t, limit: Infinity };
     };
 
-    // 1. ALOCAR PERDAS REAIS (Padrão: Início do turno)
+    // 1. ALOCAR PERDAS REAIS (Padrão: Início do turno, consome capacidade)
     const lossByShift: Record<string, number> = {};
     if (lossRecords) {
         lossRecords.forEach(l => {
@@ -443,6 +435,7 @@ export default function ProgrammingPage() {
             else if (techNorm === 'Nathan Xavier') { techKey = 'CENTRO'; shiftId = '2'; }
             else if (techNorm === 'Rodrigo Cantano') { techKey = 'CENTRO'; shiftId = '3'; }
             else if (techNorm === 'William Martinucci') { techKey = 'ADM'; shiftId = '1'; }
+            else if (techNorm === 'Marcos Barbosa') { techKey = 'TORNO'; shiftId = '1'; }
             
             if (techKey) {
                 const k = `${dStr}|${shiftId}|${techKey}`;
@@ -473,7 +466,7 @@ export default function ProgrammingPage() {
     });
 
     // 2. ALOCAR PAUSAS FIXAS (DDS e CAFÉ)
-    const numDays = 60; // Limite de dias para cálculo preventivo
+    const numDays = 60; 
     for (let dIdx = 0; dIdx < numDays; dIdx++) {
         const dayDate = addDays(baseDate, dIdx);
         if (isDomingo(dayDate)) continue;
@@ -575,7 +568,7 @@ export default function ProgrammingPage() {
     if (fila.length > 0 && lossRecords) {
         recalculatePlan(fila);
     }
-  }, [lossRecords]);
+  }, [lossRecords, fila.length]);
 
   const handleSetAnchorDate = async (date: Date | undefined) => {
     if (!firestore || !date) return;
@@ -720,7 +713,7 @@ export default function ProgrammingPage() {
                             if (!tech) return null;
                             const items = planIndex.get(`${dDisplay}|${t.id}|${cat}`) || []; const reals = realIndex.get(`${dDisplay}|${t.id}|${cat}`) || [];
                             
-                            // CALCULAR SALDO
+                            // CALCULAR SALDO REAL (Pool de 420 min)
                             const totalConsumidoShift = items.reduce((acc, curr) => acc + (curr.tempoMinutos || 0) + (curr.setupMinutos || 0), 0);
                             const saldoShift = Math.max(0, SHIFT_MIN - totalConsumidoShift);
 
