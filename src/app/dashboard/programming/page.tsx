@@ -326,7 +326,6 @@ export default function ProgrammingPage() {
   const { data: productionRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1500)) : null, [firestore]));
   const { data: lossRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]));
 
-  // Lógica de legado e inicialização de âncora
   useEffect(() => {
     async function checkLegacyData() {
         if (!firestore || fila.length > 0) return;
@@ -458,7 +457,6 @@ export default function ProgrammingPage() {
       return { start: t, limit: Infinity };
     };
 
-    // 1. PROCESSAR PERDAS REAIS PRIMEIRO: Elas bloqueiam o início da capacidade e empurram o cronograma
     const lossByShift: Record<string, number> = {};
     if (lossRecords) {
         lossRecords.forEach(l => {
@@ -492,13 +490,12 @@ export default function ProgrammingPage() {
             if (dayIdx < 0) return;
             const shiftAbs = dayIdx * 3 * SHIFT_MIN + (parseInt(shiftId) - 1) * SHIFT_MIN;
             
-            // Bloquear capacidade no início do turno
             occupy(`${techKey}_0`, shiftAbs, shiftAbs + totalTime);
             
             novosPlanItems.push({ 
                 id: `loss-vis-${key}`, 
                 dataExecucao: dStr, 
-                tecnico: 'SOMA PERDAS', 
+                tecnico: normalizeOperatorName(key.split('|')[1]) || 'SOMA PERDAS', 
                 equipamento: 'BLOQUEIO', 
                 requisicao: 'PERDA', 
                 nomeDaPeca: 'TEMPO CONSUMIDO POR PERDAS REAIS', 
@@ -587,6 +584,12 @@ export default function ProgrammingPage() {
         await setDoc(doc(firestore, 'programacaoState', `plano_${partitionKey}`), { data: novosPlanItems, updatedAt: serverTimestamp() });
     } catch (e) {} finally { setIsSaving(false); }
   };
+
+  useEffect(() => {
+    if (fila.length > 0 && lossRecords && productionRecords) {
+        recalculatePlan(fila);
+    }
+  }, [lossRecords, productionRecords]);
 
   const handleSetAnchorDate = async (date: Date | undefined) => {
     if (!firestore || !date) return;
