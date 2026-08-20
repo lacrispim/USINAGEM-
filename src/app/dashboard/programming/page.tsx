@@ -140,13 +140,6 @@ const PAUSAS = [
 
 const isDomingo = (d: Date) => getDay(d) === 0;
 
-const normalizeSiteName = (site: string | undefined): string => {
-  if (!site) return 'VALINHOS';
-  const s = String(site).toUpperCase().trim();
-  if (s.includes('VALINHOS')) return 'VALINHOS';
-  return s;
-};
-
 const normalizeOperatorName = (name: any) => {
   if (!name) return '';
   const n = String(name).toLowerCase().trim();
@@ -396,7 +389,7 @@ export default function ProgrammingPage() {
 
   const filteredFila = useMemo(() => {
     let data = fila;
-    if (selectedSiteFilter !== 'all') data = data.filter(item => normalizeSiteName(item.site) === selectedSiteFilter);
+    if (selectedSiteFilter !== 'all') data = data.filter(item => item.site === selectedSiteFilter);
     if (deferredTableFilter) { 
       const search = deferredTableFilter.toLowerCase(); 
       data = data.filter(item => item.requisicao.toLowerCase().includes(search) || item.nomeDaPeca.toLowerCase().includes(search)); 
@@ -465,12 +458,32 @@ export default function ProgrammingPage() {
       return { start: t, limit: Infinity };
     };
 
-    // 1. PROCESSAR PERDAS REAIS PRIMEIRO: Elas ocupam o início do turno conforme solicitado
+    // 1. PROCESSAR PERDAS REAIS PRIMEIRO: Elas bloqueiam o início da capacidade e empurram o cronograma
     const lossByShift: Record<string, number> = {};
-    realItems.filter(r => r.status === 'perda').forEach(p => {
-        const k = `${p.dataStr}|${p.turno}|${p.techKey}`;
-        lossByShift[k] = (lossByShift[k] || 0) + p.tempoRealizado;
-    });
+    if (lossRecords) {
+        lossRecords.forEach(l => {
+            const d = l.date?.toDate ? l.date.toDate() : new Date(l.date);
+            const dStr = format(d, 'dd/MM/yyyy');
+            const techNorm = normalizeOperatorName(l.operatorId);
+            
+            // Mapear técnico para techKey e Turno (usando escala padrão se não estiver no plano)
+            let techKey: 'TORNO' | 'CENTRO' | 'ADM' | null = null;
+            let shiftId = '1';
+            
+            if (techNorm === 'Gustavo Gozzi') { techKey = 'TORNO'; shiftId = '1'; }
+            else if (techNorm === 'Jair Melo') { techKey = 'TORNO'; shiftId = '2'; }
+            else if (techNorm === 'Alisson França') { techKey = 'TORNO'; shiftId = '3'; }
+            else if (techNorm === 'Daniel Solivo') { techKey = 'CENTRO'; shiftId = '1'; }
+            else if (techNorm === 'Nathan Xavier') { techKey = 'CENTRO'; shiftId = '2'; }
+            else if (techNorm === 'Rodrigo Cantano') { techKey = 'CENTRO'; shiftId = '3'; }
+            else if (techNorm === 'William Martinucci') { techKey = 'ADM'; shiftId = '1'; }
+            
+            if (techKey) {
+                const k = `${dStr}|${shiftId}|${techKey}`;
+                lossByShift[k] = (lossByShift[k] || 0) + (Number(l.timeLost) || 0);
+            }
+        });
+    }
 
     Object.entries(lossByShift).forEach(([key, totalTime]) => {
         const [dStr, shiftId, techKey] = key.split('|');
@@ -484,7 +497,7 @@ export default function ProgrammingPage() {
             // Ocupar o tempo de perda no motor de cálculo para empurrar o planejamento
             occupy(`${techKey}_0`, shiftAbs, shiftAbs + totalTime);
             
-            // Adicionar barra visual de perda no lane planejado
+            // Adicionar barra visual de perda no lane planejado (VISUAL ALTA FIDELIDADE)
             novosPlanItems.push({ 
                 id: `loss-vis-${key}`, 
                 dataExecucao: dStr, 
@@ -562,7 +575,7 @@ export default function ProgrammingPage() {
                 const duration = sInShift + pInShift; 
                 occupy(laneId, abs, abs + duration);
                 const displayDateStr = format(dayDate, 'dd/MM/yyyy');
-                novosPlanItems.push({ id: `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${Math.round(winStart)}`, dataExecucao: displayDateStr, tecnico: techName, equipamento: type.toUpperCase(), requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca, quantidadeTotal: job.quantidade, quantidadeNoBloco: qInShift, tempoMinutos: pInShift, setupMinutos: sInShift, turno: shiftId, startOffsetMin: winStart, tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', techKey, jobId: job.id, laneIndex: 0, isConcluded: concluidos.has(`${job.id}|${techKey}|${displayDateStr}|${shiftId}`), site: normalizeSiteName(job.site) });
+                novosPlanItems.push({ id: `pl-${job.id}-${techKey}-${dateStr}-${shiftId}-${Math.round(winStart)}`, dataExecucao: displayDateStr, tecnico: techName, equipamento: type.toUpperCase(), requisicao: job.requisicao, nomeDaPeca: job.nomeDaPeca, quantidadeTotal: job.quantidade, quantidadeNoBloco: qInShift, tempoMinutos: pInShift, setupMinutos: sInShift, turno: shiftId, startOffsetMin: winStart, tipoAtividade: type === 'prog' ? 'PROGRAMACAO' : 'USINAGEM', techKey, jobId: job.id, laneIndex: 0, isConcluded: concluidos.has(`${job.id}|${techKey}|${displayDateStr}|${shiftId}`), site: job.site || 'VALINHOS' });
                 cursor = abs + duration;
             } else cursor = shiftAbs + SHIFT_MIN;
         }
@@ -620,7 +633,7 @@ export default function ProgrammingPage() {
         const workbook = XLSX.read(new Uint8Array(event.target?.result as ArrayBuffer), { type: 'array' });
         const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         const findVal = (row: any, keys: string[]) => { for (const k of keys) { const rk = Object.keys(row).find(x => x.toLowerCase().trim() === k.toLowerCase().trim()); if (rk) return row[rk]; } return undefined; };
-        const novaFila: JobBase[] = json.map((row, i) => ({ id: `job-imp-${i}-${Date.now()}`, requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms']) || 'S/N'), nomeDaPeca: String(findVal(row, ['peça', 'peca', 'nome']) || 'SEM NOME').toUpperCase(), quantidade: Number(findVal(row, ['qtd', 'quantidade']) || 1), setup: Number(findVal(row, ['setup']) || 20), torno: Number(findVal(row, ['torno']) || 0), centro: Number(findVal(row, ['centro']) || 0), prog: Number(findVal(row, ['prog', 'programação']) || 0), site: normalizeSiteName(String(findVal(row, ['site', 'fabrica']) || 'VALINHOS')), etapa1: String(findVal(row, ['etapa 1', 'etapa1']) || 'TORNO'), etapa2: String(findVal(row, ['etapa 2', 'etapa2']) || ''), ordemTorno: i + 1, ordemCentro: i + 1 }));
+        const novaFila: JobBase[] = json.map((row, i) => ({ id: `job-imp-${i}-${Date.now()}`, requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms']) || 'S/N'), nomeDaPeca: String(findVal(row, ['peça', 'peca', 'nome']) || 'SEM NOME').toUpperCase(), quantidade: Number(findVal(row, ['qtd', 'quantidade']) || 1), setup: Number(findVal(row, ['setup']) || 20), torno: Number(findVal(row, ['torno']) || 0), centro: Number(findVal(row, ['centro']) || 0), prog: Number(findVal(row, ['prog', 'programação']) || 0), site: String(findVal(row, ['site', 'fabrica']) || 'VALINHOS'), etapa1: String(findVal(row, ['etapa 1', 'etapa1']) || 'TORNO'), etapa2: String(findVal(row, ['etapa 2', 'etapa2']) || ''), ordemTorno: i + 1, ordemCentro: i + 1 }));
         setFila(novaFila); await recalculatePlan(novaFila);
       } catch (err) {} finally { setIsImporting(false); e.target.value = ''; }
     };
