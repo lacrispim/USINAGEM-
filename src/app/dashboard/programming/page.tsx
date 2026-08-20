@@ -1,9 +1,8 @@
-
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
 import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, orderBy, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ChevronLeft, 
@@ -25,8 +24,7 @@ import {
   Check,
   Clock,
   Loader2,
-  ChevronsLeft,
-  UserRoundPen
+  ChevronsLeft
 } from 'lucide-react';
 import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -72,7 +70,12 @@ import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/comp
 import { cruzarComPlano, ComparacaoItem } from '@/lib/realizado';
 
 const TOLERANCIA_ADERENCIA = 0.10;
-const WILLIAM_OFF_DATE = '2026-08-16';
+const MONTHS = [
+    { value: '0', label: 'JANEIRO' }, { value: '1', label: 'FEVEREIRO' }, { value: '2', label: 'MARÇO' },
+    { value: '3', label: 'ABRIL' }, { value: '4', label: 'MAIO' }, { value: '5', label: 'JUNHO' },
+    { value: '6', label: 'JULHO' }, { value: '7', label: 'AGOSTO' }, { value: '8', label: 'SETEMBRO' },
+    { value: '9', label: 'OUTUBRO' }, { value: '10', label: 'NOVEMBRO' }, { value: '11', label: 'DEZEMBRO' }
+];
 
 interface JobBase {
   id: string;
@@ -141,15 +144,6 @@ const normalizeSiteName = (site: string | undefined): string => {
   const s = String(site).toUpperCase().trim();
   if (s.includes('VALINHOS')) return 'VALINHOS';
   return s;
-};
-
-const normalizeName = (name: any): string => {
-  if (!name) return '';
-  return String(name)
-    .toLowerCase()
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 };
 
 const Ruler = React.memo(() => {
@@ -289,6 +283,9 @@ export default function ProgrammingPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastUpdateRef = useRef<number>(0);
   
+  const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth()));
+  const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
+  
   const [fila, setFila] = useState<JobBase[]>([]);
   const [planejamentoData, setPlanejamentoData] = useState<PlanejamentoItem[]>([]);
   const [disabledShifts, setDisabledShifts] = useState<Record<string, boolean>>({});
@@ -306,12 +303,12 @@ export default function ProgrammingPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [newItem, setNewItem] = useState<Partial<JobBase>>({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: 'TORNO', etapa2: '' });
 
-  const { data: filaDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'fila') : null, [firestore]));
-  const { data: planoDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'plano') : null, [firestore]));
-  const { data: configDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', 'config') : null, [firestore]));
+  const partitionKey = `${selectedYear}_${selectedMonth}`;
+  const { data: filaDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', `fila_${partitionKey}`) : null, [firestore, partitionKey]));
+  const { data: planoDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', `plano_${partitionKey}`) : null, [firestore, partitionKey]));
+  const { data: configDoc } = useDoc(useMemoFirebase(() => firestore ? doc(firestore, 'programacaoState', `config_${partitionKey}`) : null, [firestore, partitionKey]));
   
-  const prodRecordsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]);
-  const { data: productionRecords } = useCollection(prodRecordsQuery);
+  const { data: productionRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'productionRecords'), orderBy('date', 'desc'), limit(1000)) : null, [firestore]));
   const { data: lossRecords } = useCollection(useMemoFirebase(() => firestore ? query(collection(firestore, 'lossRecords'), orderBy('date', 'desc'), limit(2000)) : null, [firestore]));
 
   useEffect(() => {
@@ -324,10 +321,18 @@ export default function ProgrammingPage() {
       if (configDoc.planStartDate) {
         const parsed = parse(configDoc.planStartDate, 'yyyy-MM-dd', new Date());
         if (isValid(parsed)) setPlanStartDate(startOfDay(parsed));
+      } else if (selectedMonth === '7' && selectedYear === '2026') {
+          const augustAnchor = new Date(2026, 7, 3);
+          setPlanStartDate(augustAnchor);
+          setCurrentDate(augustAnchor);
+      } else {
+          const firstOfMonth = new Date(Number(selectedYear), Number(selectedMonth), 1);
+          setPlanStartDate(firstOfMonth);
+          setCurrentDate(firstOfMonth);
       }
     }
     if (planoDoc && Array.isArray(planoDoc.data)) setPlanejamentoData(planoDoc.data);
-  }, [filaDoc, planoDoc, configDoc]);
+  }, [filaDoc, planoDoc, configDoc, selectedMonth, selectedYear]);
 
   const jobCompletionStats = useMemo(() => {
     const map = new Map<string, { total: number, concluded: number }>();
@@ -388,8 +393,8 @@ export default function ProgrammingPage() {
     if (!firestore || !planejamentoData) return;
     const updatedPlano = planejamentoData.map(item => item.id === itemId ? { ...item, isConcluded: !item.isConcluded } : item);
     setPlanejamentoData(updatedPlano);
-    try { await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: updatedPlano, updatedAt: serverTimestamp() }); } catch (e) {}
-  }, [firestore, planejamentoData]);
+    try { await setDoc(doc(firestore, 'programacaoState', `plano_${partitionKey}`), { data: updatedPlano, updatedAt: serverTimestamp() }); } catch (e) {}
+  }, [firestore, planejamentoData, partitionKey]);
 
   const nextWorkday = (d: Date) => { let res = new Date(d); while (isDomingo(res)) res = addDays(res, 1); return res; };
 
@@ -483,15 +488,15 @@ export default function ProgrammingPage() {
     [...novaFila].filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO').sort((a, b) => (a.ordemCentro || 999) - (b.ordemCentro || 999)).forEach(j => finishTimes[j.id] = allocateTask(j, 'CENTRO', j.etapa1 === 'CENTRO' ? 0 : (finishTimes[j.id] || 0), 'centro'));
     
     try {
-        await setDoc(doc(firestore, 'programacaoState', 'fila'), { data: novaFila, updatedAt: serverTimestamp() });
-        await setDoc(doc(firestore, 'programacaoState', 'plano'), { data: novosPlanItems, updatedAt: serverTimestamp() });
+        await setDoc(doc(firestore, 'programacaoState', `fila_${partitionKey}`), { data: novaFila, updatedAt: serverTimestamp() });
+        await setDoc(doc(firestore, 'programacaoState', `plano_${partitionKey}`), { data: novosPlanItems, updatedAt: serverTimestamp() });
     } catch (e) {} finally { setIsSaving(false); }
   };
 
   const handleSetAnchorDate = async (date: Date | undefined) => {
     if (!firestore || !date) return;
     const selectedDate = nextWorkday(startOfDay(date)); setPlanStartDate(selectedDate);
-    try { await setDoc(doc(firestore, 'programacaoState', 'config'), { planStartDate: format(selectedDate, 'yyyy-MM-dd') }, { merge: true }); await recalculatePlan(fila, disabledShifts, techOverrides, selectedDate); } catch (e) {}
+    try { await setDoc(doc(firestore, 'programacaoState', `config_${partitionKey}`), { planStartDate: format(selectedDate, 'yyyy-MM-dd') }, { merge: true }); await recalculatePlan(fila, disabledShifts, techOverrides, selectedDate); } catch (e) {}
   };
 
   const updateJobField = async (id: string, field: keyof JobBase, value: any) => {
@@ -570,11 +575,19 @@ export default function ProgrammingPage() {
         <div>
           <h1 className="text-4xl font-black uppercase tracking-tighter">Planejamento CNC</h1>
           <div className="flex items-center gap-2 mt-1">
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="h-8 w-[140px] text-[11px] font-black"><SelectValue /></SelectTrigger>
+                <SelectContent>{MONTHS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="h-8 w-[90px] text-[11px] font-black"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="2024">2024</SelectItem><SelectItem value="2025">2025</SelectItem><SelectItem value="2026">2026</SelectItem></SelectContent>
+            </Select>
             {isSaving ? <Badge variant="outline" className="animate-pulse bg-amber-500/10 text-amber-500 border-amber-500/20">Salvando...</Badge> : <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">Sincronizado</Badge>}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Eraser className="h-5 w-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Limpar Tudo?</AlertDialogTitle><AlertDialogDescription>Isso apagará toda a fila e o cronograma.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => { setFila([]); setPlanejamentoData([]); setDoc(doc(firestore!, 'programacaoState', 'fila'), { data: [] }); }} className="bg-destructive">Limpar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+          <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Eraser className="h-5 w-5" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Limpar Tudo?</AlertDialogTitle><AlertDialogDescription>Isso apagará toda a fila e o cronograma.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => { setFila([]); setPlanejamentoData([]); setDoc(doc(firestore!, 'programacaoState', `fila_${partitionKey}`), { data: [] }); }} className="bg-destructive">Limpar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
           
           <TooltipProvider>
             <Tooltip>
@@ -642,14 +655,14 @@ export default function ProgrammingPage() {
                 const shiftKey = `${dStr}_${t.id}`; const isDisabled = disabledShifts[shiftKey];
                 return (
                   <div key={t.id} className={cn("grid grid-cols-[100px_1fr] border-b last:border-0", isDisabled && "bg-stripes")}>
-                    <div className="p-4 flex flex-col items-center justify-center border-r bg-muted/5"><span className={cn("text-xl font-black", isDisabled && "opacity-20")}>{t.label}</span><Button variant="ghost" size="icon" className="h-7 w-7 mt-2" onClick={() => { const nd = { ...disabledShifts, [shiftKey]: !isDisabled }; setDisabledShifts(nd); setDoc(doc(firestore!, 'programacaoState', 'config'), { disabledShifts: nd }, { merge: true }); recalculatePlan(fila, nd); }}>{isDisabled ? <PowerOff className="h-4 text-destructive" /> : <Power className="h-4 text-green-500" />}</Button></div>
+                    <div className="p-4 flex flex-col items-center justify-center border-r bg-muted/5"><span className={cn("text-xl font-black", isDisabled && "opacity-20")}>{t.label}</span><Button variant="ghost" size="icon" className="h-7 w-7 mt-2" onClick={() => { const nd = { ...disabledShifts, [shiftKey]: !isDisabled }; setDisabledShifts(nd); setDoc(doc(firestore!, 'programacaoState', `config_${partitionKey}`), { disabledShifts: nd }, { merge: true }); recalculatePlan(fila, nd); }}>{isDisabled ? <PowerOff className="h-4 text-destructive" /> : <Power className="h-4 text-green-500" />}</Button></div>
                     <div className="p-4 overflow-x-auto">{!isDisabled && (<div className="min-w-[800px]"><Ruler />{['TORNO', 'CENTRO', 'ADM'].filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat).map(cat => {
                             const tech = techOverrides[`${dStr}_${cat}_${t.id}`] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
                             if (!tech || (dStr >= '2026-08-16' && tech === 'William Martinucci')) return null;
                             const items = planIndex.get(`${dDisplay}|${t.id}|${cat}`) || []; const reals = realIndex.get(`${dDisplay}|${t.id}|${cat}`) || [];
                             return (
                               <div key={`${cat}-${t.id}`} className="grid grid-cols-[160px_1fr] gap-4 mb-6 last:mb-0">
-                                <div className="pt-2 cursor-pointer group" onClick={() => {}}>
+                                <div className="pt-2 cursor-pointer group">
                                     <div className={cn("text-[10px] font-black uppercase", cat === 'TORNO' ? "text-cyan-500" : (cat === 'CENTRO' ? "text-purple-500" : "text-slate-500"))}>{cat}</div>
                                     <div className="text-xs font-black truncate">{tech}</div>
                                 </div>
