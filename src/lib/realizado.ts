@@ -30,7 +30,6 @@ export interface ComparacaoItem {
   motivoPerda?: string;
 }
 
-// Mapeamento mestre de tecnologia por técnico
 const TECH_BY_OPERATOR: Record<string, 'TORNO' | 'CENTRO' | 'ADM'> = {
   "Alisson França": "TORNO",
   "Gustavo Gozzi": "TORNO",
@@ -42,7 +41,6 @@ const TECH_BY_OPERATOR: Record<string, 'TORNO' | 'CENTRO' | 'ADM'> = {
   "Marcos Barbosa": "TORNO"
 };
 
-// Mapeamento de turno padrão por técnico para casos de "Extra" e atribuição correta
 const OPERATOR_DEFAULT_SHIFT: Record<string, string> = {
   "gustavo gozzi": "1",
   "jair melo": "2",
@@ -89,7 +87,7 @@ export function cruzarComPlano(
     prodGroup[key].push(p);
   });
 
-  // 2. Agrupar perdas por (Data, Técnico) - SOMA TOTAL DE TEMPO IMPRODUTIVO
+  // 2. Agrupar perdas por (Data, Técnico)
   const lossSummary: Record<string, { total: number, reasons: string[] }> = {};
   perdas.forEach(l => {
     if (!l.operatorId || !l.date) return;
@@ -106,16 +104,8 @@ export function cruzarComPlano(
     if (l.lossReason) lossSummary[key].reasons.push(`${l.lossReason} (${time}m)`);
   });
 
-  // 3. Mapear Turnos Planejados por Técnico/Data para alinhar perdas e extras
-  const techShiftMap: Record<string, string> = {};
-  plano.forEach(p => {
-    const key = `${p.dataExecucao}|${normalizeName(p.tecnico)}`;
-    if (!techShiftMap[key]) techShiftMap[key] = p.turno;
-  });
-
+  // 3. Processar itens do Plano
   const matchedKeys = new Set<string>();
-
-  // 4. Processar itens do Plano (Comparação de Produção)
   plano.forEach(pItem => {
     if (pItem.jobId === 'loss') return; 
 
@@ -123,11 +113,6 @@ export function cruzarComPlano(
     const formsNorm = String(pItem.requisicao).replace('#', '').trim();
     const key = `${pItem.dataExecucao}|${techNorm}|${formsNorm}`;
 
-    try {
-        const planDate = parse(pItem.dataExecucao, 'dd/MM/yyyy', new Date());
-        if (planDate >= williamOffDate && techNorm === 'william martinucci') return;
-    } catch (e) {}
-    
     const records = prodGroup[key] || [];
     const tempoTotalPlanejado = (Number(pItem.tempoMinutos) || 0) + (Number(pItem.setupMinutos) || 0);
     
@@ -175,14 +160,12 @@ export function cruzarComPlano(
     });
   });
 
-  // 5. Adicionar Linha de Perdas (Resumo Improdutivo)
+  // 4. Adicionar Linha de Perdas
   Object.keys(lossSummary).forEach(key => {
     const [dStr, techNorm] = key.split('|');
     const data = lossSummary[key];
     const techName = plano.find(p => normalizeName(p.tecnico) === techNorm)?.tecnico || techNorm;
-    
-    // Identificar o turno correto para a perda
-    const assignedShift = techShiftMap[`${dStr}|${techNorm}`] || OPERATOR_DEFAULT_SHIFT[techNorm] || '1';
+    const assignedShift = OPERATOR_DEFAULT_SHIFT[techNorm] || '1';
     
     result.push({
       id: `loss-${key}`,
@@ -206,7 +189,7 @@ export function cruzarComPlano(
     });
   });
 
-  // 6. Identificar Apontamentos "Extras" (Sem Plano)
+  // 5. Adicionar Apontamentos Extras
   Object.keys(prodGroup).forEach(key => {
     if (matchedKeys.has(key)) return;
     const [dStr, techNorm, formsNorm] = key.split('|');
@@ -220,7 +203,7 @@ export function cruzarComPlano(
     });
 
     const techName = plano.find(p => normalizeName(p.tecnico) === techNorm)?.tecnico || techNorm;
-    const assignedShift = techShiftMap[`${dStr}|${techNorm}`] || OPERATOR_DEFAULT_SHIFT[techNorm] || '1';
+    const assignedShift = OPERATOR_DEFAULT_SHIFT[techNorm] || '1';
 
     result.push({
         id: `extra-${key}`,

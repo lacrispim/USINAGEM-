@@ -466,7 +466,6 @@ export default function ProgrammingPage() {
             const dStr = format(d, 'dd/MM/yyyy');
             const techNorm = normalizeOperatorName(l.operatorId);
             
-            // Mapear técnico para techKey e Turno (usando escala padrão se não estiver no plano)
             let techKey: 'TORNO' | 'CENTRO' | 'ADM' | null = null;
             let shiftId = '1';
             
@@ -491,20 +490,18 @@ export default function ProgrammingPage() {
             const pDate = parse(dStr, 'dd/MM/yyyy', new Date());
             const dayIdx = differenceInCalendarDays(pDate, baseDate);
             if (dayIdx < 0) return;
-            const shiftIdx = parseInt(shiftId) - 1;
-            const shiftAbs = dayIdx * 3 * SHIFT_MIN + shiftIdx * SHIFT_MIN;
+            const shiftAbs = dayIdx * 3 * SHIFT_MIN + (parseInt(shiftId) - 1) * SHIFT_MIN;
             
-            // Ocupar o tempo de perda no motor de cálculo para empurrar o planejamento
+            // Bloquear capacidade no início do turno
             occupy(`${techKey}_0`, shiftAbs, shiftAbs + totalTime);
             
-            // Adicionar barra visual de perda no lane planejado (VISUAL ALTA FIDELIDADE)
             novosPlanItems.push({ 
                 id: `loss-vis-${key}`, 
                 dataExecucao: dStr, 
-                tecnico: 'BLOQUEIO', 
-                equipamento: 'PERDA', 
+                tecnico: 'SOMA PERDAS', 
+                equipamento: 'BLOQUEIO', 
                 requisicao: 'PERDA', 
-                nomeDaPeca: 'CAPACIDADE BLOQUEADA POR PERDAS', 
+                nomeDaPeca: 'TEMPO CONSUMIDO POR PERDAS REAIS', 
                 quantidadeTotal: 0, 
                 quantidadeNoBloco: 0, 
                 tempoMinutos: totalTime, 
@@ -552,11 +549,9 @@ export default function ProgrammingPage() {
             const overrideKey = `${dateStr}_${techKey}_${shiftId}`;
             const techName = currentOverrides[overrideKey] || DEFAULT_MACHINE_LANES[techKey][shiftId]?.[0];
             const isShiftDisabled = currentDisabled[`${dateStr}_${shiftId}`];
-            const isWrongShift = job.turnoDesejado && job.turnoDesejado !== '' && shiftId !== job.turnoDesejado;
             
-            if (isShiftDisabled || !techName || (dateStr >= '2026-08-16' && techName === 'William Martinucci') || isWrongShift) { 
-                cursor = shiftAbs + SHIFT_MIN; 
-                continue; 
+            if (isShiftDisabled || !techName || (dateStr >= '2026-08-16' && techName === 'William Martinucci')) { 
+                cursor = shiftAbs + SHIFT_MIN; continue; 
             }
 
             let winStart = cursor % SHIFT_MIN;
@@ -796,7 +791,13 @@ export default function ProgrammingPage() {
         </CardHeader>
         <CardContent className="p-0">
           <Tabs defaultValue="all">
-            <div className="px-6 border-b"><TabsList className="h-10 bg-transparent gap-6"><TabsTrigger value="all" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">GERAL</TabsTrigger><TabsTrigger value="TORNO" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">TORNO CNC</TabsTrigger><TabsTrigger value="CENTRO" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">CENTRO CNC</TabsTrigger></TabsList></div>
+            <div className="px-6 border-b">
+                <TabsList className="h-10 bg-transparent gap-6">
+                    <TabsTrigger value="all" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">GERAL</TabsTrigger>
+                    <TabsTrigger value="TORNO" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">TORNO CNC</TabsTrigger>
+                    <TabsTrigger value="CENTRO" className="text-[11px] font-black border-b-2 border-transparent data-[state=active]:border-primary rounded-none">CENTRO CNC</TabsTrigger>
+                </TabsList>
+            </div>
             <TabsContent value="all">{renderFilaTable(filteredFila, 'GERAL')}</TabsContent>
             <TabsContent value="TORNO">{renderFilaTable(filteredFila.filter(j => j.etapa1 === 'TORNO' || j.etapa2 === 'TORNO'), 'TORNO')}</TabsContent>
             <TabsContent value="CENTRO">{renderFilaTable(filteredFila.filter(j => j.etapa1 === 'CENTRO' || j.etapa2 === 'CENTRO'), 'CENTRO')}</TabsContent>
