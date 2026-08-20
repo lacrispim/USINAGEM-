@@ -27,7 +27,7 @@ import {
   Loader2,
   ChevronsLeft
 } from 'lucide-react';
-import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays } from 'date-fns';
+import { format, addDays, startOfDay, parse, isValid, getDay, differenceInCalendarDays, setDate, setMonth, setYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -46,6 +46,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -357,6 +365,9 @@ export default function ProgrammingPage() {
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isAnchorModalOpen, setIsAnchorModalOpen] = useState(false);
+  const [importAnchorDate, setImportAnchorDate] = useState<Date>(new Date());
+  
   const [newItem, setNewItem] = useState<Partial<JobBase>>({ requisicao: '', nomeDaPeca: '', quantidade: 1, setup: 20, torno: 0, centro: 0, prog: 0, site: 'VALINHOS', etapa1: 'TORNO', etapa2: '' });
 
   const partitionKey = `${selectedYear}_${selectedMonth}`;
@@ -384,7 +395,6 @@ export default function ProgrammingPage() {
     }
   }, [filaDoc, planoDoc, configDoc]);
 
-  // Se estivermos em Agosto/2026 e não houver âncora, forçar 03/08/2026
   useEffect(() => {
     if (selectedYear === '2026' && selectedMonth === '7' && !planStartDate) {
        const anchor = new Date(2026, 7, 3);
@@ -650,18 +660,18 @@ export default function ProgrammingPage() {
           const pos = type === 'GERAL' ? (idx + 1) : (type === 'TORNO' ? (job.ordemTorno || idx + 1) : (job.ordemCentro || idx + 1));
           return (
             <TableRow key={job.id}>
-              <TableCell className="text-center"><Input type="number" defaultValue={pos} className="h-8 w-14 text-center font-black" onBlur={(e) => moveJob(idx, Number(e.target.value), type)}/></TableCell>
+              <TableCell className="text-center"><Input type="number" value={pos} className="h-8 w-14 text-center font-black" onChange={(e) => moveJob(idx, Number(e.target.value), type)}/></TableCell>
               <TableCell><div className="flex flex-col gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveJob(idx, pos - 1, type)} disabled={idx === 0}><ArrowUp className="h-3" /></Button><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveJob(idx, pos + 1, type)} disabled={idx === jobs.length - 1}><ArrowDown className="h-3" /></Button></div></TableCell>
               <TableCell><div className="text-muted-foreground/40 font-black text-[10px]">PENDENTE</div></TableCell>
               <TableCell><JobExecutionCell job={job} calculatedDate={null as any} onUpdate={(d) => updateJobField(job.id, 'dataDesejada', d)}/></TableCell>
               <TableCell><Select value={job.turnoDesejado || "AUTO"} onValueChange={(v) => updateJobField(job.id, 'turnoDesejado', v === "AUTO" ? "" : v)}><SelectTrigger className="h-8 text-[11px] font-black"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AUTO">AUTO</SelectItem><SelectItem value="1">1T</SelectItem><SelectItem value="2">2T</SelectItem><SelectItem value="3">3T</SelectItem></SelectContent></Select></TableCell>
               <TableCell><div className="flex items-center gap-1"><Button variant={job.etapa1 === 'TORNO' || job.etapa2 === 'TORNO' ? "default" : "outline"} size="sm" className="h-7 w-8 font-black text-[10px]" onClick={() => updateJobField(job.id, 'etapa1', job.etapa1 === 'TORNO' ? '' : 'TORNO')}>T</Button><Button variant={job.etapa1 === 'CENTRO' || job.etapa2 === 'CENTRO' ? "default" : "outline"} size="sm" className="h-7 w-8 font-black text-[10px]" onClick={() => updateJobField(job.id, 'etapa1', job.etapa1 === 'CENTRO' ? '' : 'CENTRO')}>C</Button></div></TableCell>
-              <TableCell><Input className="h-8 w-20 font-mono text-[11px]" defaultValue={job.requisicao} onBlur={(e) => updateJobField(job.id, 'requisicao', e.target.value)}/></TableCell>
-              <TableCell><Input className="h-8 w-full min-w-[150px] text-[11px] uppercase" defaultValue={job.nomeDaPeca} onBlur={(e) => updateJobField(job.id, 'nomeDaPeca', e.target.value.toUpperCase())}/></TableCell>
-              <TableCell className="text-right"><Input type="number" className="h-8 w-12 text-right" defaultValue={job.quantidade} onBlur={(e) => updateJobField(job.id, 'quantidade', Number(e.target.value))}/></TableCell>
-              <TableCell className="text-right"><Input type="number" className="h-8 w-20 text-right font-bold text-amber-500 border-amber-500/30" defaultValue={job.setup} onBlur={(e) => updateJobField(job.id, 'setup', Number(e.target.value))}/></TableCell>
-              <TableCell className="text-right"><Input type="number" className="h-8 w-20 text-right font-bold text-cyan-500 border-cyan-500/30" defaultValue={job.torno} onBlur={(e) => updateJobField(job.id, 'torno', Number(e.target.value))}/></TableCell>
-              <TableCell className="text-right"><Input type="number" className="h-8 w-20 text-right font-bold text-purple-500 border-purple-500/30" defaultValue={job.centro} onBlur={(e) => updateJobField(job.id, 'centro', Number(e.target.value))}/></TableCell>
+              <TableCell><Input className="h-8 w-20 font-mono text-[11px]" value={job.requisicao} onChange={(e) => updateJobField(job.id, 'requisicao', e.target.value)}/></TableCell>
+              <TableCell><Input className="h-8 w-full min-w-[150px] text-[11px] uppercase" value={job.nomeDaPeca} onChange={(e) => updateJobField(job.id, 'nomeDaPeca', e.target.value.toUpperCase())}/></TableCell>
+              <TableCell className="text-right"><Input type="number" className="h-8 w-12 text-right" value={job.quantidade} onChange={(e) => updateJobField(job.id, 'quantidade', Number(e.target.value))}/></TableCell>
+              <TableCell className="text-right"><Input type="number" className="h-8 w-20 text-right font-bold text-amber-500 border-amber-500/30" value={job.setup} onChange={(e) => updateJobField(job.id, 'setup', Number(e.target.value))}/></TableCell>
+              <TableCell className="text-right"><Input type="number" className="h-8 w-20 text-right font-bold text-cyan-500 border-cyan-500/30" value={job.torno} onChange={(e) => updateJobField(job.id, 'torno', Number(e.target.value))}/></TableCell>
+              <TableCell className="text-right"><Input type="number" className="h-8 w-20 text-right font-bold text-purple-500 border-purple-500/30" value={job.centro} onChange={(e) => updateJobField(job.id, 'centro', Number(e.target.value))}/></TableCell>
               <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => { const nf = fila.filter(f => f.id !== job.id); setFila(nf); recalculatePlan(nf); }}><Trash2 className="h-4" /></Button></TableCell>
             </TableRow>
           );
@@ -718,14 +728,75 @@ export default function ProgrammingPage() {
                  const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
                  const findVal = (row: any, keys: string[]) => { for (const k of keys) { const rk = Object.keys(row).find(x => x.toLowerCase().trim() === k.toLowerCase().trim()); if (rk) return row[rk]; } return undefined; };
                  const novaFila: JobBase[] = json.map((row, i) => ({ id: `job-imp-${i}-${Date.now()}`, requisicao: String(findVal(row, ['requisição', 'requisicao', 'req', 'forms']) || 'S/N'), nomeDaPeca: String(findVal(row, ['peça', 'peca', 'nome']) || 'SEM NOME').toUpperCase(), quantidade: Number(findVal(row, ['qtd', 'quantidade']) || 1), setup: Number(findVal(row, ['setup']) || 20), torno: Number(findVal(row, ['torno']) || 0), centro: Number(findVal(row, ['centro']) || 0), prog: Number(findVal(row, ['prog', 'programação']) || 0), site: String(findVal(row, ['site', 'fabrica']) || 'VALINHOS'), etapa1: String(findVal(row, ['etapa 1', 'etapa1']) || 'TORNO'), etapa2: String(findVal(row, ['etapa 2', 'etapa2']) || ''), ordemTorno: i + 1, ordemCentro: i + 1 }));
-                 setFila(novaFila); await recalculatePlan(novaFila);
+                 
+                 // Salvar a âncora antes de importar os dados
+                 const anchorStr = format(importAnchorDate, 'yyyy-MM-dd');
+                 await setDoc(doc(firestore, 'programacaoState', `config_${partitionKey}`), { planStartDate: anchorStr }, { merge: true });
+                 setPlanStartDate(importAnchorDate);
+                 setCurrentDate(importAnchorDate);
+
+                 setFila(novaFila); await recalculatePlan(novaFila, disabledShifts, techOverrides, importAnchorDate);
                } catch (err) {} finally { setIsImporting(false); e.target.value = ''; }
              };
              reader.readAsArrayBuffer(file);
           }} className="hidden" accept=".xlsx,.xls" />
-          <Button className="h-10 font-black uppercase text-[11px]" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>{isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Excel</Button>
+          
+          <Button className="h-10 font-black uppercase text-[11px]" onClick={() => {
+              setImportAnchorDate(new Date(parseInt(selectedYear), parseInt(selectedMonth), 1));
+              setIsAnchorModalOpen(true);
+          }} disabled={isImporting}>{isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />} Importar Excel</Button>
         </div>
       </div>
+
+      {/* MODAL DE ANCORAGEM ANTES DA IMPORTAÇÃO */}
+      <Dialog open={isAnchorModalOpen} onOpenChange={setIsAnchorModalOpen}>
+          <DialogContent className="sm:max-w-[420px] bg-card border-border">
+              <DialogHeader>
+                  <DialogTitle className="text-xl font-black uppercase">Ancorar Nova Programação</DialogTitle>
+                  <DialogDescription className="text-muted-foreground text-xs uppercase font-bold">Escolha a data de início para os dados que serão importados.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-6 py-6">
+                  <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase opacity-50">Dia</Label>
+                          <Select value={String(importAnchorDate.getDate())} onValueChange={(v) => setImportAnchorDate(prev => setDate(prev, parseInt(v)))}>
+                              <SelectTrigger className="font-black text-sm"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}
+                              </SelectContent>
+                          </Select>
+                      </div>
+                      <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase opacity-50">Mês</Label>
+                          <Select value={String(importAnchorDate.getMonth())} onValueChange={(v) => setImportAnchorDate(prev => setMonth(prev, parseInt(v)))}>
+                              <SelectTrigger className="font-black text-sm"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                  {MONTHS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                              </SelectContent>
+                          </Select>
+                      </div>
+                      <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase opacity-50">Ano</Label>
+                          <Select value={String(importAnchorDate.getFullYear())} onValueChange={(v) => setImportAnchorDate(prev => setYear(prev, parseInt(v)))}>
+                              <SelectTrigger className="font-black text-sm"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="2024">2024</SelectItem>
+                                  <SelectItem value="2025">2025</SelectItem>
+                                  <SelectItem value="2026">2026</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+                  </div>
+              </div>
+              <DialogFooter className="gap-2">
+                  <Button variant="ghost" className="font-black uppercase text-[11px]" onClick={() => setIsAnchorModalOpen(false)}>Cancelar</Button>
+                  <Button className="font-black uppercase text-[11px]" onClick={() => {
+                      setIsAnchorModalOpen(false);
+                      fileInputRef.current?.click();
+                  }}>Continuar</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
 
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 bg-card/50 border rounded-lg p-1.5 w-full md:w-auto">
@@ -770,7 +841,6 @@ export default function ProgrammingPage() {
                             const items = planIndex.get(`${dDisplay}|${t.id}|${cat}`) || []; 
                             const reals = realIndex.get(`${dDisplay}|${t.id}|${cat}`) || [];
                             
-                            // CALCULAR SALDO REAL (Pool de 420 min)
                             const totalConsumidoShift = items.reduce((acc, curr) => acc + (curr.tempoMinutos || 0) + (curr.setupMinutos || 0), 0);
                             const saldoShift = Math.max(0, SHIFT_MIN - totalConsumidoShift);
 
