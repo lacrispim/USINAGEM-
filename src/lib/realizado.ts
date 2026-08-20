@@ -52,8 +52,6 @@ const OPERATOR_DEFAULT_SHIFT: Record<string, string> = {
   "marcos barbosa": "1"
 };
 
-const SHIFT_LIMIT_MIN = 420; // 7 HORAS
-
 function normalizeName(name: any): string {
   if (!name) return '';
   return String(name)
@@ -186,5 +184,42 @@ export function cruzarComPlano(
     });
   });
 
+  // 5. Adicionar Registros REALIZADOS SEM PLANO (DESTAQUE LARANJA)
+  Object.keys(prodGroup).forEach(key => {
+    if (matchedKeys.has(key)) return;
+
+    const [dStr, techNorm, formsNorm] = key.split('|');
+    const records = prodGroup[key];
+    const techName = records[0].operatorId;
+    
+    let tempoTotalRealizado = 0;
+    let pecasRealizadas = 0;
+    records.forEach(r => {
+      tempoTotalRealizado += Number(r.machiningTime) || 0;
+      pecasRealizadas += Number(r.quantityProduced) || 0;
+    });
+
+    result.push({
+      id: `extra-${key}`,
+      requisicao: formsNorm,
+      tecnico: techName,
+      dataStr: dStr,
+      turno: OPERATOR_DEFAULT_SHIFT[techNorm] || '1',
+      techKey: TECH_BY_OPERATOR[techName] || 'ADM',
+      tempoPlanejado: 0,
+      pecasPlanejadas: 0,
+      tempoSetupPlanejado: 0,
+      startOffsetMin: 0,
+      tempoRealizado: tempoTotalRealizado,
+      pecasRealizadas,
+      tempoPrimeiraPeca: 0,
+      tempoUsinagem: tempoTotalRealizado,
+      tempoSetupRealizado: 0,
+      status: 'semPlano',
+      suspeitaDuplicidade: false
+    });
+  });
+
   return result;
 }
+

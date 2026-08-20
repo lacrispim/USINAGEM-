@@ -124,7 +124,7 @@ const DEFAULT_MACHINE_LANES: Record<string, Record<string, string[]>> = {
   'ADM': { '1': ['William Martinucci'] }
 };
 
-const SHIFT_MIN = 420; // 7 HORAS TOTAIS
+const SHIFT_MIN = 420; 
 const PAUSAS_FIXAS = [
   { start: 0, duration: 10, label: 'DDS' },
   { start: 180, duration: 15, label: 'CAFÉ' }
@@ -256,8 +256,34 @@ TimelineBar.displayName = 'TimelineBar';
 
 const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
   const isPerda = item.status === 'perda';
-  const colors = { dentro: 'text-emerald-500', estourou: 'text-rose-500', adiantado: 'text-sky-500', semPlano: 'text-amber-500', semApontamento: 'text-muted-foreground/30', perda: 'text-red-500' };
-  const bgColors = { dentro: 'bg-emerald-500/5', estourou: 'bg-rose-500/5', adiantado: 'bg-sky-500/5', semPlano: 'bg-amber-500/5', semApontamento: 'bg-transparent', perda: 'bg-red-500/10' };
+  const isExtra = item.status === 'semPlano';
+  
+  const colors = { 
+    dentro: 'text-emerald-500', 
+    estourou: 'text-rose-500', 
+    adiantado: 'text-sky-500', 
+    semPlano: 'text-orange-500', 
+    semApontamento: 'text-muted-foreground/30', 
+    perda: 'text-red-500' 
+  };
+  
+  const bgColors = { 
+    dentro: 'bg-emerald-500/5', 
+    estourou: 'bg-rose-500/5', 
+    adiantado: 'bg-sky-500/5', 
+    semPlano: 'bg-orange-500/10', 
+    semApontamento: 'bg-transparent', 
+    perda: 'bg-red-500/10' 
+  };
+  
+  const borderColors = {
+    dentro: 'border-emerald-500',
+    estourou: 'border-rose-500',
+    adiantado: 'border-sky-500',
+    semPlano: 'border-orange-500',
+    semApontamento: 'border-transparent',
+    perda: 'border-red-500'
+  };
   
   const hasPlan = item.tempoPlanejado > 0;
   const isPending = item.status === 'semApontamento';
@@ -265,13 +291,23 @@ const ActualRow = React.memo(({ item }: { item: ComparacaoItem }) => {
   const devText = (!hasPlan || isPending || isPerda) ? '-' : (deviation === 0 ? 'OK' : (deviation > 0 ? `+${deviation}m` : `${deviation}m`));
 
   return (
-    <div className={cn("grid grid-cols-[80px_100px_100px_100px_1fr_80px] items-center px-3 py-1.5 text-[12px] font-bold border-l-4 transition-colors", bgColors[item.status], item.status === 'dentro' ? "border-emerald-500" : item.status === 'estourou' ? "border-rose-500" : item.status === 'adiantado' ? "border-sky-500" : item.status === 'semPlano' ? "border-amber-500" : item.status === 'perda' ? "border-red-500" : "border-transparent")}>
-      <div className={cn("font-mono", isPerda ? "text-red-500" : "text-foreground")}>{isPerda ? "#PERDAS" : `#${item.requisicao}`}</div>
-      <div className="flex flex-col"><span className="text-muted-foreground/50 font-medium">{item.tempoPlanejado} min</span></div>
-      <div className="flex flex-col"><span className={cn("font-black", colors[item.status])}>{isPending ? '---' : `${item.tempoRealizado} min`}</span></div>
+    <div className={cn("grid grid-cols-[80px_100px_100px_100px_1fr_80px] items-center px-3 py-1.5 text-[12px] font-bold border-l-4 transition-colors", bgColors[item.status], borderColors[item.status])}>
+      <div className={cn("font-mono", isPerda ? "text-red-500" : (isExtra ? "text-orange-500" : "text-foreground"))}>
+        {isPerda ? "#PERDAS" : `#${item.requisicao}`}
+      </div>
+      <div className="flex flex-col">
+        <span className="text-muted-foreground/50 font-medium">
+          {item.tempoPlanejado} min
+        </span>
+      </div>
+      <div className="flex flex-col">
+        <span className={cn("font-black", colors[item.status])}>
+          {isPending ? '---' : `${item.tempoRealizado} min`}
+        </span>
+      </div>
       <div className={cn("font-black tabular-nums", colors[item.status])}>{devText}</div>
       <div className="flex items-center gap-2 overflow-hidden">
-        {item.status === 'semPlano' && <Badge variant="outline" className="h-4 text-[8px] border-amber-500/30 text-amber-500 py-0 uppercase font-black shrink-0">Extra</Badge>}
+        {isExtra && <Badge variant="outline" className="h-4 text-[8px] border-orange-500/30 text-orange-500 py-0 uppercase font-black shrink-0">Extra / Não Planejado</Badge>}
         {isPerda && <span className="text-[10px] uppercase font-black text-red-500/70 truncate">{item.motivoPerda}</span>}
       </div>
       <div className="text-right tabular-nums font-black opacity-80">{isPending ? '-' : (isPerda ? '' : `${item.pecasRealizadas} pç`)}</div>
@@ -426,7 +462,6 @@ export default function ProgrammingPage() {
       return { start: t, limit: Infinity };
     };
 
-    // 1. ALOCAR PAUSAS FIXAS (DDS e CAFÉ) - Elas "mordem" os 420 minutos obrigatoriamente
     const numDays = 60; 
     for (let dIdx = 0; dIdx < numDays; dIdx++) {
         const dayDate = addDays(baseDate, dIdx);
@@ -453,7 +488,6 @@ export default function ProgrammingPage() {
         });
     }
 
-    // 2. ALOCAR PERDAS REAIS (Consomem a jornada de 420 min logo após o DDS)
     const lossByShift: Record<string, number> = {};
     if (lossRecords) {
         lossRecords.forEach(l => {
@@ -488,7 +522,6 @@ export default function ProgrammingPage() {
             if (dayIdx < 0) return;
             const shiftAbs = dayIdx * 3 * SHIFT_MIN + (parseInt(shiftId) - 1) * SHIFT_MIN;
             
-            // Tenta alocar no início (minuto 10, após DDS)
             const freeStart = nextFree(`${techKey}_0`, shiftAbs + 10);
             occupy(`${techKey}_0`, freeStart.start, freeStart.start + totalTime);
             
