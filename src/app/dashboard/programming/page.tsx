@@ -167,10 +167,10 @@ const TimelineBar = React.memo(({ item, onToggle }: { item: PlanejamentoItem, on
   const leftPc = (item.startOffsetMin / SHIFT_MIN) * 100;
   const setupPc = totalMin > 0 ? (item.setupMinutos / totalMin) * 100 : 0;
 
-  const isTorno = item.techKey === 'TORNO';
-  const isProg = item.techKey === 'ADM';
   const isLoss = item.tipoAtividade === 'PERDA';
   const isPausa = item.tipoAtividade === 'PAUSA';
+  const isTorno = item.techKey === 'TORNO';
+  const isProg = item.techKey === 'ADM';
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -348,6 +348,15 @@ export default function ProgrammingPage() {
     }
   }, [filaDoc, planoDoc, configDoc]);
 
+  // Se estivermos em Agosto/2026 e não houver âncora, forçar 03/08/2026
+  useEffect(() => {
+    if (selectedYear === '2026' && selectedMonth === '7' && !planStartDate) {
+       const anchor = new Date(2026, 7, 3);
+       setPlanStartDate(anchor);
+       setCurrentDate(anchor);
+    }
+  }, [selectedYear, selectedMonth, planStartDate]);
+
   const filteredFila = useMemo(() => {
     let data = fila;
     if (selectedSiteFilter !== 'all') data = data.filter(item => item.site === selectedSiteFilter);
@@ -417,7 +426,34 @@ export default function ProgrammingPage() {
       return { start: t, limit: Infinity };
     };
 
-    // 1. ALOCAR PERDAS REAIS (Padrão: Início do turno, consome capacidade)
+    // 1. ALOCAR PAUSAS FIXAS (DDS e CAFÉ) - Elas "mordem" os 420 minutos obrigatoriamente
+    const numDays = 60; 
+    for (let dIdx = 0; dIdx < numDays; dIdx++) {
+        const dayDate = addDays(baseDate, dIdx);
+        if (isDomingo(dayDate)) continue;
+        const dStr = format(dayDate, 'dd/MM/yyyy');
+        
+        ['TORNO', 'CENTRO', 'ADM'].forEach(cat => {
+            for (let sIdx = 0; sIdx < 3; sIdx++) {
+                const shiftAbs = dIdx * 3 * SHIFT_MIN + sIdx * SHIFT_MIN;
+                PAUSAS_FIXAS.forEach(p => {
+                    const startAbs = shiftAbs + p.start;
+                    const endAbs = startAbs + p.duration;
+                    occupy(`${cat}_0`, startAbs, endAbs);
+                    novosPlanItems.push({
+                        id: `pausa-${dStr}-${sIdx+1}-${cat}-${p.label}`,
+                        dataExecucao: dStr, tecnico: 'PAUSA', equipamento: cat,
+                        requisicao: 'PAUSA', nomeDaPeca: p.label,
+                        quantidadeTotal: 0, quantidadeNoBloco: 0, tempoMinutos: p.duration, setupMinutos: 0,
+                        turno: String(sIdx + 1), startOffsetMin: p.start, tipoAtividade: 'PAUSA',
+                        techKey: cat as any, jobId: 'pausa', laneIndex: 0, site: 'SISTEMA'
+                    });
+                });
+            }
+        });
+    }
+
+    // 2. ALOCAR PERDAS REAIS (Consomem a jornada de 420 min logo após o DDS)
     const lossByShift: Record<string, number> = {};
     if (lossRecords) {
         lossRecords.forEach(l => {
@@ -452,46 +488,21 @@ export default function ProgrammingPage() {
             if (dayIdx < 0) return;
             const shiftAbs = dayIdx * 3 * SHIFT_MIN + (parseInt(shiftId) - 1) * SHIFT_MIN;
             
-            occupy(`${techKey}_0`, shiftAbs, shiftAbs + totalTime);
+            // Tenta alocar no início (minuto 10, após DDS)
+            const freeStart = nextFree(`${techKey}_0`, shiftAbs + 10);
+            occupy(`${techKey}_0`, freeStart.start, freeStart.start + totalTime);
             
             novosPlanItems.push({ 
                 id: `loss-vis-${key}`, 
-                dataExecucao: dStr, tecnico: 'CONSUMO PERDAS', equipamento: 'CAPACIDADE', 
-                requisicao: 'PERDA', nomeDaPeca: 'TEMPO CONSUMIDO POR PERDAS REAIS', 
+                dataExecucao: dStr, tecnico: 'PERDA REAL', equipamento: 'CAPACIDADE', 
+                requisicao: 'PERDA', nomeDaPeca: 'TEMPO CONSUMIDO POR PERDAS', 
                 quantidadeTotal: 0, quantidadeNoBloco: 0, tempoMinutos: totalTime, setupMinutos: 0, 
-                turno: shiftId, startOffsetMin: 0, tipoAtividade: 'PERDA', techKey: techKey as any, 
+                turno: shiftId, startOffsetMin: freeStart.start % SHIFT_MIN, tipoAtividade: 'PERDA', techKey: techKey as any, 
                 jobId: 'loss', laneIndex: 0, site: 'LOCAL' 
             });
         } catch (e) {}
     });
 
-    // 2. ALOCAR PAUSAS FIXAS (DDS e CAFÉ)
-    const numDays = 60; 
-    for (let dIdx = 0; dIdx < numDays; dIdx++) {
-        const dayDate = addDays(baseDate, dIdx);
-        if (isDomingo(dayDate)) continue;
-        const dStr = format(dayDate, 'dd/MM/yyyy');
-        
-        ['TORNO', 'CENTRO', 'ADM'].forEach(cat => {
-            for (let sIdx = 0; sIdx < 3; sIdx++) {
-                const shiftAbs = dIdx * 3 * SHIFT_MIN + sIdx * SHIFT_MIN;
-                PAUSAS_FIXAS.forEach(p => {
-                    const startAbs = shiftAbs + p.start;
-                    const endAbs = startAbs + p.duration;
-                    occupy(`${cat}_0`, startAbs, endAbs);
-                    novosPlanItems.push({
-                        id: `pausa-${dStr}-${sIdx+1}-${cat}-${p.label}`,
-                        dataExecucao: dStr, tecnico: 'PAUSA', equipamento: cat,
-                        requisicao: 'PAUSA', nomeDaPeca: p.label,
-                        quantidadeTotal: 0, quantidadeNoBloco: 0, tempoMinutos: p.duration, setupMinutos: 0,
-                        turno: String(sIdx + 1), startOffsetMin: p.start, tipoAtividade: 'PAUSA',
-                        techKey: cat as any, jobId: 'pausa', laneIndex: 0, site: 'SISTEMA'
-                    });
-                });
-            }
-        });
-    }
-    
     const allocateTask = (job: JobBase, techKey: 'TORNO' | 'CENTRO' | 'ADM', minStartTime: number, type: 'torno' | 'centro' | 'prog') => {
         let prodTime = Number(job[type]) || 0;
         let setupTime = (type === 'torno' || type === 'centro') ? (Number(job.setup) || 20) : 0;
@@ -503,7 +514,7 @@ export default function ProgrammingPage() {
         let cursor = minStartTime;
         if (job.dataDesejada) { 
             const forcedDate = startOfDay(parse(job.dataDesejada, 'yyyy-MM-dd', new Date())); 
-            if (isValid(forcedDate)) cursor = differenceInCalendarDays(forcedDate, baseDate) * 3 * SHIFT_MIN; 
+            if (isValid(forcedDate)) cursor = Math.max(cursor, differenceInCalendarDays(forcedDate, baseDate) * 3 * SHIFT_MIN); 
         }
 
         let iter = 0;
@@ -572,7 +583,7 @@ export default function ProgrammingPage() {
 
   const handleSetAnchorDate = async (date: Date | undefined) => {
     if (!firestore || !date) return;
-    const selectedDate = startOfDay(date); setPlanStartDate(selectedDate);
+    const selectedDate = startOfDay(date); setPlanStartDate(selectedDate); setCurrentDate(selectedDate);
     try { 
       await setDoc(doc(firestore, 'programacaoState', `config_${partitionKey}`), { planStartDate: format(selectedDate, 'yyyy-MM-dd') }, { merge: true }); 
       await recalculatePlan(fila, disabledShifts, techOverrides, selectedDate); 
@@ -652,7 +663,7 @@ export default function ProgrammingPage() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" onClick={() => handleSetAnchorDate(planStartDate || new Date())} className="h-10 font-black uppercase text-[11px]"><Anchor className="h-4 w-4 mr-2" /> {planStartDate ? `Início: ${format(planStartDate, 'dd/MM')}` : "Definir Âncora"}</Button>
+                <Button variant="outline" onClick={() => handleSetAnchorDate(planStartDate || new Date())} className="h-10 font-black uppercase text-[11px]"><Anchor className="h-4 w-4 mr-2" /> {planStartDate ? `ÂNCORA: ${format(planStartDate, 'dd/MM/yy')}` : "Definir Âncora"}</Button>
               </TooltipTrigger>
               <TooltipContent><p>Recalcular plano desde a âncora</p></TooltipContent>
             </Tooltip>
@@ -702,16 +713,29 @@ export default function ProgrammingPage() {
           const dStr = format(day, 'yyyy-MM-dd'); const dDisplay = format(day, 'dd/MM/yyyy');
           return (
             <div key={dStr} className="bg-card border rounded-lg overflow-hidden shadow-sm">
-              <div className="bg-muted/10 p-4 border-b flex items-center justify-between"><div className="flex items-center gap-4"><span className="text-2xl font-bold">{format(day, 'dd · MM/yy')}</span><span className="text-[10px] font-black uppercase opacity-40">{format(day, 'EEEE', { locale: ptBR })}</span></div></div>
+              <div className="bg-muted/10 p-4 border-b flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-2xl font-bold">{format(day, 'dd · MM/yy')}</span>
+                  <span className="text-[10px] font-black uppercase opacity-40">{format(day, 'EEEE', { locale: ptBR })}</span>
+                </div>
+              </div>
               {TURNOS.map(t => {
                 const shiftKey = `${dStr}_${t.id}`; const isDisabled = disabledShifts[shiftKey];
                 return (
                   <div key={t.id} className={cn("grid grid-cols-[100px_1fr] border-b last:border-0", isDisabled && "bg-stripes")}>
-                    <div className="p-4 flex flex-col items-center justify-center border-r bg-muted/5"><span className={cn("text-xl font-black", isDisabled && "opacity-20")}>{t.label}</span><Button variant="ghost" size="icon" className="h-7 w-7 mt-2" onClick={() => { const nd = { ...disabledShifts, [shiftKey]: !isDisabled }; setDisabledShifts(nd); setDoc(doc(firestore!, 'programacaoState', `config_${partitionKey}`), { disabledShifts: nd }, { merge: true }); recalculatePlan(fila, nd); }}>{isDisabled ? <PowerOff className="h-4 text-destructive" /> : <Power className="h-4 text-green-500" />}</Button></div>
-                    <div className="p-4 overflow-x-auto">{!isDisabled && (<div className="min-w-[800px]"><Ruler />{['TORNO', 'CENTRO', 'ADM'].filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat).map(cat => {
+                    <div className="p-4 flex flex-col items-center justify-center border-r bg-muted/5">
+                      <span className={cn("text-xl font-black", isDisabled && "opacity-20")}>{t.label}</span>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 mt-2" onClick={() => { const nd = { ...disabledShifts, [shiftKey]: !isDisabled }; setDisabledShifts(nd); setDoc(doc(firestore!, 'programacaoState', `config_${partitionKey}`), { disabledShifts: nd }, { merge: true }); recalculatePlan(fila, nd); }}>{isDisabled ? <PowerOff className="h-4 text-destructive" /> : <Power className="h-4 text-green-500" />}</Button>
+                    </div>
+                    <div className="p-4 overflow-x-auto">
+                      {!isDisabled && (
+                        <div className="min-w-[800px]">
+                          <Ruler />
+                          {['TORNO', 'CENTRO', 'ADM'].filter(cat => selectedEquipmentFilter === 'all' || selectedEquipmentFilter === cat).map(cat => {
                             const tech = techOverrides[`${dStr}_${cat}_${t.id}`] || DEFAULT_MACHINE_LANES[cat][t.id]?.[0];
                             if (!tech) return null;
-                            const items = planIndex.get(`${dDisplay}|${t.id}|${cat}`) || []; const reals = realIndex.get(`${dDisplay}|${t.id}|${cat}`) || [];
+                            const items = planIndex.get(`${dDisplay}|${t.id}|${cat}`) || []; 
+                            const reals = realIndex.get(`${dDisplay}|${t.id}|${cat}`) || [];
                             
                             // CALCULAR SALDO REAL (Pool de 420 min)
                             const totalConsumidoShift = items.reduce((acc, curr) => acc + (curr.tempoMinutos || 0) + (curr.setupMinutos || 0), 0);
@@ -736,7 +760,10 @@ export default function ProgrammingPage() {
                                 </div>
                               </div>
                             );
-                          })}</div>)}</div>
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
